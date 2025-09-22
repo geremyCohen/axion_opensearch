@@ -2,6 +2,10 @@
 
 ## URLs
 - OpenSearch: http://localhost:9200
+- OpenSearch Cluster Health: http://localhost:9200/_cluster/health?pretty
+- OpenSearch Indices: http://localhost:9200/_cat/indices?v
+- OpenSearch Nodes: http://localhost:9200/_cat/nodes?v
+- OpenSearch Stats: http://localhost:9200/_stats?pretty
 - OpenSearch Benchmark: https://github.com/opensearch-project/opensearch-benchmark
 - OpenSearch Workloads: https://github.com/opensearch-project/opensearch-benchmark-workloads
 
