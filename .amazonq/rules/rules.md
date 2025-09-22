@@ -1,3 +1,5 @@
+OpenSearch 3.1 should be installed in the /opt/opensearch folder already.
+
 For each numbered question you ask me, label each option by letter, so I can respond like 1:a, 2:c, etc.
 
 Do not provide summary responses of what you've done ever.
