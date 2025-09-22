@@ -5,7 +5,12 @@ echo "Installing OpenSearch 3.1.0 on Google Axion (Ubuntu 24)..."
 
 # Update system and install dependencies
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y openjdk-21-jdk curl wget git unzip
+sudo apt install -y default-jdk curl wget git unzip
+
+# For Debian 12, install OpenJDK 17 if 21 not available
+if ! dpkg -l | grep -q openjdk-21-jdk; then
+    sudo apt install -y openjdk-17-jdk
+fi
 
 # Download and install OpenSearch 3.1.0
 cd /opt
