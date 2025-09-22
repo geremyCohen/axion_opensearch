@@ -1,5 +1,10 @@
 # OpenSearch Benchmark Commands
 
+## URLs
+- OpenSearch: http://localhost:9200
+- OpenSearch Benchmark: https://github.com/opensearch-project/opensearch-benchmark
+- OpenSearch Workloads: https://github.com/opensearch-project/opensearch-benchmark-workloads
+
 ## Run Benchmark
 ```bash
 ~/benchmark-env/bin/opensearch-benchmark run --workload=nyc_taxis --target-hosts=localhost:9200 --client-options=use_ssl:false,verify_certs:false
