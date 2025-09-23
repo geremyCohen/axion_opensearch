@@ -5,7 +5,11 @@ echo "Installing OpenSearch 3.1.0 on Google Axion (Ubuntu 24)..."
 
 # Update system and install dependencies
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y default-jdk curl wget git unzip
+sudo apt install -y default-jdk curl wget git unzip build-essential btop
+
+# Configure git
+git config --global user.name "Geremy Cohen"
+git config --global user.email "geremy.cohen@arm.com"
 
 # For Ubuntu 24, prefer OpenJDK 21, fallback to 17
 if ! dpkg -l | grep -q openjdk-21-jdk; then
