@@ -4,8 +4,8 @@ set -e
 
 echo "Installing OpenSearch Workloads and NY Taxi benchmark..."
 
-# Install pip3 and python3-venv
-sudo apt update && sudo apt install -y python3-pip python3-venv
+# Install pip3 and python3-venv for Ubuntu 24
+sudo apt update && sudo apt install -y python3-pip python3-venv python3-full
 
 # Clean up existing directories
 sudo rm -rf /opt/opensearch-benchmark-workloads
