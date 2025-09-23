@@ -53,7 +53,7 @@ mkdir -p data logs
 echo "Installing Amazon Q CLI..."
 curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-aarch64-linux.zip" -o "q.zip"
 unzip q.zip
-./q/install.sh --noconfirm
+./q/install.sh
 rm -rf q.zip q/
 
 echo "Installation complete. To start OpenSearch:"

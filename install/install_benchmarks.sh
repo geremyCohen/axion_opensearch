@@ -20,7 +20,7 @@ if [ ! -f "README.md" ] || ! grep -q "axion_opensearch" README.md 2>/dev/null; t
 fi
 
 # Clean up existing directories
-sudo rm -rf /opt/opensearch-benchmark-workloads
+# sudo rm -rf /opt/opensearch-benchmark-workloads
 rm -rf ~/benchmark-env
 
 # Clone OpenSearch Workloads
@@ -28,10 +28,16 @@ cd /opt
 sudo git clone https://github.com/opensearch-project/opensearch-benchmark-workloads.git
 sudo chown -R $USER:$USER opensearch-benchmark-workloads
 
-# Create virtual environment and install opensearch-benchmark
-python3 -m venv ~/benchmark-env
+# Create virtual environment and install opensearch-benchmark (force Python 3.11)
+# Install Python 3.11 on Ubuntu 24.04 via Deadsnakes PPA
+sudo apt update
+sudo apt install -y software-properties-common
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt install -y python3.11 python3.11-venv python3.11-dev
+python3.11 -m venv ~/benchmark-env
 source ~/benchmark-env/bin/activate
-pip install opensearch-benchmark
+pip install -U pip setuptools wheel
+pip install "opensearch-benchmark<1.16"
 
 # Setup NY Taxi workload
 cd opensearch-benchmark-workloads
