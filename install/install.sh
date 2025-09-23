@@ -49,6 +49,13 @@ EOF
 # Create directories
 mkdir -p data logs
 
+# Install Amazon Q CLI
+echo "Installing Amazon Q CLI..."
+curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-aarch64-linux.zip" -o "q.zip"
+unzip q.zip
+./q/install.sh --noconfirm
+rm -rf q.zip q/
+
 echo "Installation complete. To start OpenSearch:"
 echo "cd /opt/opensearch && ./bin/opensearch"
 echo "Or run in background: nohup ./bin/opensearch > logs/opensearch.log 2>&1 &"
