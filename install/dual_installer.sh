@@ -1,207 +1,161 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-### --- Config (change if you want) ---
+### Config
 OS_VERSION="3.1.0"
-OS_TARBALL="opensearch-${OS_VERSION}-linux-x64.tar.gz"
-OS_URL="https://artifacts.opensearch.org/releases/bundle/opensearch/${OS_VERSION}/${OS_TARBALL}"
-OS_HOME="/opt/opensearch"                # << fixed, never changes
-NODE1_DIR="/opt/opensearch-node1"
-NODE2_DIR="/opt/opensearch-node2"
-CLUSTER_NAME="opensearch-dual"
-NODE1_HTTP_PORT=9200
-NODE1_TRANSPORT_PORT=9300
-NODE2_HTTP_PORT=9201
-NODE2_TRANSPORT_PORT=9301
-HEAP_GB="${HEAP_GB:-1}"                  # override by env if desired
-DISABLE_SECURITY="${DISABLE_SECURITY:-true}"   # set to "false" for prod & add TLS
-DISABLE_PA="${DISABLE_PA:-true}"         # Disable Performance Analyzer to reduce background CPU
-JAVA_PACKAGE="${JAVA_PACKAGE:-openjdk-21-jdk}" # OpenSearch 3.x expects Java 21
-### -----------------------------------
+OS_URL="https://artifacts.opensearch.org/releases/bundle/opensearch/${OS_VERSION}/opensearch-${OS_VERSION}-linux-x64.tar.gz"
 
-if [[ $EUID -ne 0 ]]; then
-  echo "[opensearch-dual] Please run as root (sudo)." >&2
-  exit 1
+INSTALL_ROOT="/opt"
+OS_VERSION_DIR="${INSTALL_ROOT}/opensearch-${OS_VERSION}"
+OS_HOME="${INSTALL_ROOT}/opensearch"
+NODE1_HOME="${INSTALL_ROOT}/opensearch-node1"
+NODE2_HOME="${INSTALL_ROOT}/opensearch-node2"
+
+OS_USER="opensearch"
+OS_GROUP="opensearch"
+
+NODE1_HTTP=9200
+NODE1_TRANSPORT=9300
+NODE2_HTTP=9201
+NODE2_TRANSPORT=9301
+
+# Heap (per node)
+HEAP_GB=1
+
+# Get host IP for publish
+HOST_IP=$(hostname -I | awk '{print $1}')
+
+### Ensure user/group
+if ! getent group "${OS_GROUP}" >/dev/null; then
+  groupadd --system "${OS_GROUP}"
+fi
+if ! id -u "${OS_USER}" >/dev/null 2>&1; then
+  useradd --system --home-dir "${INSTALL_ROOT}" --shell /usr/sbin/nologin -g "${OS_GROUP}" "${OS_USER}"
 fi
 
-log() { echo "[opensearch-dual] $*"; }
-
-# 1) Basics & prerequisites
-log "Installing prerequisites"
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y curl tar ${JAVA_PACKAGE}
-
-# Kernel & limits (safe on repeat)
-log "Tuning kernel limits (vm.max_map_count)"
-sysctl -w vm.max_map_count=262144 >/dev/null
-grep -q 'vm.max_map_count' /etc/sysctl.conf || echo 'vm.max_map_count=262144' >> /etc/sysctl.conf
-
-if ! id opensearch >/dev/null 2>&1; then
-  log "Creating user/group 'opensearch'"
-  groupadd --system opensearch
-  useradd --system --home-dir /nonexistent --shell /usr/sbin/nologin --gid opensearch opensearch
+### Sysctl
+if [[ "$(sysctl -n vm.max_map_count)" -lt 262144 ]]; then
+  sysctl -w vm.max_map_count=262144
+  echo "vm.max_map_count=262144" >/etc/sysctl.d/99-opensearch.conf
 fi
 
-# 2) Install OpenSearch at fixed path /opt/opensearch
-#    We download to a temp dir and extract directly into /opt/opensearch (no versioned path).
-install_opensearch() {
-  local tmp
-  tmp="$(mktemp -d)"
-  log "Downloading OpenSearch ${OS_VERSION}"
-  curl -fL "${OS_URL}" -o "${tmp}/${OS_TARBALL}"
-  rm -rf "${OS_HOME}"
-  mkdir -p "${OS_HOME}"
-  log "Extracting to ${OS_HOME}"
-  tar -xzf "${tmp}/${OS_TARBALL}" --strip-components=1 -C "${OS_HOME}"
-  rm -rf "${tmp}"
-  chmod +x "${OS_HOME}/bin/opensearch" "${OS_HOME}/bin/opensearch-plugin"
-  chown -R opensearch:opensearch "${OS_HOME}"
-}
-
-if [[ ! -x "${OS_HOME}/bin/opensearch" ]]; then
-  install_opensearch
-else
-  log "OpenSearch already present at ${OS_HOME} (skipping download)."
+### Download & extract
+if [[ ! -d "${OS_VERSION_DIR}" ]]; then
+  curl -fsSLO "${OS_URL}"
+  tar -xf "opensearch-${OS_VERSION}-linux-x64.tar.gz"
+  mv "opensearch-${OS_VERSION}" "${OS_VERSION_DIR}"
 fi
 
-# 3) Create per-node layouts
-for node in "${NODE1_DIR}" "${NODE2_DIR}"; do
-  mkdir -p "${node}/config/jvm.options.d" "${node}/data" "${node}/logs"
+ln -sfn "${OS_VERSION_DIR}" "${OS_HOME}"
+chown -R "${OS_USER}:${OS_GROUP}" "${OS_VERSION_DIR}"
+
+### Create node homes
+for NODE in "${NODE1_HOME}" "${NODE2_HOME}"; do
+  mkdir -p "${NODE}"/{config,data,logs,tmp,jvm.options.d}
+  chown -R "${OS_USER}:${OS_GROUP}" "${NODE}"
 done
-chown -R opensearch:opensearch "${NODE1_DIR}" "${NODE2_DIR}"
 
-# JVM heap (per node, read from jvm.options.d under *each* node's config)
-cat > "${NODE1_DIR}/config/jvm.options.d/heap.options" <<EOF
+### Configs
+cat >"${NODE1_HOME}/config/opensearch.yml" <<EOF
+cluster.name: dual-cluster
+node.name: node-1
+node.roles: [ cluster_manager, data, ingest ]
+
+path.data: ${NODE1_HOME}/data
+path.logs: ${NODE1_HOME}/logs
+
+http.port: ${NODE1_HTTP}
+transport.port: ${NODE1_TRANSPORT}
+
+network.host: 0.0.0.0
+network.publish_host: ${HOST_IP}
+
+discovery.seed_hosts: ["${HOST_IP}:${NODE1_TRANSPORT}","${HOST_IP}:${NODE2_TRANSPORT}"]
+cluster.initial_master_nodes: ["node-1","node-2"]
+
+plugins.security.disabled: true
+EOF
+
+cat >"${NODE2_HOME}/config/opensearch.yml" <<EOF
+cluster.name: dual-cluster
+node.name: node-2
+node.roles: [ cluster_manager, data, ingest ]
+
+path.data: ${NODE2_HOME}/data
+path.logs: ${NODE2_HOME}/logs
+
+http.port: ${NODE2_HTTP}
+transport.port: ${NODE2_TRANSPORT}
+
+network.host: 0.0.0.0
+network.publish_host: ${HOST_IP}
+
+discovery.seed_hosts: ["${HOST_IP}:${NODE1_TRANSPORT}","${HOST_IP}:${NODE2_TRANSPORT}"]
+cluster.initial_master_nodes: ["node-1","node-2"]
+
+plugins.security.disabled: true
+EOF
+
+### JVM options
+for NODE in "${NODE1_HOME}" "${NODE2_HOME}"; do
+  cat >"${NODE}/jvm.options.d/heap.options" <<EOF
 -Xms${HEAP_GB}g
 -Xmx${HEAP_GB}g
+-Djava.io.tmpdir=${NODE}/tmp
 EOF
+done
 
-cp "${NODE1_DIR}/config/jvm.options.d/heap.options" "${NODE2_DIR}/config/jvm.options.d/heap.options"
-chown -R opensearch:opensearch "${NODE1_DIR}/config" "${NODE2_DIR}/config"
-
-# 4) Minimal configs for each node
-# Shared discovery seeds (loopback)
-DISCOVERY_SEEDS="127.0.0.1:${NODE1_TRANSPORT_PORT},127.0.0.1:${NODE2_TRANSPORT_PORT}"
-
-cat > "${NODE1_DIR}/config/opensearch.yml" <<EOF
-cluster.name: ${CLUSTER_NAME}
-node.name: node-1
-path.data: ${NODE1_DIR}/data
-path.logs: ${NODE1_DIR}/logs
-network.host: 127.0.0.1
-http.port: ${NODE1_HTTP_PORT}
-transport.port: ${NODE1_TRANSPORT_PORT}
-discovery.seed_hosts: [ "127.0.0.1:${NODE1_TRANSPORT_PORT}", "127.0.0.1:${NODE2_TRANSPORT_PORT}" ]
-cluster.initial_cluster_manager_nodes: [ "node-1", "node-2" ]
-plugins.security.disabled: ${DISABLE_SECURITY}
-EOF
-
-cat > "${NODE2_DIR}/config/opensearch.yml" <<EOF
-cluster.name: ${CLUSTER_NAME}
-node.name: node-2
-path.data: ${NODE2_DIR}/data
-path.logs: ${NODE2_DIR}/logs
-network.host: 127.0.0.1
-http.port: ${NODE2_HTTP_PORT}
-transport.port: ${NODE2_TRANSPORT_PORT}
-discovery.seed_hosts: [ "127.0.0.1:${NODE1_TRANSPORT_PORT}", "127.0.0.1:${NODE2_TRANSPORT_PORT}" ]
-cluster.initial_cluster_manager_nodes: [ "node-1", "node-2" ]
-plugins.security.disabled: ${DISABLE_SECURITY}
-EOF
-
-chown -R opensearch:opensearch "${NODE1_DIR}/config" "${NODE1_DIR}/data" "${NODE1_DIR}/logs" \
-                                  "${NODE2_DIR}/config" "${NODE2_DIR}/data" "${NODE2_DIR}/logs"
-
-# 5) Systemd units with RuntimeDirectory and fixed paths
-make_unit() {
-  local svc="$1" node_dir="$2" runtime_name="$3" pa_flag="$4"
-  cat > "/etc/systemd/system/${svc}.service" <<EOF
+### systemd units
+cat >/etc/systemd/system/opensearch-node1.service <<EOF
 [Unit]
-Description=OpenSearch ${svc/-/ }
+Description=OpenSearch node-1
 After=network.target
 
 [Service]
-Type=simple
-User=opensearch
-Group=opensearch
+Type=notify
+User=${OS_USER}
+Group=${OS_GROUP}
 Environment=OPENSEARCH_HOME=${OS_HOME}
-Environment=OPENSEARCH_PATH_CONF=${node_dir}/config
-Environment=DISABLE_PERFORMANCE_ANALYZER=${pa_flag}
-# Force JVM tmp inside a safe, auto-created runtime dir
-RuntimeDirectory=${runtime_name}
-RuntimeDirectoryMode=0750
-Environment=JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/run/${runtime_name}
-# Create only persistent dirs here (tmp is handled by RuntimeDirectory)
-ExecStartPre=/bin/mkdir -p ${node_dir}/logs ${node_dir}/data
-ExecStart=/opt/opensearch/bin/opensearch
+Environment=OPENSEARCH_PATH_CONF=${NODE1_HOME}/config
+Environment=OPENSEARCH_TMPDIR=${NODE1_HOME}/tmp
+ExecStartPre=/bin/mkdir -p ${NODE1_HOME}/tmp ${NODE1_HOME}/logs ${NODE1_HOME}/data
+ExecStartPre=/bin/chown -R ${OS_USER}:${OS_GROUP} ${NODE1_HOME}
+ExecStart=${OS_HOME}/bin/opensearch
 LimitNOFILE=65535
-LimitMEMLOCK=infinity
-TimeoutStartSec=180
-Restart=always
+Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
-}
 
-log "Creating systemd units"
-make_unit "opensearch-node1" "${NODE1_DIR}" "opensearch-node1" "${DISABLE_PA}"
-make_unit "opensearch-node2" "${NODE2_DIR}" "opensearch-node2" "${DISABLE_PA}"
+cat >/etc/systemd/system/opensearch-node2.service <<EOF
+[Unit]
+Description=OpenSearch node-2
+After=network.target
 
+[Service]
+Type=notify
+User=${OS_USER}
+Group=${OS_GROUP}
+Environment=OPENSEARCH_HOME=${OS_HOME}
+Environment=OPENSEARCH_PATH_CONF=${NODE2_HOME}/config
+Environment=OPENSEARCH_TMPDIR=${NODE2_HOME}/tmp
+ExecStartPre=/bin/mkdir -p ${NODE2_HOME}/tmp ${NODE2_HOME}/logs ${NODE2_HOME}/data
+ExecStartPre=/bin/chown -R ${OS_USER}:${OS_GROUP} ${NODE2_HOME}
+ExecStart=${OS_HOME}/bin/opensearch
+LimitNOFILE=65535
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+### Reload & restart
 systemctl daemon-reload
-systemctl enable opensearch-node1 opensearch-node2
+systemctl enable opensearch-node1.service opensearch-node2.service
+systemctl restart opensearch-node1.service opensearch-node2.service
 
-# 6) Start both nodes
-log "Starting node-1"
-systemctl restart opensearch-node1 || true
-log "Starting node-2"
-systemctl restart opensearch-node2 || true
-
-# 7) Wait for HTTP (best-effort)
-wait_for() {
-  local port="$1" name="$2" secs=60
-  for i in $(seq 1 $secs); do
-    if curl -fsS "http://127.0.0.1:${port}" >/dev/null 2>&1; then
-      log "${name} is responding on :${port}"
-      return 0
-    fi
-    sleep 1
-  done
-  log "Timed out waiting for ${name} on :${port} (check systemd logs)"
-  return 1
-}
-
-wait_for "${NODE1_HTTP_PORT}" "node-1" || true
-wait_for "${NODE2_HTTP_PORT}" "node-2" || true
-
-# 8) Quick status dump
-log "Service status (first 20 lines each)"
-systemctl status opensearch-node1 --no-pager | head -n 20 || true
-echo
-systemctl status opensearch-node2 --no-pager | head -n 20 || true
-echo
-
-# 9) Hints
-cat <<'HINTS'
-
-Next steps / quick checks:
-
-  # Logs (follow)
-  sudo journalctl -fu opensearch-node1 -u opensearch-node2
-
-  # Health & nodes (security disabled by default)
-  curl -s http://127.0.0.1:9200/_cluster/health?pretty
-  curl -s http://127.0.0.1:9200/_cat/nodes?v
-
-If you see repeated "cluster-manager not discovered yet" warnings for >1–2 minutes,
-ensure both services are up and that ports 9300/9301 are free.
-
-To re-run with a different heap size:
-  HEAP_GB=2 sudo bash dual_installer.sh
-
-To enable Security (TLS and auth), set DISABLE_SECURITY=false and configure certs.
-HINTS
-
-log "Done."
+echo "Install complete. Check cluster with:"
+echo "  curl -s http://${HOST_IP}:${NODE1_HTTP}/_cat/nodes?v"
