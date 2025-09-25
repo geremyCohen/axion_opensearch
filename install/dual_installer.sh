@@ -136,17 +136,21 @@ plugins.security.disabled: true
 bootstrap.memory_lock: true
 EOF
 
-  # Heap settings
-  log "Setting heap for ${node_name}..."
-  local heap_gb
+  # Remove any existing -Xms or -Xmx lines in jvm.options to avoid conflicts
+  sed -i.bak '/^-Xms/d' "${node_home}/config/jvm.options"
+  sed -i.bak '/^-Xmx/d' "${node_home}/config/jvm.options"
+
+  # Heap settings - use HEAP_GB_NODE1 or HEAP_GB_NODE2 env var if set, else default to 8g
+  local heap_val=8
   if [[ "${node_name}" == "node-1" ]]; then
-    heap_gb="${HEAP_GB_NODE1}"
-  else
-    heap_gb="${HEAP_GB_NODE2}"
+    heap_val="${HEAP_GB_NODE1:-8}"
+  elif [[ "${node_name}" == "node-2" ]]; then
+    heap_val="${HEAP_GB_NODE2:-8}"
   fi
+  log "Setting heap for ${node_name} to ${heap_val}g..."
   cat >"${node_home}/config/jvm.options.d/heap.options" <<EOF
--Xms${heap_gb}g
--Xmx${heap_gb}g
+-Xms${heap_val}g
+-Xmx${heap_val}g
 EOF
 
   # jvm tweaks for containers/vm common cases (kept minimal)
