@@ -1,161 +1,264 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-### Config
-OS_VERSION="3.1.0"
-OS_URL="https://artifacts.opensearch.org/releases/bundle/opensearch/${OS_VERSION}/opensearch-${OS_VERSION}-linux-x64.tar.gz"
+# =========================
+# Configurable parameters
+# =========================
+OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
+HEAP_GB_NODE1="${HEAP_GB_NODE1:-2}"
+HEAP_GB_NODE2="${HEAP_GB_NODE2:-2}"
 
-INSTALL_ROOT="/opt"
-OS_VERSION_DIR="${INSTALL_ROOT}/opensearch-${OS_VERSION}"
-OS_HOME="${INSTALL_ROOT}/opensearch"
-NODE1_HOME="${INSTALL_ROOT}/opensearch-node1"
-NODE2_HOME="${INSTALL_ROOT}/opensearch-node2"
+# Fixed install locations (do not change at runtime)
+BASE_DIR="/opt"
+BASE_DIST_DIR="${BASE_DIR}/opensearch-dist-${OPENSEARCH_VERSION}"
+BASE_LINK="${BASE_DIR}/opensearch-dist"            # stable pointer to the dist
+NODE1_HOME="${BASE_DIR}/opensearch-node1"          # OPENSEARCH_HOME for node-1 (fixed)
+NODE2_HOME="${BASE_DIR}/opensearch-node2"          # OPENSEARCH_HOME for node-2 (fixed)
 
-OS_USER="opensearch"
-OS_GROUP="opensearch"
+# Ports
+N1_HTTP=9200
+N1_TRANSPORT=9300
+N2_HTTP=9201
+N2_TRANSPORT=9301
 
-NODE1_HTTP=9200
-NODE1_TRANSPORT=9300
-NODE2_HTTP=9201
-NODE2_TRANSPORT=9301
+# Service names
+SVC1="opensearch-node1"
+SVC2="opensearch-node2"
 
-# Heap (per node)
-HEAP_GB=1
+# =========================
+# Helpers
+# =========================
+log() { echo -e "\033[1;32m[install]\033[0m $*"; }
+warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
+err() { echo -e "\033[1;31m[error]\033[0m $*" >&2; }
 
-# Get host IP for publish
-HOST_IP=$(hostname -I | awk '{print $1}')
+require_root() {
+  if [[ "${EUID}" -ne 0 ]]; then
+    err "Please run as root (sudo)."
+    exit 1
+  fi
+}
 
-### Ensure user/group
-if ! getent group "${OS_GROUP}" >/dev/null; then
-  groupadd --system "${OS_GROUP}"
-fi
-if ! id -u "${OS_USER}" >/dev/null 2>&1; then
-  useradd --system --home-dir "${INSTALL_ROOT}" --shell /usr/sbin/nologin -g "${OS_GROUP}" "${OS_USER}"
-fi
+ensure_pkg() {
+  if command -v apt-get >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl jq tar coreutils gawk procps openjdk-17-jre-headless
+  else
+    warn "Non-Debian system detected. Ensure curl/jq/tar/Java 17 are installed."
+  fi
+}
 
-### Sysctl
-if [[ "$(sysctl -n vm.max_map_count)" -lt 262144 ]]; then
-  sysctl -w vm.max_map_count=262144
-  echo "vm.max_map_count=262144" >/etc/sysctl.d/99-opensearch.conf
-fi
+sysctl_limits() {
+  log "Applying kernel and ulimit settings..."
+  # vm.max_map_count
+  if [[ "$(sysctl -n vm.max_map_count)" -lt 262144 ]]; then
+    echo "vm.max_map_count=262144" >/etc/sysctl.d/99-opensearch.conf
+    sysctl --system >/dev/null
+  fi
+  # nofile/nproc
+  cat >/etc/security/limits.d/opensearch.conf <<EOF
+opensearch soft nofile 65536
+opensearch hard nofile 65536
+opensearch soft nproc  4096
+opensearch hard nproc  4096
+EOF
+}
 
-### Download & extract
-if [[ ! -d "${OS_VERSION_DIR}" ]]; then
-  curl -fsSLO "${OS_URL}"
-  tar -xf "opensearch-${OS_VERSION}-linux-x64.tar.gz"
-  mv "opensearch-${OS_VERSION}" "${OS_VERSION_DIR}"
-fi
+create_user() {
+  log "Ensuring 'opensearch' user/group exist..."
+  getent group opensearch >/dev/null 2>&1 || groupadd --system opensearch
+  id -u opensearch >/dev/null 2>&1 || useradd --system --no-create-home --gid opensearch --shell /usr/sbin/nologin opensearch
+}
 
-ln -sfn "${OS_VERSION_DIR}" "${OS_HOME}"
-chown -R "${OS_USER}:${OS_GROUP}" "${OS_VERSION_DIR}"
+download_dist() {
+  if [[ ! -d "${BASE_DIST_DIR}" ]]; then
+    log "Downloading OpenSearch ${OPENSEARCH_VERSION}..."
+    TMP_TGZ="/tmp/opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz"
+    if [[ ! -f "${TMP_TGZ}" ]]; then
+      curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz" -o "${TMP_TGZ}"
+    fi
+    log "Extracting to ${BASE_DIST_DIR}..."
+    mkdir -p "${BASE_DIST_DIR}"
+    tar -xzf "${TMP_TGZ}" -C "${BASE_DIR}"
+    mv -f "${BASE_DIR}/opensearch-${OPENSEARCH_VERSION}"/* "${BASE_DIST_DIR}/"
+    rm -rf "${BASE_DIR}/opensearch-${OPENSEARCH_VERSION}"
+  else
+    log "Base distribution already present at ${BASE_DIST_DIR}"
+  fi
+  ln -sfn "${BASE_DIST_DIR}" "${BASE_LINK}"
+}
 
-### Create node homes
-for NODE in "${NODE1_HOME}" "${NODE2_HOME}"; do
-  mkdir -p "${NODE}"/{config,data,logs,tmp,jvm.options.d}
-  chown -R "${OS_USER}:${OS_GROUP}" "${NODE}"
-done
+clone_node_home() {
+  local node_home="$1"
+  if [[ ! -d "${node_home}" ]]; then
+    log "Provisioning node home at ${node_home} (copying base dist)..."
+    # Copy the dist into the node home so OPENSEARCH_HOME is self-contained
+    rsync -a --delete "${BASE_LINK}/" "${node_home}/"
+    # Prepare per-node dirs
+    mkdir -p "${node_home}/data" "${node_home}/logs" "${node_home}/tmp" "${node_home}/config/jvm.options.d"
+  else
+    log "Node home already exists at ${node_home}"
+    # Ensure critical subdirs exist even if user pruned them
+    mkdir -p "${node_home}/data" "${node_home}/logs" "${node_home}/tmp" "${node_home}/config/jvm.options.d"
+  fi
+}
 
-### Configs
-cat >"${NODE1_HOME}/config/opensearch.yml" <<EOF
-cluster.name: dual-cluster
-node.name: node-1
-node.roles: [ cluster_manager, data, ingest ]
+write_config() {
+  local node_home="$1"
+  local node_name="$2"
+  local http_port="$3"
+  local transport_port="$4"
+  local peer1="$5"
+  local peer2="$6"
 
-path.data: ${NODE1_HOME}/data
-path.logs: ${NODE1_HOME}/logs
+  log "Writing ${node_home}/config/opensearch.yml for ${node_name}..."
+  cat >"${node_home}/config/opensearch.yml" <<EOF
+cluster.name: axion-dual
+node.name: ${node_name}
 
-http.port: ${NODE1_HTTP}
-transport.port: ${NODE1_TRANSPORT}
-
+# Bind HTTP to all interfaces so remote curl works
 network.host: 0.0.0.0
-network.publish_host: ${HOST_IP}
+http.port: ${http_port}
+transport.port: ${transport_port}
 
-discovery.seed_hosts: ["${HOST_IP}:${NODE1_TRANSPORT}","${HOST_IP}:${NODE2_TRANSPORT}"]
-cluster.initial_master_nodes: ["node-1","node-2"]
+# Two-node discovery on localhost transports
+discovery.seed_hosts: ["127.0.0.1:${N1_TRANSPORT}", "127.0.0.1:${N2_TRANSPORT}"]
+cluster.initial_cluster_manager_nodes: ["node-1","node-2"]
 
+# Paths inside the node home
+path.data: ${node_home}/data
+path.logs: ${node_home}/logs
+
+# Make bring-up easy for dev/demo (disable security plugin)
 plugins.security.disabled: true
+
+# Recommended
+bootstrap.memory_lock: true
 EOF
 
-cat >"${NODE2_HOME}/config/opensearch.yml" <<EOF
-cluster.name: dual-cluster
-node.name: node-2
-node.roles: [ cluster_manager, data, ingest ]
-
-path.data: ${NODE2_HOME}/data
-path.logs: ${NODE2_HOME}/logs
-
-http.port: ${NODE2_HTTP}
-transport.port: ${NODE2_TRANSPORT}
-
-network.host: 0.0.0.0
-network.publish_host: ${HOST_IP}
-
-discovery.seed_hosts: ["${HOST_IP}:${NODE1_TRANSPORT}","${HOST_IP}:${NODE2_TRANSPORT}"]
-cluster.initial_master_nodes: ["node-1","node-2"]
-
-plugins.security.disabled: true
+  # Heap settings
+  log "Setting heap for ${node_name}..."
+  local heap_gb
+  if [[ "${node_name}" == "node-1" ]]; then
+    heap_gb="${HEAP_GB_NODE1}"
+  else
+    heap_gb="${HEAP_GB_NODE2}"
+  fi
+  cat >"${node_home}/config/jvm.options.d/heap.options" <<EOF
+-Xms${heap_gb}g
+-Xmx${heap_gb}g
 EOF
 
-### JVM options
-for NODE in "${NODE1_HOME}" "${NODE2_HOME}"; do
-  cat >"${NODE}/jvm.options.d/heap.options" <<EOF
--Xms${HEAP_GB}g
--Xmx${HEAP_GB}g
--Djava.io.tmpdir=${NODE}/tmp
-EOF
-done
+  # jvm tweaks for containers/vm common cases (kept minimal)
+  grep -q 'ExitOnOutOfMemoryError' "${node_home}/config/jvm.options" || true
+}
 
-### systemd units
-cat >/etc/systemd/system/opensearch-node1.service <<EOF
+unit_file() {
+  local svc="$1"
+  local node_home="$2"
+  local http_port="$3"
+
+  log "Installing systemd unit ${svc}..."
+  cat >/etc/systemd/system/${svc}.service <<EOF
 [Unit]
-Description=OpenSearch node-1
-After=network.target
+Description=OpenSearch ${svc/opensearch-/}
+Wants=network-online.target
+After=network-online.target
 
 [Service]
-Type=notify
-User=${OS_USER}
-Group=${OS_GROUP}
-Environment=OPENSEARCH_HOME=${OS_HOME}
-Environment=OPENSEARCH_PATH_CONF=${NODE1_HOME}/config
-Environment=OPENSEARCH_TMPDIR=${NODE1_HOME}/tmp
-ExecStartPre=/bin/mkdir -p ${NODE1_HOME}/tmp ${NODE1_HOME}/logs ${NODE1_HOME}/data
-ExecStartPre=/bin/chown -R ${OS_USER}:${OS_GROUP} ${NODE1_HOME}
-ExecStart=${OS_HOME}/bin/opensearch
-LimitNOFILE=65535
-Restart=on-failure
-RestartSec=5
+Type=simple
+User=opensearch
+Group=opensearch
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+Environment=OPENSEARCH_HOME=${node_home}
+Environment=OPENSEARCH_PATH_CONF=${node_home}/config
+WorkingDirectory=${node_home}
+ExecStart=${node_home}/bin/opensearch
+Restart=always
+RestartSec=10
+TimeoutStartSec=180
+# IMPORTANT: do NOT chown here; ownership is handled at install time.
 
 [Install]
 WantedBy=multi-user.target
 EOF
+}
 
-cat >/etc/systemd/system/opensearch-node2.service <<EOF
-[Unit]
-Description=OpenSearch node-2
-After=network.target
+open_firewall() {
+  if command -v ufw >/dev/null 2>&1; then
+    if ufw status | grep -q "Status: active"; then
+      log "UFW is active; allowing OpenSearch ports ${N1_HTTP},${N2_HTTP},${N1_TRANSPORT},${N2_TRANSPORT}..."
+      ufw allow "${N1_HTTP}/tcp" || true
+      ufw allow "${N2_HTTP}/tcp" || true
+      ufw allow "${N1_TRANSPORT}/tcp" || true
+      ufw allow "${N2_TRANSPORT}/tcp" || true
+    else
+      warn "UFW not active; skipping firewall rules."
+    fi
+  else
+    warn "ufw not installed; skipping firewall rules."
+  fi
+}
 
-[Service]
-Type=notify
-User=${OS_USER}
-Group=${OS_GROUP}
-Environment=OPENSEARCH_HOME=${OS_HOME}
-Environment=OPENSEARCH_PATH_CONF=${NODE2_HOME}/config
-Environment=OPENSEARCH_TMPDIR=${NODE2_HOME}/tmp
-ExecStartPre=/bin/mkdir -p ${NODE2_HOME}/tmp ${NODE2_HOME}/logs ${NODE2_HOME}/data
-ExecStartPre=/bin/chown -R ${OS_USER}:${OS_GROUP} ${NODE2_HOME}
-ExecStart=${OS_HOME}/bin/opensearch
-LimitNOFILE=65535
-Restart=on-failure
-RestartSec=5
+ownership() {
+  log "Setting ownership of node homes to opensearch:opensearch (one-time)..."
+  chown -R opensearch:opensearch "${NODE1_HOME}" "${NODE2_HOME}"
+}
 
-[Install]
-WantedBy=multi-user.target
-EOF
+reload_enable_restart() {
+  log "Reloading systemd units..."
+  systemctl daemon-reload
 
-### Reload & restart
-systemctl daemon-reload
-systemctl enable opensearch-node1.service opensearch-node2.service
-systemctl restart opensearch-node1.service opensearch-node2.service
+  log "Enabling services ${SVC1} and ${SVC2}..."
+  systemctl enable "${SVC1}" "${SVC2}" >/dev/null 2>&1 || true
 
-echo "Install complete. Check cluster with:"
-echo "  curl -s http://${HOST_IP}:${NODE1_HTTP}/_cat/nodes?v"
+  log "Restarting services (idempotent on every run)..."
+  systemctl restart "${SVC1}" || true
+  systemctl restart "${SVC2}" || true
+}
+
+post_checks() {
+  log "Waiting up to 30s for HTTP endpoints..."
+  SECS=0
+  until curl -sf "http://127.0.0.1:${N1_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
+  SECS=0
+  until curl -sf "http://127.0.0.1:${N2_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
+
+  log "Local curl checks:"
+  set +e
+  curl -s "http://127.0.0.1:${N1_HTTP}/_cluster/health?pretty" | jq . || true
+  curl -s "http://127.0.0.1:${N2_HTTP}/_nodes/http?pretty" | jq '._nodes, .nodes[].http' || true
+  set -e
+
+  ss -ltnp | egrep ":${N1_HTTP}|:${N2_HTTP}|:${N1_TRANSPORT}|:${N2_TRANSPORT}" || true
+}
+
+# =========================
+# Main
+# =========================
+require_root
+ensure_pkg
+sysctl_limits
+create_user
+download_dist
+
+clone_node_home "${NODE1_HOME}"
+clone_node_home "${NODE2_HOME}"
+
+write_config "${NODE1_HOME}" "node-1" "${N1_HTTP}" "${N1_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
+write_config "${NODE2_HOME}" "node-2" "${N2_HTTP}" "${N2_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
+
+unit_file "${SVC1}" "${NODE1_HOME}" "${N1_HTTP}"
+unit_file "${SVC2}" "${NODE2_HOME}" "${N2_HTTP}"
+
+ownership
+open_firewall
+reload_enable_restart
+post_checks
+
+log "Done. OPENSEARCH_HOME locations:"
+echo "  node-1: ${NODE1_HOME}"
+echo "  node-2: ${NODE2_HOME}"
+echo
+log "If remote curls still RST, check your cloud/VPC firewall (ingress to 9200/9201)."
