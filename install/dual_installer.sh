@@ -246,6 +246,12 @@ plugins.security.disabled: true
 
 # Recommended
 bootstrap.memory_lock: true
+
+# Indexing performance optimizations
+indices.memory.index_buffer_size: 40%
+thread_pool.write.size: 16
+thread_pool.write.queue_size: 1000
+action.auto_create_index: true
 EOF
 
   # Remove any existing -Xms or -Xmx lines in jvm.options to avoid conflicts
