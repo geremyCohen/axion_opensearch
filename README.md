@@ -1,3 +1,38 @@
+# Cluster and Node Config
+
+## Default Parameters for OpenSearch Cluster
+
+### Cluster Settings
+| Setting | Value | Description |
+|---------|-------|-------------|
+| cluster.name | axion-dual | Cluster identifier |
+| discovery.seed_hosts | ["127.0.0.1:9300", "127.0.0.1:9301"] | Node discovery hosts |
+| cluster.initial_cluster_manager_nodes | ["node-1", "node-2"] | Initial cluster manager nodes |
+
+### Node Settings
+| Setting | Value | Description |
+|---------|-------|-------------|
+| network.host | 0.0.0.0 | Bind to all network interfaces |
+| http.port | 9200/9201 | HTTP API ports (node1/node2) |
+| transport.port | 9300/9301 | Transport layer ports (node1/node2) |
+| plugins.security.disabled | true | Security plugin disabled |
+| bootstrap.memory_lock | true | Lock JVM memory to prevent swapping |
+| path.data | /opt/opensearch-nodeX/data | Data directory path |
+| path.logs | /opt/opensearch-nodeX/logs | Log directory path |
+
+### JVM Settings
+| Setting | Value | Description |
+|---------|-------|-------------|
+| -Xms | 15g | Initial heap size |
+| -Xmx | 15g | Maximum heap size |
+
+### System Settings
+| Setting | Value | Description |
+|---------|-------|-------------|
+| vm.max_map_count | 262144 | Virtual memory map count limit |
+| opensearch nofile (soft/hard) | 65536 | File descriptor limits |
+| opensearch nproc (soft/hard) | 4096 | Process limits |
+
 # Install
 
 Run dual_installer.sh to install OpenSearch 
