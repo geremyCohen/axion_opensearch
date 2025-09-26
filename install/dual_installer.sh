@@ -366,7 +366,8 @@ post_checks() {
     "priority": 1,
     "template": {
       "settings": {
-        "refresh_interval": "30s"
+        "refresh_interval": "30s",
+        "number_of_replicas": 1
       }
     }
   }' >/dev/null 2>&1 || true
