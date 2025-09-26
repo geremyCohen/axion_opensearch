@@ -16,12 +16,30 @@ OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
 HEAP_GB_NODE1="${HEAP_GB_NODE1:-2}"
 HEAP_GB_NODE2="${HEAP_GB_NODE2:-2}"
 
+# Architecture detection for correct OpenSearch bundle
+UNAME_M="$(uname -m)"
+case "$UNAME_M" in
+  x86_64|amd64)
+    OS_BUNDLE_ARCH="linux-x64"
+    ;;
+  aarch64|arm64)
+    OS_BUNDLE_ARCH="linux-arm64"
+    ;;
+  *)
+    echo "[error] Unsupported architecture: $UNAME_M" >&2
+    echo "        Supported: x86_64/amd64, aarch64/arm64" >&2
+    exit 1
+    ;;
+esac
+
 # Fixed install locations (do not change at runtime)
 BASE_DIR="/opt"
 BASE_DIST_DIR="${BASE_DIR}/opensearch-dist-${OPENSEARCH_VERSION}"
 BASE_LINK="${BASE_DIR}/opensearch-dist"            # stable pointer to the dist
 NODE1_HOME="${BASE_DIR}/opensearch-node1"          # OPENSEARCH_HOME for node-1 (fixed)
 NODE2_HOME="${BASE_DIR}/opensearch-node2"          # OPENSEARCH_HOME for node-2 (fixed)
+
+TARBALL_PATH="/tmp/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz"
 
 # Ports
 N1_HTTP=9200
@@ -139,10 +157,11 @@ create_user() {
 
 download_dist() {
   if [[ ! -d "${BASE_DIST_DIR}" ]]; then
-    log "Downloading OpenSearch ${OPENSEARCH_VERSION}..."
-    TMP_TGZ="/tmp/opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz"
+    log "Downloading OpenSearch ${OPENSEARCH_VERSION} for ${OS_BUNDLE_ARCH}..."
+    local TMP_TGZ="${TARBALL_PATH}"
     if [[ ! -f "${TMP_TGZ}" ]]; then
-      curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz" -o "${TMP_TGZ}"
+      log "Fetching bundle for arch ${OS_BUNDLE_ARCH}..."
+      curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz" -o "${TMP_TGZ}"
     fi
     log "Extracting to ${BASE_DIST_DIR}..."
     mkdir -p "${BASE_DIST_DIR}"
@@ -335,6 +354,7 @@ case "$action" in
     reload_enable_restart
     post_checks
 
+    log "Detected architecture: ${UNAME_M} -> ${OS_BUNDLE_ARCH}"
     log "Done. OPENSEARCH_HOME locations:"
     echo "  node-1: ${NODE1_HOME}"
     echo "  node-2: ${NODE2_HOME}"
