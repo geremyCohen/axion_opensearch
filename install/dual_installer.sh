@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<USAGE
+Usage: $0 <install|remove>
+  install  Install or upgrade OpenSearch dual-node (default if omitted)
+  remove   Stop services and remove all non-apt artifacts created by install
+USAGE
+}
+
 # =========================
 # Configurable parameters
 # =========================
@@ -24,6 +32,65 @@ N2_TRANSPORT=9301
 # Service names
 SVC1="opensearch-node1"
 SVC2="opensearch-node2"
+
+remove_install() {
+  log "Stopping services if running..."
+  set +e
+  systemctl stop "${SVC1}" 2>/dev/null || true
+  systemctl stop "${SVC2}" 2>/dev/null || true
+  set -e
+
+  log "Disabling services..."
+  set +e
+  systemctl disable "${SVC1}" 2>/dev/null || true
+  systemctl disable "${SVC2}" 2>/dev/null || true
+  set -e
+
+  log "Removing systemd unit files..."
+  rm -f "/etc/systemd/system/${SVC1}.service" "/etc/systemd/system/${SVC2}.service"
+  systemctl daemon-reload || true
+
+  log "Removing node homes and base distribution..."
+  rm -rf "${NODE1_HOME}" "${NODE2_HOME}"
+  rm -rf "${BASE_DIST_DIR}"
+  rm -f "${BASE_LINK}"
+
+  log "Removing installer-created sysctl and limits files..."
+  rm -f /etc/sysctl.d/99-opensearch.conf
+  sysctl --system >/dev/null 2>&1 || true
+  rm -f /etc/security/limits.d/opensearch.conf
+
+  # Optional: remove opensearch user/group if unused
+  if id -u opensearch >/dev/null 2>&1; then
+    log "Removing 'opensearch' system user (if present)..."
+    set +e
+    userdel -f opensearch 2>/dev/null || true
+    set -e
+  fi
+  if getent group opensearch >/dev/null 2>&1; then
+    log "Removing 'opensearch' group (if present)..."
+    set +e
+    groupdel opensearch 2>/dev/null || true
+    set -e
+  fi
+
+  # Clean downloaded tarball if present
+  TMP_TGZ="/tmp/opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz"
+  [ -f "$TMP_TGZ" ] && rm -f "$TMP_TGZ"
+
+  # Attempt to remove UFW allowances if UFW active
+  if command -v ufw >/dev/null 2>&1; then
+    if ufw status | grep -q "Status: active"; then
+      log "Removing UFW rules for OpenSearch ports (if present)..."
+      yes | ufw delete allow "${N1_HTTP}/tcp" >/dev/null 2>&1 || true
+      yes | ufw delete allow "${N2_HTTP}/tcp" >/dev/null 2>&1 || true
+      yes | ufw delete allow "${N1_TRANSPORT}/tcp" >/dev/null 2>&1 || true
+      yes | ufw delete allow "${N2_TRANSPORT}/tcp" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  log "Removal complete."
+}
 
 # =========================
 # Helpers
@@ -241,28 +308,47 @@ post_checks() {
 # =========================
 # Main
 # =========================
-require_root
-ensure_pkg
-sysctl_limits
-create_user
-download_dist
+action="${1:-install}"
+case "$action" in
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+  install)
+    require_root
+    ensure_pkg
+    sysctl_limits
+    create_user
+    download_dist
 
-clone_node_home "${NODE1_HOME}"
-clone_node_home "${NODE2_HOME}"
+    clone_node_home "${NODE1_HOME}"
+    clone_node_home "${NODE2_HOME}"
 
-write_config "${NODE1_HOME}" "node-1" "${N1_HTTP}" "${N1_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
-write_config "${NODE2_HOME}" "node-2" "${N2_HTTP}" "${N2_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
+    write_config "${NODE1_HOME}" "node-1" "${N1_HTTP}" "${N1_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
+    write_config "${NODE2_HOME}" "node-2" "${N2_HTTP}" "${N2_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
 
-unit_file "${SVC1}" "${NODE1_HOME}" "${N1_HTTP}"
-unit_file "${SVC2}" "${NODE2_HOME}" "${N2_HTTP}"
+    unit_file "${SVC1}" "${NODE1_HOME}" "${N1_HTTP}"
+    unit_file "${SVC2}" "${NODE2_HOME}" "${N2_HTTP}"
 
-ownership
-open_firewall
-reload_enable_restart
-post_checks
+    ownership
+    open_firewall
+    reload_enable_restart
+    post_checks
 
-log "Done. OPENSEARCH_HOME locations:"
-echo "  node-1: ${NODE1_HOME}"
-echo "  node-2: ${NODE2_HOME}"
-echo
-log "If remote curls still RST, check your cloud/VPC firewall (ingress to 9200/9201)."
+    log "Done. OPENSEARCH_HOME locations:"
+    echo "  node-1: ${NODE1_HOME}"
+    echo "  node-2: ${NODE2_HOME}"
+    echo
+    log "If remote curls still RST, check your cloud/VPC firewall (ingress to 9200/9201)."
+    ;;
+  remove)
+    require_root
+    # Ports/service names and paths are already defined above.
+    remove_install
+    ;;
+  *)
+    err "Unknown action: $action"
+    usage
+    exit 2
+    ;;
+esac
