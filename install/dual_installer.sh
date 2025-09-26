@@ -13,8 +13,8 @@ USAGE
 # Configurable parameters
 # =========================
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
-HEAP_GB_NODE1="${HEAP_GB_NODE1:-2}"
-HEAP_GB_NODE2="${HEAP_GB_NODE2:-2}"
+HEAP_GB_NODE1="${HEAP_GB_NODE1:-auto}"
+HEAP_GB_NODE2="${HEAP_GB_NODE2:-auto}"
 
 # Architecture detection for correct OpenSearch bundle
 UNAME_M="$(uname -m)"
@@ -110,12 +110,38 @@ remove_install() {
   log "Removal complete."
 }
 
+
 # =========================
 # Helpers
 # =========================
 log() { echo -e "\033[1;32m[install]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
 err() { echo -e "\033[1;31m[error]\033[0m $*" >&2; }
+
+# Calculate total system memory in GB (integer, floor)
+mem_total_gb() {
+  local kb
+  kb="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  # Convert kB -> GB (floor)
+  echo $(( kb / 1024 / 1024 ))
+}
+
+# Heuristic heap size: 25% of system memory, capped at 31 GB, min 1 GB
+calc_heap_gb() {
+  local total_gb heap
+  total_gb="$(mem_total_gb)"
+  # 25% of total memory
+  heap=$(( total_gb / 4 ))
+  # Cap to 31 GB
+  if (( heap > 31 )); then
+    heap=31
+  fi
+  # Ensure at least 1 GB
+  if (( heap < 1 )); then
+    heap=1
+  fi
+  echo "${heap}"
+}
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
@@ -226,14 +252,27 @@ EOF
   sed -i.bak '/^-Xms/d' "${node_home}/config/jvm.options"
   sed -i.bak '/^-Xmx/d' "${node_home}/config/jvm.options"
 
-  # Heap settings - use HEAP_GB_NODE1 or HEAP_GB_NODE2 env var if set, else default to 8g
-  local heap_val=8
+  # Heap settings:
+  # - If HEAP_GB_NODE1/HEAP_GB_NODE2 are provided, use them.
+  # - Otherwise, set to 25% of system memory (capped at 31g).
+  local heap_val
   if [[ "${node_name}" == "node-1" ]]; then
-    heap_val="${HEAP_GB_NODE1:-8}"
+    if [[ "${HEAP_GB_NODE1}" == "auto" || -z "${HEAP_GB_NODE1}" ]]; then
+      heap_val="$(calc_heap_gb)"
+    else
+      heap_val="${HEAP_GB_NODE1}"
+    fi
   elif [[ "${node_name}" == "node-2" ]]; then
-    heap_val="${HEAP_GB_NODE2:-8}"
+    if [[ "${HEAP_GB_NODE2}" == "auto" || -z "${HEAP_GB_NODE2}" ]]; then
+      heap_val="$(calc_heap_gb)"
+    else
+      heap_val="${HEAP_GB_NODE2}"
+    fi
+  else
+    heap_val="$(calc_heap_gb)"
   fi
-  log "Setting heap for ${node_name} to ${heap_val}g..."
+
+  log "Setting heap for ${node_name} to ${heap_val}g (25% of RAM, cap 31g; override with HEAP_GB_NODEX)."
   cat >"${node_home}/config/jvm.options.d/heap.options" <<EOF
 -Xms${heap_val}g
 -Xmx${heap_val}g
@@ -354,6 +393,7 @@ case "$action" in
     reload_enable_restart
     post_checks
 
+    log "Detected total memory: $(mem_total_gb) GB; auto heap per node: $(calc_heap_gb) GB"
     log "Detected architecture: ${UNAME_M} -> ${OS_BUNDLE_ARCH}"
     log "Done. OPENSEARCH_HOME locations:"
     echo "  node-1: ${NODE1_HOME}"
