@@ -360,6 +360,17 @@ post_checks() {
   SECS=0
   until curl -sf "http://127.0.0.1:${N2_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
 
+  log "Creating performance-optimized index template..."
+  curl -X PUT "http://127.0.0.1:${N1_HTTP}/_index_template/performance_template" -H 'Content-Type: application/json' -d '{
+    "index_patterns": ["*"],
+    "priority": 1,
+    "template": {
+      "settings": {
+        "refresh_interval": "30s"
+      }
+    }
+  }' >/dev/null 2>&1 || true
+
   log "Local curl checks:"
   set +e
   curl -s "http://127.0.0.1:${N1_HTTP}/_cluster/health?pretty" | jq . || true
