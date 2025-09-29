@@ -51,10 +51,10 @@ show_cluster() {
   echo "Circuit Breaker Configuration:"
   local settings=$(curl -s "http://$HOST/_cluster/settings?include_defaults=true&pretty" 2>/dev/null)
   
-  # Extract breaker settings with fallbacks to defaults
-  local total_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.total.limit" // "70%"' 2>/dev/null || echo "70%")
-  local request_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.request.limit" // "60%"' 2>/dev/null || echo "60%")
-  local fielddata_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.fielddata.limit" // "40%"' 2>/dev/null || echo "40%")
+  # Extract breaker settings from persistent settings first, then defaults
+  local total_limit=$(echo "$settings" | jq -r '.persistent.indices.breaker.total.limit // .defaults."indices.breaker.total.limit" // "70%"' 2>/dev/null || echo "70%")
+  local request_limit=$(echo "$settings" | jq -r '.persistent.indices.breaker.request.limit // .defaults."indices.breaker.request.limit" // "60%"' 2>/dev/null || echo "60%")
+  local fielddata_limit=$(echo "$settings" | jq -r '.persistent.indices.breaker.fielddata.limit // .defaults."indices.breaker.fielddata.limit" // "40%"' 2>/dev/null || echo "40%")
   
   printf "%-25s %s\n" "Setting" "Limit"
   printf "%-25s %s\n" "-------" "-----"
