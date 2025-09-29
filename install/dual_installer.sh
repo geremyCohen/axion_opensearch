@@ -169,12 +169,12 @@ mem_total_gb() {
   echo $(( kb / 1024 / 1024 ))
 }
 
-# Heuristic heap size: 25% of system memory, capped at 31 GB, min 1 GB
+# Heuristic heap size: 50% of system memory divided by node count, capped at 31 GB, min 1 GB
 calc_heap_gb() {
   local total_gb heap
   total_gb="$(mem_total_gb)"
-  # 25% of total memory
-  heap=$(( total_gb / 4 ))
+  # 50% of total memory divided by node count
+  heap=$(( (total_gb / 2) / NODE_COUNT ))
   # Cap to 31 GB
   if (( heap > 31 )); then
     heap=31
@@ -295,9 +295,13 @@ write_config() {
     fi
   done
   
-  # Build initial cluster manager nodes list
+  # Build initial cluster manager nodes list (limit to first 3 nodes for large clusters)
   local manager_nodes=""
-  for i in $(seq 1 $NODE_COUNT); do
+  local manager_count=$NODE_COUNT
+  if (( manager_count > 3 )); then
+    manager_count=3
+  fi
+  for i in $(seq 1 $manager_count); do
     if [ $i -eq 1 ]; then
       manager_nodes="\"node-${i}\""
     else
