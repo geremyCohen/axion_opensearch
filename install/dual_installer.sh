@@ -3,10 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 [install|remove] [node_count] [remote_ip]
+Usage: $0 [install|remove|update] [node_count] [remote_ip]
   install     Install or upgrade OpenSearch cluster (default if omitted)
   remove      Stop services and remove all OpenSearch installations (auto-detects node count)
-  node_count  Number of nodes to install (default: 2, ignored for remove)
+  update      Update existing cluster configuration (requires system_memory_percent=X)
+  node_count  Number of nodes to install (default: 2, ignored for remove/update)
   remote_ip   Remote host IP for SSH installation (optional, installs locally if omitted)
 
 Examples:
@@ -15,6 +16,7 @@ Examples:
   $0 install 4 10.0.0.205       # Install 4-node cluster on remote host
   $0 remove                     # Remove all nodes locally (auto-detect)
   $0 remove 10.0.0.205          # Remove all nodes from remote host (auto-detect)
+  system_memory_percent=80 $0 update 10.0.0.205  # Update heap to 80% memory split
 USAGE
 }
 
@@ -24,11 +26,11 @@ USAGE
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
 ACTION="${1:-install}"
 
-# For remove, node_count is ignored (auto-detected)
+# For remove/update, node_count is ignored (auto-detected)
 # For install, parse node_count and remote_ip normally
-if [[ "$ACTION" == "remove" ]]; then
+if [[ "$ACTION" == "remove" || "$ACTION" == "update" ]]; then
   NODE_COUNT=0  # Will be auto-detected
-  REMOTE_IP="${2:-}"  # Second parameter is remote_ip for remove
+  REMOTE_IP="${2:-}"  # Second parameter is remote_ip for remove/update
 else
   NODE_COUNT="${2:-2}"
   REMOTE_IP="${3:-}"
@@ -101,6 +103,61 @@ for i in $(seq 1 $NODE_COUNT); do
 done
 SVC1="opensearch-node1"
 SVC2="opensearch-node2"
+
+update_heap_config() {
+  local memory_percent="${system_memory_percent:-50}"
+  
+  # Validate memory percentage
+  if ! [[ "$memory_percent" =~ ^[1-9][0-9]*$ ]] || [ "$memory_percent" -gt 100 ]; then
+    echo "[error] Invalid system_memory_percent: $memory_percent. Must be 1-100" >&2
+    exit 1
+  fi
+  
+  # Auto-detect existing nodes
+  local detected_nodes=()
+  for i in {1..50}; do
+    if remote_exec "[ -d \"/opt/opensearch-node${i}\" ]"; then
+      detected_nodes+=($i)
+    fi
+  done
+  
+  if [ ${#detected_nodes[@]} -eq 0 ]; then
+    log "No OpenSearch nodes found to update."
+    return 0
+  fi
+  
+  local node_count=${#detected_nodes[@]}
+  local new_heap=$(calc_heap_gb_with_percent "$memory_percent" "$node_count")
+  
+  log "Updating ${node_count} nodes to use ${memory_percent}% system memory (${new_heap}g per node)"
+  
+  # Stop services
+  log "Stopping OpenSearch services..."
+  for node in "${detected_nodes[@]}"; do
+    remote_exec "systemctl stop opensearch-node${node} 2>/dev/null || true"
+  done
+  
+  # Update heap configuration for each node
+  for node in "${detected_nodes[@]}"; do
+    log "Updating heap for node-${node} to ${new_heap}g"
+    local heap_content="-Xms${new_heap}g
+-Xmx${new_heap}g"
+    
+    if [[ -n "$REMOTE_HOST_IP" ]]; then
+      echo "$heap_content" | ssh "${SUDO_USER:-$USER}@${REMOTE_HOST_IP}" "sudo tee \"/opt/opensearch-node${node}/config/jvm.options.d/heap.options\" >/dev/null"
+    else
+      echo "$heap_content" > "/opt/opensearch-node${node}/config/jvm.options.d/heap.options"
+    fi
+  done
+  
+  # Restart services
+  log "Restarting OpenSearch services..."
+  for node in "${detected_nodes[@]}"; do
+    remote_exec "systemctl start opensearch-node${node}"
+  done
+  
+  log "Heap update complete. Updated ${node_count} nodes to ${new_heap}g each (${memory_percent}% system memory)"
+}
 
 remove_install() {
   # Auto-detect existing nodes
@@ -209,6 +266,25 @@ calc_heap_gb() {
   total_gb="$(mem_total_gb)"
   # 50% of total memory divided by node count
   heap=$(( (total_gb / 2) / NODE_COUNT ))
+  # Cap to 31 GB
+  if (( heap > 31 )); then
+    heap=31
+  fi
+  # Ensure at least 1 GB
+  if (( heap < 1 )); then
+    heap=1
+  fi
+  echo "${heap}"
+}
+
+# Custom heap size with specified memory percentage
+calc_heap_gb_with_percent() {
+  local memory_percent="$1"
+  local node_count="$2"
+  local total_gb heap
+  total_gb="$(mem_total_gb)"
+  # Custom percentage of total memory divided by node count
+  heap=$(( (total_gb * memory_percent / 100) / node_count ))
   # Cap to 31 GB
   if (( heap > 31 )); then
     heap=31
@@ -394,6 +470,61 @@ bootstrap.memory_lock: true"
   remote_exec "grep -q 'ExitOnOutOfMemoryError' \"${node_home}/config/jvm.options\" || true"
 }
 
+update_heap_config() {
+  local memory_percent="${system_memory_percent:-50}"
+  
+  # Validate memory percentage
+  if ! [[ "$memory_percent" =~ ^[1-9][0-9]*$ ]] || [ "$memory_percent" -gt 100 ]; then
+    echo "[error] Invalid system_memory_percent: $memory_percent. Must be 1-100" >&2
+    exit 1
+  fi
+  
+  # Auto-detect existing nodes
+  local detected_nodes=()
+  for i in {1..50}; do
+    if remote_exec "[ -d \"/opt/opensearch-node${i}\" ]"; then
+      detected_nodes+=($i)
+    fi
+  done
+  
+  if [ ${#detected_nodes[@]} -eq 0 ]; then
+    log "No OpenSearch nodes found to update."
+    return 0
+  fi
+  
+  local node_count=${#detected_nodes[@]}
+  local new_heap=$(calc_heap_gb_with_percent "$memory_percent" "$node_count")
+  
+  log "Updating ${node_count} nodes to use ${memory_percent}% system memory (${new_heap}g per node)"
+  
+  # Stop services
+  log "Stopping OpenSearch services..."
+  for node in "${detected_nodes[@]}"; do
+    remote_exec "systemctl stop opensearch-node${node} 2>/dev/null || true"
+  done
+  
+  # Update heap configuration for each node
+  for node in "${detected_nodes[@]}"; do
+    log "Updating heap for node-${node} to ${new_heap}g"
+    local heap_content="-Xms${new_heap}g
+-Xmx${new_heap}g"
+    
+    if [[ -n "$REMOTE_HOST_IP" ]]; then
+      echo "$heap_content" | ssh "${SUDO_USER:-$USER}@${REMOTE_HOST_IP}" "sudo tee \"/opt/opensearch-node${node}/config/jvm.options.d/heap.options\" >/dev/null"
+    else
+      echo "$heap_content" > "/opt/opensearch-node${node}/config/jvm.options.d/heap.options"
+    fi
+  done
+  
+  # Restart services
+  log "Restarting OpenSearch services..."
+  for node in "${detected_nodes[@]}"; do
+    remote_exec "systemctl start opensearch-node${node}"
+  done
+  
+  log "Heap update complete. Updated ${node_count} nodes to ${new_heap}g each (${memory_percent}% system memory)"
+}
+
 unit_file() {
   local svc="$1"
   local node_home="$2"
@@ -506,6 +637,8 @@ if [[ -n "$REMOTE_IP" ]]; then
   log "Executing remotely: sudo /tmp/dual_installer.sh $action${NODE_COUNT:+ $NODE_COUNT}"
   if [[ "$action" == "remove" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
+  elif [[ "$action" == "update" ]]; then
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent=${system_memory_percent:-50} REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh update"
   else
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh $action $NODE_COUNT"
   fi
@@ -574,6 +707,10 @@ case "$action" in
   remove)
     require_root
     remove_install
+    ;;
+  update)
+    require_root
+    update_heap_config
     ;;
   *)
     err "Unknown action: $action"
