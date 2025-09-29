@@ -29,7 +29,41 @@ show_detailed() {
 }
 
 show_cluster() {
+  echo "Cluster-Wide Memory Summary:"
   curl -s "http://$HOST/_cluster/stats?pretty" | jq '.nodes.jvm.mem'
+  echo
+  
+  echo "Cluster-Wide Max Values & Usage:"
+  # Get heap stats
+  local heap_data=$(curl -s "http://$HOST/_nodes/stats/jvm?pretty" | jq -r '.nodes | to_entries[] | "\(.value.jvm.mem.heap_used_percent) \(.value.jvm.mem.heap_used_in_bytes) \(.value.jvm.mem.heap_max_in_bytes)"')
+  
+  # Calculate heap maximums
+  local max_heap_percent=$(echo "$heap_data" | awk '{if($1>max) max=$1} END {print max}')
+  local total_heap_used=$(echo "$heap_data" | awk '{sum+=$2} END {print sum}')
+  local total_heap_max=$(echo "$heap_data" | awk '{sum+=$3} END {print sum}')
+  local cluster_heap_percent=$(echo "$total_heap_used $total_heap_max" | awk '{printf "%.1f", ($1/$2)*100}')
+  
+  echo "  Max Heap Usage: ${max_heap_percent}% (highest node)"
+  echo "  Cluster Heap Usage: ${cluster_heap_percent}% ($(echo "$total_heap_used" | awk '{printf "%.1fGB", $1/1073741824}') / $(echo "$total_heap_max" | awk '{printf "%.1fGB", $1/1073741824}'))"
+  
+  # Get circuit breaker settings from cluster settings
+  echo
+  echo "Circuit Breaker Limits (update-configurable):"
+  local settings=$(curl -s "http://$HOST/_cluster/settings?include_defaults=true&pretty" 2>/dev/null)
+  
+  # Extract breaker settings with fallbacks to defaults
+  local total_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.total.limit" // "70%"' 2>/dev/null || echo "70%")
+  local request_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.request.limit" // "60%"' 2>/dev/null || echo "60%")
+  local fielddata_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.fielddata.limit" // "40%"' 2>/dev/null || echo "40%")
+  
+  echo "  indices.breaker.total.limit: ${total_limit}"
+  echo "  indices.breaker.request.limit: ${request_limit}"
+  echo "  indices.breaker.fielddata.limit: ${fielddata_limit}"
+  
+  # Get current breaker usage
+  echo
+  echo "Current Breaker Usage:"
+  curl -s "http://$HOST/_nodes/stats/breaker?pretty" | jq -r '.nodes | to_entries[] | .value.breakers | to_entries[] | select(.key | test("request|fielddata|total")) | "  \(.key): \(.value.estimated_size) / \(.value.limit_size) (\(.value.estimated_size_in_bytes / .value.limit_size_in_bytes * 100 | floor)%)"' 2>/dev/null | head -6
 }
 
 show_all() {
