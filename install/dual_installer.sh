@@ -343,8 +343,8 @@ write_config() {
     fi
   done
 
-  cat >"${node_home}/config/opensearch.yml" <<EOF
-cluster.name: axion-cluster
+  # Create config file content
+  local config_content="cluster.name: axion-cluster
 node.name: ${node_name}
 
 # Bind HTTP to all interfaces so remote curl works
@@ -364,29 +364,34 @@ path.logs: ${node_home}/logs
 plugins.security.disabled: true
 
 # Recommended
-bootstrap.memory_lock: true
+bootstrap.memory_lock: true"
 
-# Indexing performance optimizations
-indices.memory.index_buffer_size: 40%
-thread_pool.write.size: 16
-thread_pool.write.queue_size: 1000
-action.auto_create_index: true
-EOF
+  # Write config file using remote_exec
+  if [[ -n "$REMOTE_IP" ]]; then
+    echo "$config_content" | ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo tee \"${node_home}/config/opensearch.yml\" >/dev/null"
+  else
+    echo "$config_content" > "${node_home}/config/opensearch.yml"
+  fi
 
   # Remove any existing -Xms or -Xmx lines in jvm.options to avoid conflicts
-  sed -i.bak '/^-Xms/d' "${node_home}/config/jvm.options"
-  sed -i.bak '/^-Xmx/d' "${node_home}/config/jvm.options"
+  remote_exec "sed -i.bak '/^-Xms/d' \"${node_home}/config/jvm.options\""
+  remote_exec "sed -i.bak '/^-Xmx/d' \"${node_home}/config/jvm.options\""
 
-  # Heap settings: 25% of system memory (capped at 31g), min 1g
+  # Heap settings: 50% of system memory divided by node count, capped at 31g, min 1g
   local heap_val="$(calc_heap_gb)"
-  log "Setting heap for ${node_name} to ${heap_val}g (25% of RAM, cap 31g)."
-  cat >"${node_home}/config/jvm.options.d/heap.options" <<EOF
--Xms${heap_val}g
--Xmx${heap_val}g
-EOF
+  log "Setting heap for ${node_name} to ${heap_val}g (50% of RAM / ${NODE_COUNT} nodes, cap 31g)."
+  
+  local heap_content="-Xms${heap_val}g
+-Xmx${heap_val}g"
+
+  if [[ -n "$REMOTE_IP" ]]; then
+    echo "$heap_content" | ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo tee \"${node_home}/config/jvm.options.d/heap.options\" >/dev/null"
+  else
+    echo "$heap_content" > "${node_home}/config/jvm.options.d/heap.options"
+  fi
 
   # jvm tweaks for containers/vm common cases (kept minimal)
-  grep -q 'ExitOnOutOfMemoryError' "${node_home}/config/jvm.options" || true
+  remote_exec "grep -q 'ExitOnOutOfMemoryError' \"${node_home}/config/jvm.options\" || true"
 }
 
 unit_file() {
