@@ -6,7 +6,7 @@ usage() {
 Usage: $0 [install|remove|update] [node_count] [remote_ip]
   install     Install or upgrade OpenSearch cluster (default if omitted)
   remove      Stop services and remove all OpenSearch installations (auto-detects node count)
-  update      Update existing cluster configuration (requires system_memory_percent=X)
+  update      Update existing cluster configuration (requires environment variables)
   node_count  Number of nodes to install (default: 2, ignored for remove/update)
   remote_ip   Remote host IP for SSH installation (optional, installs locally if omitted)
 
@@ -16,7 +16,17 @@ Examples:
   $0 install 4 10.0.0.205       # Install 4-node cluster on remote host
   $0 remove                     # Remove all nodes locally (auto-detect)
   $0 remove 10.0.0.205          # Remove all nodes from remote host (auto-detect)
-  system_memory_percent=80 $0 update 10.0.0.205  # Update heap to 80% memory split
+  
+Update examples:
+  system_memory_percent=80 $0 update 10.0.0.205                    # Update heap to 80% memory split
+  indices_breaker_total_limit=85% $0 update 10.0.0.205            # Update total breaker limit
+  system_memory_percent=70 indices_breaker_request_limit=60% $0 update 10.0.0.205  # Multiple settings
+
+Update environment variables:
+  system_memory_percent         # Heap memory percentage (1-100)
+  indices_breaker_total_limit   # Total circuit breaker limit (e.g., 85%)
+  indices_breaker_request_limit # Request circuit breaker limit (e.g., 70%)
+  indices_breaker_fielddata_limit # Fielddata circuit breaker limit (e.g., 50%)
 USAGE
 }
 
@@ -106,6 +116,9 @@ SVC2="opensearch-node2"
 
 update_heap_config() {
   local memory_percent="${system_memory_percent:-50}"
+  local total_limit="${indices_breaker_total_limit:-}"
+  local request_limit="${indices_breaker_request_limit:-}"
+  local fielddata_limit="${indices_breaker_fielddata_limit:-}"
   
   # Validate memory percentage
   if ! [[ "$memory_percent" =~ ^[1-9][0-9]*$ ]] || [ "$memory_percent" -gt 100 ]; then
@@ -129,7 +142,11 @@ update_heap_config() {
   local node_count=${#detected_nodes[@]}
   local new_heap=$(calc_heap_gb_with_percent "$memory_percent" "$node_count")
   
-  log "Updating ${node_count} nodes to use ${memory_percent}% system memory (${new_heap}g per node)"
+  log "Updating ${node_count} nodes:"
+  log "  - Heap: ${new_heap}g per node (${memory_percent}% system memory)"
+  [[ -n "$total_limit" ]] && log "  - indices.breaker.total.limit: ${total_limit}"
+  [[ -n "$request_limit" ]] && log "  - indices.breaker.request.limit: ${request_limit}"
+  [[ -n "$fielddata_limit" ]] && log "  - indices.breaker.fielddata.limit: ${fielddata_limit}"
   
   # Stop services
   log "Stopping OpenSearch services..."
@@ -137,14 +154,25 @@ update_heap_config() {
     remote_exec "systemctl stop opensearch-node${node} 2>/dev/null || true"
   done
   
-  # Update heap configuration for each node
+  # Update configurations for each node
   for node in "${detected_nodes[@]}"; do
-    log "Updating heap for node-${node} to ${new_heap}g"
+    log "Updating configuration for node-${node}"
+    
+    # Update heap configuration
     local heap_content="-Xms${new_heap}g
 -Xmx${new_heap}g"
-    
-    # Write locally since update command runs on the target host
     echo "$heap_content" > "/opt/opensearch-node${node}/config/jvm.options.d/heap.options"
+    
+    # Update circuit breaker settings if provided
+    if [[ -n "$total_limit" || -n "$request_limit" || -n "$fielddata_limit" ]]; then
+      # Remove existing breaker settings first
+      remote_exec "sed -i '/^indices\.breaker\./d' \"/opt/opensearch-node${node}/config/opensearch.yml\""
+      
+      # Append new breaker settings
+      [[ -n "$total_limit" ]] && echo "indices.breaker.total.limit: ${total_limit}" >> "/opt/opensearch-node${node}/config/opensearch.yml"
+      [[ -n "$request_limit" ]] && echo "indices.breaker.request.limit: ${request_limit}" >> "/opt/opensearch-node${node}/config/opensearch.yml"
+      [[ -n "$fielddata_limit" ]] && echo "indices.breaker.fielddata.limit: ${fielddata_limit}" >> "/opt/opensearch-node${node}/config/opensearch.yml"
+    fi
   done
   
   # Restart services
@@ -153,7 +181,7 @@ update_heap_config() {
     remote_exec "systemctl start opensearch-node${node}"
   done
   
-  log "Heap update complete. Updated ${node_count} nodes to ${new_heap}g each (${memory_percent}% system memory)"
+  log "Configuration update complete. Updated ${node_count} nodes."
 }
 
 remove_install() {
@@ -580,7 +608,7 @@ if [[ -n "$REMOTE_IP" ]]; then
   if [[ "$action" == "remove" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
   elif [[ "$action" == "update" ]]; then
-    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent=${system_memory_percent:-50} REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh update"
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent=${system_memory_percent:-50} indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh update"
   else
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh $action $NODE_COUNT"
   fi
