@@ -143,11 +143,8 @@ update_heap_config() {
     local heap_content="-Xms${new_heap}g
 -Xmx${new_heap}g"
     
-    if [[ -n "$REMOTE_HOST_IP" ]]; then
-      echo "$heap_content" | ssh "${SUDO_USER:-$USER}@${REMOTE_HOST_IP}" "sudo tee \"/opt/opensearch-node${node}/config/jvm.options.d/heap.options\" >/dev/null"
-    else
-      echo "$heap_content" > "/opt/opensearch-node${node}/config/jvm.options.d/heap.options"
-    fi
+    # Write locally since update command runs on the target host
+    echo "$heap_content" > "/opt/opensearch-node${node}/config/jvm.options.d/heap.options"
   done
   
   # Restart services
@@ -479,52 +476,6 @@ update_heap_config() {
     exit 1
   fi
   
-  # Auto-detect existing nodes
-  local detected_nodes=()
-  for i in {1..50}; do
-    if remote_exec "[ -d \"/opt/opensearch-node${i}\" ]"; then
-      detected_nodes+=($i)
-    fi
-  done
-  
-  if [ ${#detected_nodes[@]} -eq 0 ]; then
-    log "No OpenSearch nodes found to update."
-    return 0
-  fi
-  
-  local node_count=${#detected_nodes[@]}
-  local new_heap=$(calc_heap_gb_with_percent "$memory_percent" "$node_count")
-  
-  log "Updating ${node_count} nodes to use ${memory_percent}% system memory (${new_heap}g per node)"
-  
-  # Stop services
-  log "Stopping OpenSearch services..."
-  for node in "${detected_nodes[@]}"; do
-    remote_exec "systemctl stop opensearch-node${node} 2>/dev/null || true"
-  done
-  
-  # Update heap configuration for each node
-  for node in "${detected_nodes[@]}"; do
-    log "Updating heap for node-${node} to ${new_heap}g"
-    local heap_content="-Xms${new_heap}g
--Xmx${new_heap}g"
-    
-    if [[ -n "$REMOTE_HOST_IP" ]]; then
-      echo "$heap_content" | ssh "${SUDO_USER:-$USER}@${REMOTE_HOST_IP}" "sudo tee \"/opt/opensearch-node${node}/config/jvm.options.d/heap.options\" >/dev/null"
-    else
-      echo "$heap_content" > "/opt/opensearch-node${node}/config/jvm.options.d/heap.options"
-    fi
-  done
-  
-  # Restart services
-  log "Restarting OpenSearch services..."
-  for node in "${detected_nodes[@]}"; do
-    remote_exec "systemctl start opensearch-node${node}"
-  done
-  
-  log "Heap update complete. Updated ${node_count} nodes to ${new_heap}g each (${memory_percent}% system memory)"
-}
-
 unit_file() {
   local svc="$1"
   local node_home="$2"
