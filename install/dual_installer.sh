@@ -33,7 +33,7 @@ fi
 # Remote execution wrapper
 remote_exec() {
   if [[ -n "$REMOTE_IP" ]]; then
-    ssh "$REMOTE_IP" "$@"
+    ssh "$REMOTE_IP" "sudo $*"
   else
     eval "$@"
   fi
@@ -213,12 +213,21 @@ sysctl_limits() {
     remote_exec "sysctl --system >/dev/null"
   fi
   # nofile/nproc
-  remote_exec "cat >/etc/security/limits.d/opensearch.conf <<EOF
+  if [[ -n "$REMOTE_IP" ]]; then
+    ssh "$REMOTE_IP" "sudo tee /etc/security/limits.d/opensearch.conf >/dev/null" <<EOF
 opensearch soft nofile 65536
 opensearch hard nofile 65536
 opensearch soft nproc  4096
 opensearch hard nproc  4096
-EOF"
+EOF
+  else
+    cat >/etc/security/limits.d/opensearch.conf <<EOF
+opensearch soft nofile 65536
+opensearch hard nofile 65536
+opensearch soft nproc  4096
+opensearch hard nproc  4096
+EOF
+  fi
 }
 
 create_user() {
