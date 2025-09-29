@@ -35,17 +35,41 @@
 
 # Install
 
-Run dual_installer.sh to install OpenSearch 
+## Local Installation
+
+Run dual_installer.sh to install OpenSearch locally:
 
 ```bash
+# Install 2-node cluster (default)
 ./install/dual_installer.sh install
+
+# Install specific number of nodes (1-10)
+./install/dual_installer.sh install 4
+
+# Remove installation
+./install/dual_installer.sh remove 4
 ```
 
-to remove, same command, but with remove
+## Remote Installation
+
+Use remote_installer.sh for SSH-based installations on remote hosts:
 
 ```bash
-./install/dual_installer.sh remove
+# Install 4-node cluster on remote host
+./install/remote_installer.sh install 4 10.0.0.205
+
+# Install 2-node cluster on remote host (default)
+./install/remote_installer.sh install 2 10.0.0.205
+
+# Remove cluster from remote host
+./install/remote_installer.sh remove 4 10.0.0.205
 ```
+
+**Node Configuration:**
+- Node count: 1-10 nodes per installation
+- HTTP ports: 9200, 9201, 9202, 9203, etc.
+- Transport ports: 9300, 9301, 9302, 9303, etc.
+- Cluster name: `axion-cluster`
 
 # Run
 
