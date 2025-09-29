@@ -18,6 +18,10 @@ show_menu() {
 
 show_simple() {
   curl -s "http://$HOST/_cat/nodes?v&h=name,heap.percent,heap.current,heap.max"
+  echo
+  # Calculate average heap percentage
+  avg_heap=$(curl -s "http://$HOST/_cat/nodes?h=heap.percent" | awk '{sum+=$1; count++} END {if(count>0) printf "%.1f", sum/count}')
+  echo "Average Heap Usage: ${avg_heap}%"
 }
 
 show_detailed() {
@@ -56,6 +60,6 @@ while true; do
   $chart_func
   
   echo
-  echo "Press Ctrl+C to exit. Refreshing in 5 seconds..."
-  sleep 5
+  echo "Press Ctrl+C to exit. Refreshing in 1 second..."
+  sleep 1
 done
