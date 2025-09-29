@@ -496,6 +496,22 @@ post_checks() {
 # Main
 # =========================
 action="${1:-install}"
+
+# Handle remote execution by copying script and executing remotely
+if [[ -n "$REMOTE_IP" ]]; then
+  log "Remote execution detected for $REMOTE_IP"
+  log "Copying installer to remote host..."
+  scp "$0" "${SUDO_USER:-$USER}@${REMOTE_IP}:/tmp/dual_installer.sh"
+  
+  log "Executing remotely: sudo /tmp/dual_installer.sh $action${NODE_COUNT:+ $NODE_COUNT}"
+  if [[ "$action" == "remove" ]]; then
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
+  else
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh $action $NODE_COUNT"
+  fi
+  exit $?
+fi
+
 case "$action" in
   -h|--help|help)
     usage
