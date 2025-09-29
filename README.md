@@ -74,6 +74,12 @@ ssh 10.0.0.50 "sudo /tmp/dual_installer.sh remove"
 - HTTP ports: 9200, 9201, 9202, 9203, etc.
 - Transport ports: 9300, 9301, 9302, 9303, etc.
 - Cluster name: `axion-cluster`
+- **Index template**: Automatically created with optimized settings:
+  - `refresh_interval: 30s` (eliminates CPU stalls from 1s default)
+  - `number_of_replicas: 1` (proper data distribution)
+  - `merge.scheduler.max_thread_count: 4` (controlled segment merging)
+  - `translog.flush_threshold_size: 1gb` (less frequent flushes)
+  - `index.codec: best_compression` (storage efficiency)
 
 # Run
 
