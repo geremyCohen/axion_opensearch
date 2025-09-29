@@ -48,7 +48,7 @@ show_cluster() {
   
   # Get circuit breaker settings from cluster settings
   echo
-  echo "Circuit Breaker Limits (update-configurable):"
+  echo "Circuit Breaker Configuration:"
   local settings=$(curl -s "http://$HOST/_cluster/settings?include_defaults=true&pretty" 2>/dev/null)
   
   # Extract breaker settings with fallbacks to defaults
@@ -56,14 +56,21 @@ show_cluster() {
   local request_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.request.limit" // "60%"' 2>/dev/null || echo "60%")
   local fielddata_limit=$(echo "$settings" | jq -r '.defaults."indices.breaker.fielddata.limit" // "40%"' 2>/dev/null || echo "40%")
   
-  echo "  indices.breaker.total.limit: ${total_limit}"
-  echo "  indices.breaker.request.limit: ${request_limit}"
-  echo "  indices.breaker.fielddata.limit: ${fielddata_limit}"
+  printf "%-25s %s\n" "Setting" "Limit"
+  printf "%-25s %s\n" "-------" "-----"
+  printf "%-25s %s\n" "indices.breaker.total" "$total_limit"
+  printf "%-25s %s\n" "indices.breaker.request" "$request_limit"
+  printf "%-25s %s\n" "indices.breaker.fielddata" "$fielddata_limit"
   
-  # Get current breaker usage
+  # Get current breaker usage in readable format
   echo
-  echo "Current Breaker Usage:"
-  curl -s "http://$HOST/_nodes/stats/breaker?pretty" | jq -r '.nodes | to_entries[] | .value.breakers | to_entries[] | select(.key | test("request|fielddata|total")) | "  \(.key): \(.value.estimated_size) / \(.value.limit_size) (\(.value.estimated_size_in_bytes / .value.limit_size_in_bytes * 100 | floor)%)"' 2>/dev/null | head -6
+  echo "Circuit Breaker Usage:"
+  printf "%-15s %-12s %-12s %s\n" "Breaker" "Used" "Limit" "Usage%"
+  printf "%-15s %-12s %-12s %s\n" "-------" "----" "-----" "------"
+  
+  curl -s "http://$HOST/_nodes/stats/breaker?pretty" | jq -r '.nodes | to_entries[0] | .value.breakers | to_entries[] | select(.key | test("request|fielddata|total")) | "\(.key) \(.value.estimated_size) \(.value.limit_size) \((.value.estimated_size_in_bytes / .value.limit_size_in_bytes * 100) | floor)"' 2>/dev/null | while read breaker used limit percent; do
+    printf "%-15s %-12s %-12s %s%%\n" "$breaker" "$used" "$limit" "$percent"
+  done
 }
 
 show_all() {
