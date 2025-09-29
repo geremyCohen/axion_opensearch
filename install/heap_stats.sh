@@ -68,7 +68,12 @@ show_cluster() {
   printf "%-15s %-12s %-12s %s\n" "Breaker" "Used" "Limit" "Usage%"
   printf "%-15s %-12s %-12s %s\n" "-------" "----" "-----" "------"
   
-  curl -s "http://$HOST/_nodes/stats/breaker?pretty" | jq -r '.nodes | to_entries[0] | .value.breakers | to_entries[] | select(.key | test("request|fielddata|total")) | "\(.key) \(.value.estimated_size) \(.value.limit_size) \((.value.estimated_size_in_bytes / .value.limit_size_in_bytes * 100) | floor)"' 2>/dev/null | while read breaker used limit percent; do
+  curl -s "http://$HOST/_nodes/stats/breaker?pretty" | jq -r '.nodes | to_entries[0] | .value.breakers | to_entries[] | select(.key | test("request|fielddata|total")) | [.key, .value.estimated_size, .value.limit_size, .value.estimated_size_in_bytes, .value.limit_size_in_bytes] | @tsv' 2>/dev/null | while IFS=$'\t' read breaker used limit used_bytes limit_bytes; do
+    if [ "$limit_bytes" -gt 0 ]; then
+      percent=$(echo "$used_bytes $limit_bytes" | awk '{printf "%.1f", ($1/$2)*100}')
+    else
+      percent="0.0"
+    fi
     printf "%-15s %-12s %-12s %s%%\n" "$breaker" "$used" "$limit" "$percent"
   done
 }
