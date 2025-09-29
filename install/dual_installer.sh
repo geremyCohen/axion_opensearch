@@ -565,6 +565,45 @@ reload_enable_restart() {
   done
 }
 
+create_index_template() {
+  log "Creating index template with optimized settings..."
+  
+  local template_json='{
+    "index_patterns": ["*"],
+    "template": {
+      "settings": {
+        "number_of_replicas": 1,
+        "refresh_interval": "30s",
+        "merge.scheduler.max_thread_count": 4,
+        "translog.flush_threshold_size": "1gb",
+        "index.codec": "best_compression"
+      }
+    },
+    "priority": 100
+  }'
+  
+  # Wait for cluster to be ready
+  local max_attempts=30
+  local attempt=1
+  while [ $attempt -le $max_attempts ]; do
+    if curl -s "http://127.0.0.1:9200/_cluster/health" | grep -q '"status":"green\|yellow"'; then
+      break
+    fi
+    log "Waiting for cluster... (attempt $attempt/$max_attempts)"
+    sleep 2
+    ((attempt++))
+  done
+  
+  # Create the template
+  if curl -s -X PUT "http://127.0.0.1:9200/_index_template/default-template" \
+       -H "Content-Type: application/json" \
+       -d "$template_json" | grep -q '"acknowledged":true'; then
+    log "Index template created successfully"
+  else
+    log "Warning: Failed to create index template"
+  fi
+}
+
 post_checks() {
   log "Waiting up to 30s for HTTP endpoints..."
   for i in $(seq 1 $NODE_COUNT); do
@@ -574,6 +613,9 @@ post_checks() {
       SECS=$((SECS+1))
     done
   done
+
+  # Create index template after cluster is ready
+  create_index_template
 
   log "Local curl checks:"
   set +e
@@ -657,7 +699,7 @@ case "$action" in
     echo "OpenSearch Benchmark command:"
     echo -n "opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts="
     for i in $(seq 1 $NODE_COUNT); do
-      if [[ -n "$REMOTE_HOST_IP" ]]; then
+      if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
         host_ip="$REMOTE_HOST_IP"
       else
         host_ip="127.0.0.1"
