@@ -384,18 +384,6 @@ post_checks() {
     done
   done
 
-  log "Creating performance-optimized index template..."
-  curl -X PUT "http://127.0.0.1:${N1_HTTP}/_index_template/performance_template" -H 'Content-Type: application/json' -d '{
-    "index_patterns": ["*"],
-    "priority": 1,
-    "template": {
-      "settings": {
-        "refresh_interval": "30s",
-        "number_of_replicas": 1
-      }
-    }
-  }' >/dev/null 2>&1 || true
-
   log "Local curl checks:"
   set +e
   curl -s "http://127.0.0.1:${NODE_HTTP_PORTS[1]}/_cluster/health?pretty" | jq . || true
