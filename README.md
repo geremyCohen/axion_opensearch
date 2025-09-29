@@ -77,6 +77,27 @@ ssh 10.0.0.50 "sudo /tmp/dual_installer.sh remove"
 
 # Run
 
+## Update Cluster Configuration
+
+Update existing cluster settings without reinstalling:
+
+```bash
+# Update heap memory percentage only
+system_memory_percent=80 ./install/dual_installer.sh update 10.0.0.50
+
+# Update circuit breaker limits for higher indexing throughput
+indices_breaker_total_limit=85% indices_breaker_request_limit=70% ./install/dual_installer.sh update 10.0.0.50
+
+# Recommended: Update memory + breakers for maximum benchmark performance
+system_memory_percent=90 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% ./install/dual_installer.sh update 10.0.0.50
+```
+
+**Update Options:**
+- `system_memory_percent`: Heap memory percentage (1-100)
+- `indices_breaker_total_limit`: Total circuit breaker limit (e.g., 85%)
+- `indices_breaker_request_limit`: Request circuit breaker limit (e.g., 70%)
+- `indices_breaker_fielddata_limit`: Fielddata circuit breaker limit (e.g., 50%)
+
 ## nyc_taxis Benchmark
 
 From the OSB, run:
