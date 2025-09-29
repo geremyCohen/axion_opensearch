@@ -467,15 +467,6 @@ bootstrap.memory_lock: true"
   remote_exec "grep -q 'ExitOnOutOfMemoryError' \"${node_home}/config/jvm.options\" || true"
 }
 
-update_heap_config() {
-  local memory_percent="${system_memory_percent:-50}"
-  
-  # Validate memory percentage
-  if ! [[ "$memory_percent" =~ ^[1-9][0-9]*$ ]] || [ "$memory_percent" -gt 100 ]; then
-    echo "[error] Invalid system_memory_percent: $memory_percent. Must be 1-100" >&2
-    exit 1
-  fi
-  
 unit_file() {
   local svc="$1"
   local node_home="$2"
