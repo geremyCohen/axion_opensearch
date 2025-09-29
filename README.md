@@ -58,8 +58,9 @@ From the OSB, run:
 curl -X DELETE "http://10.0.0.203:9200/nyc_taxis*"
 
 # run nyc_taxis benchmark
+# This saturates a c4a-standard-16 instance to about 95% CPU with 90 clients and bulk size of 10,000
 
-~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200,10.0.0.203:9201 --client-options=use_ssl:false,verify_certs:false,timeout:10 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:29,bulk_size:10000"
+~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200,10.0.0.203:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:90,bulk_size:10000"
 ```
 
 Clear the OS before each run by issuing this command to delete everything on the OS clusterm then start the benchmark:

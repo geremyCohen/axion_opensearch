@@ -42,9 +42,19 @@ pip install "opensearch-benchmark<1.16"
 # Setup NY Taxi workload
 cd opensearch-benchmark-workloads
 
-echo "Setup complete. To run NY Taxi benchmark against OpenSearch 3.1:"
-echo "~/benchmark-env/bin/opensearch-benchmark run --workload=nyc_taxis --target-hosts=localhost:9200 --client-options=use_ssl:false,verify_certs:false"
-
 # Test the benchmark
 echo "Running NY Taxi benchmark test..."
-~/benchmark-env/bin/opensearch-benchmark run --workload=nyc_taxis --target-hosts=localhost:9200 --client-options=use_ssl:false,verify_certs:false
+
+sudo systemctl restart opensearch
+~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.52:9200 --client-options=use_ssl:false,verify_certs:false
+curl -s http://10.0.0.52:9200/_nodes/stats/indices | jq '
+  .nodes[] | {
+    merges_total_time: .indices.merges.total_time_in_millis,
+    indexing_total_time: .indices.indexing.index_time_in_millis,
+    refresh_total_time: .indices.refresh.total_time_in_millis,
+    flush_total_time: .indices.flush.total_time_in_millis
+  }'
+
+  Run
+  clean.sh
+  to start opensearch
