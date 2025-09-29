@@ -81,6 +81,42 @@ show_cluster() {
     fi
     printf "%-15s %-12s %-12s %s%%\n" "$breaker" "$used" "$limit" "$percent"
   done
+
+  # Thread Pool Analysis
+  echo
+  echo "Thread Pool Status (Bottleneck Analysis):"
+  printf "%-15s %-8s %-8s %-8s %-10s %-10s\n" "Pool" "Active" "Queue" "Rejected" "Completed" "Largest"
+  printf "%-15s %-8s %-8s %-8s %-10s %-10s\n" "----" "------" "-----" "--------" "---------" "-------"
+  
+  curl -s "http://$HOST/_nodes/stats/thread_pool?pretty" | jq -r '.nodes | to_entries[0] | .value.thread_pool | to_entries[] | select(.key | test("write|bulk|search|get")) | [.key, .value.active, .value.queue, .value.rejected, .value.completed, .value.largest] | @tsv' 2>/dev/null | while IFS=$'\t' read pool active queue rejected completed largest; do
+    printf "%-15s %-8s %-8s %-8s %-10s %-10s\n" "$pool" "$active" "$queue" "$rejected" "$completed" "$largest"
+  done
+
+  # Indexing Performance Metrics
+  echo
+  echo "Indexing Performance Metrics:"
+  local indexing_stats=$(curl -s "http://$HOST/_nodes/stats/indices?pretty" | jq '.nodes | to_entries[0] | .value.indices.indexing')
+  echo "  Index Rate: $(echo "$indexing_stats" | jq -r '.index_total // 0') total docs, $(echo "$indexing_stats" | jq -r '.index_current // 0') current"
+  echo "  Index Time: $(echo "$indexing_stats" | jq -r '.index_time_in_millis // 0')ms total"
+  echo "  Throttle Time: $(echo "$indexing_stats" | jq -r '.throttle_time_in_millis // 0')ms"
+  
+  # Merge Activity (CPU stall indicator)
+  local merge_stats=$(curl -s "http://$HOST/_nodes/stats/indices?pretty" | jq '.nodes | to_entries[0] | .value.indices.merges')
+  echo "  Active Merges: $(echo "$merge_stats" | jq -r '.current // 0')"
+  echo "  Merge Throttle: $(echo "$merge_stats" | jq -r '.total_throttled_time_in_millis // 0')ms"
+
+  # System Resource Usage
+  echo
+  echo "System Resource Usage:"
+  local host_ip=$(echo "$HOST" | cut -d: -f1)
+  if [ "$host_ip" != "127.0.0.1" ] && [ "$host_ip" != "localhost" ]; then
+    echo "  CPU Usage: $(ssh "$host_ip" "top -bn1 | grep 'Cpu(s)' | awk '{print \$2}'" 2>/dev/null || echo "N/A")"
+    echo "  Load Average: $(ssh "$host_ip" "uptime | awk -F'load average:' '{print \$2}'" 2>/dev/null || echo "N/A")"
+    echo "  Disk I/O: $(ssh "$host_ip" "iostat -x 1 1 2>/dev/null | tail -n +4 | awk 'NR>3 {print \$1 \": \" \$10 \"% util\"}' | head -3" 2>/dev/null || echo "iostat not available")"
+  else
+    echo "  CPU Usage: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' 2>/dev/null || echo "N/A")"
+    echo "  Load Average: $(uptime | awk -F'load average:' '{print $2}' 2>/dev/null || echo "N/A")"
+  fi
 }
 
 show_all() {
