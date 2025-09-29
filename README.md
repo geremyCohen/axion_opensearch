@@ -46,8 +46,8 @@ Run dual_installer.sh to install OpenSearch locally:
 # Install specific number of nodes (1-10)
 ./install/dual_installer.sh install 4
 
-# Remove installation
-./install/dual_installer.sh remove 4
+# Remove all nodes (auto-detects node count)
+./install/dual_installer.sh remove
 ```
 
 ## Remote Installation
@@ -62,8 +62,8 @@ Use dual_installer.sh for SSH-based installations on remote hosts:
 scp ./install/dual_installer.sh 10.0.0.50:/tmp/
 ssh 10.0.0.50 "sudo /tmp/dual_installer.sh install 4"
 
-# Remove cluster from remote host
-ssh 10.0.0.50 "sudo /tmp/dual_installer.sh remove 4"
+# Remove all nodes from remote host (auto-detects node count)
+./install/dual_installer.sh remove 10.0.0.50
 ```
 
 **Node Configuration:**

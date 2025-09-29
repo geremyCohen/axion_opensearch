@@ -5,15 +5,16 @@ usage() {
   cat <<USAGE
 Usage: $0 [install|remove] [node_count] [remote_ip]
   install     Install or upgrade OpenSearch cluster (default if omitted)
-  remove      Stop services and remove all non-apt artifacts created by install
-  node_count  Number of nodes to install (default: 2)
+  remove      Stop services and remove all OpenSearch installations (auto-detects node count)
+  node_count  Number of nodes to install (default: 2, ignored for remove)
   remote_ip   Remote host IP for SSH installation (optional, installs locally if omitted)
 
 Examples:
   $0 install                    # Install 2-node cluster locally
   $0 install 4                  # Install 4-node cluster locally
   $0 install 4 10.0.0.205       # Install 4-node cluster on remote host
-  $0 remove 4 10.0.0.205        # Remove 4-node cluster from remote host
+  $0 remove                     # Remove all nodes locally (auto-detect)
+  $0 remove 10.0.0.205          # Remove all nodes from remote host (auto-detect)
 USAGE
 }
 
@@ -21,13 +22,22 @@ USAGE
 # Configurable parameters
 # =========================
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
-NODE_COUNT="${2:-2}"
-REMOTE_IP="${3:-}"
+ACTION="${1:-install}"
 
-# Validate node count
-if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$NODE_COUNT" -gt 10 ]; then
-  echo "[error] Invalid node count: $NODE_COUNT. Must be 1-10" >&2
-  exit 1
+# For remove, node_count is ignored (auto-detected)
+# For install, parse node_count and remote_ip normally
+if [[ "$ACTION" == "remove" ]]; then
+  NODE_COUNT=0  # Will be auto-detected
+  REMOTE_IP="${2:-}"  # Second parameter is remote_ip for remove
+else
+  NODE_COUNT="${2:-2}"
+  REMOTE_IP="${3:-}"
+  
+  # Validate node count for install
+  if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$NODE_COUNT" -gt 10 ]; then
+    echo "[error] Invalid node count: $NODE_COUNT. Must be 1-10" >&2
+    exit 1
+  fi
 fi
 
 # Remote execution wrapper
@@ -89,29 +99,47 @@ SVC1="opensearch-node1"
 SVC2="opensearch-node2"
 
 remove_install() {
+  # Auto-detect existing nodes
+  local detected_nodes=()
+  local detected_services=()
+  
+  for i in {1..10}; do
+    if remote_exec "[ -d \"/opt/opensearch-node${i}\" ]"; then
+      detected_nodes+=($i)
+      detected_services+=("opensearch-node${i}")
+    fi
+  done
+  
+  if [ ${#detected_nodes[@]} -eq 0 ]; then
+    log "No OpenSearch nodes found to remove."
+    return 0
+  fi
+  
+  log "Detected ${#detected_nodes[@]} nodes to remove: ${detected_nodes[*]}"
+
   log "Stopping services if running..."
   set +e
-  for i in $(seq 1 $NODE_COUNT); do
-    remote_exec "systemctl stop \"${SERVICE_NAMES[$i]}\" 2>/dev/null || true"
+  for service in "${detected_services[@]}"; do
+    remote_exec "systemctl stop \"${service}\" 2>/dev/null || true"
   done
   set -e
 
   log "Disabling services..."
   set +e
-  for i in $(seq 1 $NODE_COUNT); do
-    remote_exec "systemctl disable \"${SERVICE_NAMES[$i]}\" 2>/dev/null || true"
+  for service in "${detected_services[@]}"; do
+    remote_exec "systemctl disable \"${service}\" 2>/dev/null || true"
   done
   set -e
 
   log "Removing systemd unit files..."
-  for i in $(seq 1 $NODE_COUNT); do
-    remote_exec "rm -f \"/etc/systemd/system/${SERVICE_NAMES[$i]}.service\""
+  for service in "${detected_services[@]}"; do
+    remote_exec "rm -f \"/etc/systemd/system/${service}.service\""
   done
   remote_exec "systemctl daemon-reload || true"
 
   log "Removing node homes and base distribution..."
-  for i in $(seq 1 $NODE_COUNT); do
-    remote_exec "rm -rf \"${NODE_HOMES[$i]}\""
+  for node in "${detected_nodes[@]}"; do
+    remote_exec "rm -rf \"/opt/opensearch-node${node}\""
   done
   remote_exec "rm -rf \"${BASE_DIST_DIR}\""
   remote_exec "rm -f \"${BASE_LINK}\""
@@ -143,14 +171,16 @@ remove_install() {
   if remote_exec "command -v ufw >/dev/null 2>&1"; then
     if remote_exec "ufw status | grep -q \"Status: active\""; then
       log "Removing UFW rules for OpenSearch ports (if present)..."
-      for i in $(seq 1 $NODE_COUNT); do
-        remote_exec "yes | ufw delete allow \"${NODE_HTTP_PORTS[$i]}/tcp\" >/dev/null 2>&1 || true"
-        remote_exec "yes | ufw delete allow \"${NODE_TRANSPORT_PORTS[$i]}/tcp\" >/dev/null 2>&1 || true"
+      for node in "${detected_nodes[@]}"; do
+        local http_port=$((9199 + node))
+        local transport_port=$((9299 + node))
+        remote_exec "yes | ufw delete allow \"${http_port}/tcp\" >/dev/null 2>&1 || true"
+        remote_exec "yes | ufw delete allow \"${transport_port}/tcp\" >/dev/null 2>&1 || true"
       done
     fi
   fi
 
-  log "Removal complete."
+  log "Removal complete. Removed ${#detected_nodes[@]} nodes."
 }
 
 
