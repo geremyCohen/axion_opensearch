@@ -34,8 +34,8 @@ else
   REMOTE_IP="${3:-}"
   
   # Validate node count for install
-  if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$NODE_COUNT" -gt 10 ]; then
-    echo "[error] Invalid node count: $NODE_COUNT. Must be 1-10" >&2
+  if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[error] Invalid node count: $NODE_COUNT. Must be a positive integer" >&2
     exit 1
   fi
 fi
@@ -107,7 +107,7 @@ remove_install() {
   local detected_nodes=()
   local detected_services=()
   
-  for i in {1..10}; do
+  for i in {1..50}; do
     if remote_exec "[ -d \"/opt/opensearch-node${i}\" ]"; then
       detected_nodes+=($i)
       detected_services+=("opensearch-node${i}")
