@@ -246,6 +246,12 @@ plugins.security.disabled: true
 
 # Recommended
 bootstrap.memory_lock: true
+
+# Indexing performance optimizations
+indices.memory.index_buffer_size: 40%
+thread_pool.write.size: 16
+thread_pool.write.queue_size: 1000
+action.auto_create_index: true
 EOF
 
   # Remove any existing -Xms or -Xmx lines in jvm.options to avoid conflicts
@@ -353,6 +359,18 @@ post_checks() {
   until curl -sf "http://127.0.0.1:${N1_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
   SECS=0
   until curl -sf "http://127.0.0.1:${N2_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
+
+  log "Creating performance-optimized index template..."
+  curl -X PUT "http://127.0.0.1:${N1_HTTP}/_index_template/performance_template" -H 'Content-Type: application/json' -d '{
+    "index_patterns": ["*"],
+    "priority": 1,
+    "template": {
+      "settings": {
+        "refresh_interval": "30s",
+        "number_of_replicas": 1
+      }
+    }
+  }' >/dev/null 2>&1 || true
 
   log "Local curl checks:"
   set +e
