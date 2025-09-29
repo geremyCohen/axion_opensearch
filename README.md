@@ -52,17 +52,17 @@ Run dual_installer.sh to install OpenSearch locally:
 
 ## Remote Installation
 
-Use remote_installer.sh for SSH-based installations on remote hosts:
+Use dual_installer.sh for SSH-based installations on remote hosts:
 
 ```bash
 # Install 4-node cluster on remote host
-./install/remote_installer.sh install 4 10.0.0.205
+./install/dual_installer.sh install 4 10.0.0.205
 
 # Install 2-node cluster on remote host (default)
-./install/remote_installer.sh install 2 10.0.0.205
+./install/dual_installer.sh install 2 10.0.0.205
 
 # Remove cluster from remote host
-./install/remote_installer.sh remove 4 10.0.0.205
+./install/dual_installer.sh remove 4 10.0.0.205
 ```
 
 **Node Configuration:**

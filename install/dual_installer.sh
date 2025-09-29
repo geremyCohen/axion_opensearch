@@ -3,10 +3,17 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 [install|remove] [node_count]
+Usage: $0 [install|remove] [node_count] [remote_ip]
   install     Install or upgrade OpenSearch cluster (default if omitted)
   remove      Stop services and remove all non-apt artifacts created by install
   node_count  Number of nodes to install (default: 2)
+  remote_ip   Remote host IP for SSH installation (optional, installs locally if omitted)
+
+Examples:
+  $0 install                    # Install 2-node cluster locally
+  $0 install 4                  # Install 4-node cluster locally
+  $0 install 4 10.0.0.205       # Install 4-node cluster on remote host
+  $0 remove 4 10.0.0.205        # Remove 4-node cluster from remote host
 USAGE
 }
 
@@ -15,12 +22,33 @@ USAGE
 # =========================
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
 NODE_COUNT="${2:-2}"
+REMOTE_IP="${3:-}"
 
 # Validate node count
 if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$NODE_COUNT" -gt 10 ]; then
   echo "[error] Invalid node count: $NODE_COUNT. Must be 1-10" >&2
   exit 1
 fi
+
+# Remote execution wrapper
+remote_exec() {
+  if [[ -n "$REMOTE_IP" ]]; then
+    ssh "$REMOTE_IP" "$@"
+  else
+    eval "$@"
+  fi
+}
+
+# Remote file copy wrapper
+remote_copy() {
+  local src="$1"
+  local dest="$2"
+  if [[ -n "$REMOTE_IP" ]]; then
+    scp "$src" "$REMOTE_IP:$dest"
+  else
+    cp "$src" "$dest"
+  fi
+}
 
 # Architecture detection for correct OpenSearch bundle
 UNAME_M="$(uname -m)"
@@ -64,60 +92,60 @@ remove_install() {
   log "Stopping services if running..."
   set +e
   for i in $(seq 1 $NODE_COUNT); do
-    systemctl stop "${SERVICE_NAMES[$i]}" 2>/dev/null || true
+    remote_exec "systemctl stop \"${SERVICE_NAMES[$i]}\" 2>/dev/null || true"
   done
   set -e
 
   log "Disabling services..."
   set +e
   for i in $(seq 1 $NODE_COUNT); do
-    systemctl disable "${SERVICE_NAMES[$i]}" 2>/dev/null || true
+    remote_exec "systemctl disable \"${SERVICE_NAMES[$i]}\" 2>/dev/null || true"
   done
   set -e
 
   log "Removing systemd unit files..."
   for i in $(seq 1 $NODE_COUNT); do
-    rm -f "/etc/systemd/system/${SERVICE_NAMES[$i]}.service"
+    remote_exec "rm -f \"/etc/systemd/system/${SERVICE_NAMES[$i]}.service\""
   done
-  systemctl daemon-reload || true
+  remote_exec "systemctl daemon-reload || true"
 
   log "Removing node homes and base distribution..."
   for i in $(seq 1 $NODE_COUNT); do
-    rm -rf "${NODE_HOMES[$i]}"
+    remote_exec "rm -rf \"${NODE_HOMES[$i]}\""
   done
-  rm -rf "${BASE_DIST_DIR}"
-  rm -f "${BASE_LINK}"
+  remote_exec "rm -rf \"${BASE_DIST_DIR}\""
+  remote_exec "rm -f \"${BASE_LINK}\""
 
   log "Removing installer-created sysctl and limits files..."
-  rm -f /etc/sysctl.d/99-opensearch.conf
-  sysctl --system >/dev/null 2>&1 || true
-  rm -f /etc/security/limits.d/opensearch.conf
+  remote_exec "rm -f /etc/sysctl.d/99-opensearch.conf"
+  remote_exec "sysctl --system >/dev/null 2>&1 || true"
+  remote_exec "rm -f /etc/security/limits.d/opensearch.conf"
 
   # Optional: remove opensearch user/group if unused
-  if id -u opensearch >/dev/null 2>&1; then
+  if remote_exec "id -u opensearch >/dev/null 2>&1"; then
     log "Removing 'opensearch' system user (if present)..."
     set +e
-    userdel -f opensearch 2>/dev/null || true
+    remote_exec "userdel -f opensearch 2>/dev/null || true"
     set -e
   fi
-  if getent group opensearch >/dev/null 2>&1; then
+  if remote_exec "getent group opensearch >/dev/null 2>&1"; then
     log "Removing 'opensearch' group (if present)..."
     set +e
-    groupdel opensearch 2>/dev/null || true
+    remote_exec "groupdel opensearch 2>/dev/null || true"
     set -e
   fi
 
   # Clean downloaded tarball if present
   TMP_TGZ="/tmp/opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz"
-  [ -f "$TMP_TGZ" ] && rm -f "$TMP_TGZ"
+  remote_exec "[ -f \"$TMP_TGZ\" ] && rm -f \"$TMP_TGZ\" || true"
 
   # Attempt to remove UFW allowances if UFW active
-  if command -v ufw >/dev/null 2>&1; then
-    if ufw status | grep -q "Status: active"; then
+  if remote_exec "command -v ufw >/dev/null 2>&1"; then
+    if remote_exec "ufw status | grep -q \"Status: active\""; then
       log "Removing UFW rules for OpenSearch ports (if present)..."
       for i in $(seq 1 $NODE_COUNT); do
-        yes | ufw delete allow "${NODE_HTTP_PORTS[$i]}/tcp" >/dev/null 2>&1 || true
-        yes | ufw delete allow "${NODE_TRANSPORT_PORTS[$i]}/tcp" >/dev/null 2>&1 || true
+        remote_exec "yes | ufw delete allow \"${NODE_HTTP_PORTS[$i]}/tcp\" >/dev/null 2>&1 || true"
+        remote_exec "yes | ufw delete allow \"${NODE_TRANSPORT_PORTS[$i]}/tcp\" >/dev/null 2>&1 || true"
       done
     fi
   fi
@@ -136,7 +164,7 @@ err() { echo -e "\033[1;31m[error]\033[0m $*" >&2; }
 # Calculate total system memory in GB (integer, floor)
 mem_total_gb() {
   local kb
-  kb="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  kb="$(remote_exec "awk '/MemTotal:/ {print \$2}' /proc/meminfo 2>/dev/null || echo 0")"
   # Convert kB -> GB (floor)
   echo $(( kb / 1024 / 1024 ))
 }
@@ -159,74 +187,84 @@ calc_heap_gb() {
 }
 
 require_root() {
-  if [[ "${EUID}" -ne 0 ]]; then
+  if [[ -n "$REMOTE_IP" ]]; then
+    # For remote execution, we assume sudo access
+    return 0
+  elif [[ "${EUID}" -ne 0 ]]; then
     err "Please run as root (sudo)."
     exit 1
   fi
 }
 
 ensure_pkg() {
-  if command -v apt-get >/dev/null 2>&1; then
-    DEBIAN_FRONTEND=noninteractive apt-get update -y
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl jq tar coreutils gawk procps openjdk-17-jre-headless
+  if remote_exec "command -v apt-get >/dev/null 2>&1"; then
+    remote_exec "DEBIAN_FRONTEND=noninteractive apt-get update -y"
+    remote_exec "DEBIAN_FRONTEND=noninteractive apt-get install -y curl jq tar coreutils gawk procps openjdk-17-jre-headless rsync"
   else
-    warn "Non-Debian system detected. Ensure curl/jq/tar/Java 17 are installed."
+    warn "Non-Debian system detected. Ensure curl/jq/tar/Java 17/rsync are installed."
   fi
 }
 
 sysctl_limits() {
   log "Applying kernel and ulimit settings..."
   # vm.max_map_count
-  if [[ "$(sysctl -n vm.max_map_count)" -lt 262144 ]]; then
-    echo "vm.max_map_count=262144" >/etc/sysctl.d/99-opensearch.conf
-    sysctl --system >/dev/null
+  if [[ "$(remote_exec "sysctl -n vm.max_map_count")" -lt 262144 ]]; then
+    remote_exec "echo 'vm.max_map_count=262144' >/etc/sysctl.d/99-opensearch.conf"
+    remote_exec "sysctl --system >/dev/null"
   fi
   # nofile/nproc
-  cat >/etc/security/limits.d/opensearch.conf <<EOF
+  remote_exec "cat >/etc/security/limits.d/opensearch.conf <<EOF
 opensearch soft nofile 65536
 opensearch hard nofile 65536
 opensearch soft nproc  4096
 opensearch hard nproc  4096
-EOF
+EOF"
 }
 
 create_user() {
   log "Ensuring 'opensearch' user/group exist..."
-  getent group opensearch >/dev/null 2>&1 || groupadd --system opensearch
-  id -u opensearch >/dev/null 2>&1 || useradd --system --no-create-home --gid opensearch --shell /usr/sbin/nologin opensearch
+  remote_exec "getent group opensearch >/dev/null 2>&1 || groupadd --system opensearch"
+  remote_exec "id -u opensearch >/dev/null 2>&1 || useradd --system --no-create-home --gid opensearch --shell /usr/sbin/nologin opensearch"
 }
 
 download_dist() {
-  if [[ ! -d "${BASE_DIST_DIR}" ]]; then
+  if ! remote_exec "[ -d \"${BASE_DIST_DIR}\" ]"; then
     log "Downloading OpenSearch ${OPENSEARCH_VERSION} for ${OS_BUNDLE_ARCH}..."
     local TMP_TGZ="${TARBALL_PATH}"
-    if [[ ! -f "${TMP_TGZ}" ]]; then
+    if ! remote_exec "[ -f \"${TMP_TGZ}\" ]"; then
       log "Fetching bundle for arch ${OS_BUNDLE_ARCH}..."
-      curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz" -o "${TMP_TGZ}"
+      if [[ -n "$REMOTE_IP" ]]; then
+        # Download locally then copy to remote
+        curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz" -o "${TMP_TGZ}"
+        remote_copy "${TMP_TGZ}" "${TMP_TGZ}"
+        rm -f "${TMP_TGZ}"
+      else
+        curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz" -o "${TMP_TGZ}"
+      fi
     fi
     log "Extracting to ${BASE_DIST_DIR}..."
-    mkdir -p "${BASE_DIST_DIR}"
-    tar -xzf "${TMP_TGZ}" -C "${BASE_DIR}"
-    mv -f "${BASE_DIR}/opensearch-${OPENSEARCH_VERSION}"/* "${BASE_DIST_DIR}/"
-    rm -rf "${BASE_DIR}/opensearch-${OPENSEARCH_VERSION}"
+    remote_exec "mkdir -p \"${BASE_DIST_DIR}\""
+    remote_exec "tar -xzf \"${TMP_TGZ}\" -C \"${BASE_DIR}\""
+    remote_exec "mv -f \"${BASE_DIR}/opensearch-${OPENSEARCH_VERSION}\"/* \"${BASE_DIST_DIR}/\""
+    remote_exec "rm -rf \"${BASE_DIR}/opensearch-${OPENSEARCH_VERSION}\""
   else
     log "Base distribution already present at ${BASE_DIST_DIR}"
   fi
-  ln -sfn "${BASE_DIST_DIR}" "${BASE_LINK}"
+  remote_exec "ln -sfn \"${BASE_DIST_DIR}\" \"${BASE_LINK}\""
 }
 
 clone_node_home() {
   local node_home="$1"
-  if [[ ! -d "${node_home}" ]]; then
+  if ! remote_exec "[ -d \"${node_home}\" ]"; then
     log "Provisioning node home at ${node_home} (copying base dist)..."
     # Copy the dist into the node home so OPENSEARCH_HOME is self-contained
-    rsync -a --delete "${BASE_LINK}/" "${node_home}/"
+    remote_exec "rsync -a --delete \"${BASE_LINK}/\" \"${node_home}/\""
     # Prepare per-node dirs
-    mkdir -p "${node_home}/data" "${node_home}/logs" "${node_home}/tmp" "${node_home}/config/jvm.options.d"
+    remote_exec "mkdir -p \"${node_home}/data\" \"${node_home}/logs\" \"${node_home}/tmp\" \"${node_home}/config/jvm.options.d\""
   else
     log "Node home already exists at ${node_home}"
     # Ensure critical subdirs exist even if user pruned them
-    mkdir -p "${node_home}/data" "${node_home}/logs" "${node_home}/tmp" "${node_home}/config/jvm.options.d"
+    remote_exec "mkdir -p \"${node_home}/data\" \"${node_home}/logs\" \"${node_home}/tmp\" \"${node_home}/config/jvm.options.d\""
   fi
 }
 
@@ -442,7 +480,27 @@ case "$action" in
     done
     echo
     log "HTTP ports: $(for i in $(seq 1 $NODE_COUNT); do echo -n "${NODE_HTTP_PORTS[$i]} "; done)"
-    log "If remote curls still RST, check your cloud/VPC firewall."
+    
+    if [[ -n "$REMOTE_IP" ]]; then
+      echo
+      echo "OpenSearch cluster is now running on $REMOTE_IP with $NODE_COUNT nodes:"
+      for i in $(seq 1 $NODE_COUNT); do
+        echo "  Node $i: http://$REMOTE_IP:${NODE_HTTP_PORTS[$i]}"
+      done
+      echo
+      echo "Example OSB command:"
+      echo -n "~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts="
+      for i in $(seq 1 $NODE_COUNT); do
+        if [ $i -eq 1 ]; then
+          echo -n "$REMOTE_IP:${NODE_HTTP_PORTS[$i]}"
+        else
+          echo -n ",$REMOTE_IP:${NODE_HTTP_PORTS[$i]}"
+        fi
+      done
+      echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" --workload-params=\"bulk_indexing_clients:90,bulk_size:10000\""
+    else
+      log "If remote curls still RST, check your cloud/VPC firewall."
+    fi
     ;;
   remove)
     require_root
