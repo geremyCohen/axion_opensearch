@@ -507,7 +507,7 @@ if [[ -n "$REMOTE_IP" ]]; then
   if [[ "$action" == "remove" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
   else
-    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh $action $NODE_COUNT"
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh $action $NODE_COUNT"
   fi
   exit $?
 fi
@@ -549,24 +549,25 @@ case "$action" in
     echo
     log "HTTP ports: $(for i in $(seq 1 $NODE_COUNT); do echo -n "${NODE_HTTP_PORTS[$i]} "; done)"
     
-    if [[ -n "$REMOTE_IP" ]]; then
-      echo
-      echo "OpenSearch cluster is now running on $REMOTE_IP with $NODE_COUNT nodes:"
-      for i in $(seq 1 $NODE_COUNT); do
-        echo "  Node $i: http://$REMOTE_IP:${NODE_HTTP_PORTS[$i]}"
-      done
-      echo
-      echo "Example OSB command:"
-      echo -n "~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts="
-      for i in $(seq 1 $NODE_COUNT); do
-        if [ $i -eq 1 ]; then
-          echo -n "$REMOTE_IP:${NODE_HTTP_PORTS[$i]}"
-        else
-          echo -n ",$REMOTE_IP:${NODE_HTTP_PORTS[$i]}"
-        fi
-      done
-      echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" --workload-params=\"bulk_indexing_clients:90,bulk_size:10000\""
-    else
+    # Generate OSB command
+    echo
+    echo "OpenSearch Benchmark command:"
+    echo -n "opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts="
+    for i in $(seq 1 $NODE_COUNT); do
+      if [[ -n "$REMOTE_HOST_IP" ]]; then
+        host_ip="$REMOTE_HOST_IP"
+      else
+        host_ip="127.0.0.1"
+      fi
+      if [ $i -eq 1 ]; then
+        echo -n "${host_ip}:${NODE_HTTP_PORTS[$i]}"
+      else
+        echo -n ",${host_ip}:${NODE_HTTP_PORTS[$i]}"
+      fi
+    done
+    echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" --workload-params=\"bulk_indexing_clients:90,bulk_size:10000\""
+    
+    if [[ -z "$REMOTE_IP" ]]; then
       log "If remote curls still RST, check your cloud/VPC firewall."
     fi
     ;;
