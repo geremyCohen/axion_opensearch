@@ -43,7 +43,9 @@ fi
 # Remote execution wrapper
 remote_exec() {
   if [[ -n "$REMOTE_IP" ]]; then
-    ssh "$REMOTE_IP" "sudo $*"
+    # Use original username if running with sudo
+    local ssh_user="${SUDO_USER:-$USER}"
+    ssh "${ssh_user}@${REMOTE_IP}" "sudo $*"
   else
     eval "$@"
   fi
@@ -54,7 +56,9 @@ remote_copy() {
   local src="$1"
   local dest="$2"
   if [[ -n "$REMOTE_IP" ]]; then
-    scp "$src" "$REMOTE_IP:$dest"
+    # Use original username if running with sudo
+    local ssh_user="${SUDO_USER:-$USER}"
+    scp "$src" "${ssh_user}@${REMOTE_IP}:$dest"
   else
     cp "$src" "$dest"
   fi
