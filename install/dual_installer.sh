@@ -3,9 +3,10 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 <install|remove>
-  install  Install or upgrade OpenSearch dual-node (default if omitted)
-  remove   Stop services and remove all non-apt artifacts created by install
+Usage: $0 [install|remove] [node_count]
+  install     Install or upgrade OpenSearch cluster (default if omitted)
+  remove      Stop services and remove all non-apt artifacts created by install
+  node_count  Number of nodes to install (default: 2)
 USAGE
 }
 
@@ -13,8 +14,13 @@ USAGE
 # Configurable parameters
 # =========================
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
-HEAP_GB_NODE1="${HEAP_GB_NODE1:-auto}"
-HEAP_GB_NODE2="${HEAP_GB_NODE2:-auto}"
+NODE_COUNT="${2:-2}"
+
+# Validate node count
+if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$NODE_COUNT" -gt 10 ]; then
+  echo "[error] Invalid node count: $NODE_COUNT. Must be 1-10" >&2
+  exit 1
+fi
 
 # Architecture detection for correct OpenSearch bundle
 UNAME_M="$(uname -m)"
@@ -36,40 +42,49 @@ esac
 BASE_DIR="/opt"
 BASE_DIST_DIR="${BASE_DIR}/opensearch-dist-${OPENSEARCH_VERSION}"
 BASE_LINK="${BASE_DIR}/opensearch-dist"            # stable pointer to the dist
-NODE1_HOME="${BASE_DIR}/opensearch-node1"          # OPENSEARCH_HOME for node-1 (fixed)
-NODE2_HOME="${BASE_DIR}/opensearch-node2"          # OPENSEARCH_HOME for node-2 (fixed)
 
 TARBALL_PATH="/tmp/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz"
 
-# Ports
-N1_HTTP=9200
-N1_TRANSPORT=9300
-N2_HTTP=9201
-N2_TRANSPORT=9301
+# Generate node configurations
+declare -a NODE_HOMES
+declare -a NODE_HTTP_PORTS
+declare -a NODE_TRANSPORT_PORTS
+declare -a SERVICE_NAMES
 
-# Service names
+for i in $(seq 1 $NODE_COUNT); do
+  NODE_HOMES[$i]="${BASE_DIR}/opensearch-node${i}"
+  NODE_HTTP_PORTS[$i]=$((9199 + i))
+  NODE_TRANSPORT_PORTS[$i]=$((9299 + i))
+  SERVICE_NAMES[$i]="opensearch-node${i}"
+done
 SVC1="opensearch-node1"
 SVC2="opensearch-node2"
 
 remove_install() {
   log "Stopping services if running..."
   set +e
-  systemctl stop "${SVC1}" 2>/dev/null || true
-  systemctl stop "${SVC2}" 2>/dev/null || true
+  for i in $(seq 1 $NODE_COUNT); do
+    systemctl stop "${SERVICE_NAMES[$i]}" 2>/dev/null || true
+  done
   set -e
 
   log "Disabling services..."
   set +e
-  systemctl disable "${SVC1}" 2>/dev/null || true
-  systemctl disable "${SVC2}" 2>/dev/null || true
+  for i in $(seq 1 $NODE_COUNT); do
+    systemctl disable "${SERVICE_NAMES[$i]}" 2>/dev/null || true
+  done
   set -e
 
   log "Removing systemd unit files..."
-  rm -f "/etc/systemd/system/${SVC1}.service" "/etc/systemd/system/${SVC2}.service"
+  for i in $(seq 1 $NODE_COUNT); do
+    rm -f "/etc/systemd/system/${SERVICE_NAMES[$i]}.service"
+  done
   systemctl daemon-reload || true
 
   log "Removing node homes and base distribution..."
-  rm -rf "${NODE1_HOME}" "${NODE2_HOME}"
+  for i in $(seq 1 $NODE_COUNT); do
+    rm -rf "${NODE_HOMES[$i]}"
+  done
   rm -rf "${BASE_DIST_DIR}"
   rm -f "${BASE_LINK}"
 
@@ -100,10 +115,10 @@ remove_install() {
   if command -v ufw >/dev/null 2>&1; then
     if ufw status | grep -q "Status: active"; then
       log "Removing UFW rules for OpenSearch ports (if present)..."
-      yes | ufw delete allow "${N1_HTTP}/tcp" >/dev/null 2>&1 || true
-      yes | ufw delete allow "${N2_HTTP}/tcp" >/dev/null 2>&1 || true
-      yes | ufw delete allow "${N1_TRANSPORT}/tcp" >/dev/null 2>&1 || true
-      yes | ufw delete allow "${N2_TRANSPORT}/tcp" >/dev/null 2>&1 || true
+      for i in $(seq 1 $NODE_COUNT); do
+        yes | ufw delete allow "${NODE_HTTP_PORTS[$i]}/tcp" >/dev/null 2>&1 || true
+        yes | ufw delete allow "${NODE_TRANSPORT_PORTS[$i]}/tcp" >/dev/null 2>&1 || true
+      done
     fi
   fi
 
@@ -220,12 +235,31 @@ write_config() {
   local node_name="$2"
   local http_port="$3"
   local transport_port="$4"
-  local peer1="$5"
-  local peer2="$6"
 
   log "Writing ${node_home}/config/opensearch.yml for ${node_name}..."
+  
+  # Build discovery seed hosts list
+  local seed_hosts=""
+  for i in $(seq 1 $NODE_COUNT); do
+    if [ $i -eq 1 ]; then
+      seed_hosts="\"127.0.0.1:${NODE_TRANSPORT_PORTS[$i]}\""
+    else
+      seed_hosts="${seed_hosts}, \"127.0.0.1:${NODE_TRANSPORT_PORTS[$i]}\""
+    fi
+  done
+  
+  # Build initial cluster manager nodes list
+  local manager_nodes=""
+  for i in $(seq 1 $NODE_COUNT); do
+    if [ $i -eq 1 ]; then
+      manager_nodes="\"node-${i}\""
+    else
+      manager_nodes="${manager_nodes}, \"node-${i}\""
+    fi
+  done
+
   cat >"${node_home}/config/opensearch.yml" <<EOF
-cluster.name: axion-dual
+cluster.name: axion-cluster
 node.name: ${node_name}
 
 # Bind HTTP to all interfaces so remote curl works
@@ -233,9 +267,9 @@ network.host: 0.0.0.0
 http.port: ${http_port}
 transport.port: ${transport_port}
 
-# Two-node discovery on localhost transports
-discovery.seed_hosts: ["127.0.0.1:${N1_TRANSPORT}", "127.0.0.1:${N2_TRANSPORT}"]
-cluster.initial_cluster_manager_nodes: ["node-1","node-2"]
+# Node discovery
+discovery.seed_hosts: [${seed_hosts}]
+cluster.initial_cluster_manager_nodes: [${manager_nodes}]
 
 # Paths inside the node home
 path.data: ${node_home}/data
@@ -258,27 +292,9 @@ EOF
   sed -i.bak '/^-Xms/d' "${node_home}/config/jvm.options"
   sed -i.bak '/^-Xmx/d' "${node_home}/config/jvm.options"
 
-  # Heap settings:
-  # - If HEAP_GB_NODE1/HEAP_GB_NODE2 are provided, use them.
-  # - Otherwise, set to 25% of system memory (capped at 31g).
-  local heap_val
-  if [[ "${node_name}" == "node-1" ]]; then
-    if [[ "${HEAP_GB_NODE1}" == "auto" || -z "${HEAP_GB_NODE1}" ]]; then
-      heap_val="$(calc_heap_gb)"
-    else
-      heap_val="${HEAP_GB_NODE1}"
-    fi
-  elif [[ "${node_name}" == "node-2" ]]; then
-    if [[ "${HEAP_GB_NODE2}" == "auto" || -z "${HEAP_GB_NODE2}" ]]; then
-      heap_val="$(calc_heap_gb)"
-    else
-      heap_val="${HEAP_GB_NODE2}"
-    fi
-  else
-    heap_val="$(calc_heap_gb)"
-  fi
-
-  log "Setting heap for ${node_name} to ${heap_val}g (25% of RAM, cap 31g; override with HEAP_GB_NODEX)."
+  # Heap settings: 25% of system memory (capped at 31g), min 1g
+  local heap_val="$(calc_heap_gb)"
+  log "Setting heap for ${node_name} to ${heap_val}g (25% of RAM, cap 31g)."
   cat >"${node_home}/config/jvm.options.d/heap.options" <<EOF
 -Xms${heap_val}g
 -Xmx${heap_val}g
@@ -323,11 +339,11 @@ EOF
 open_firewall() {
   if command -v ufw >/dev/null 2>&1; then
     if ufw status | grep -q "Status: active"; then
-      log "UFW is active; allowing OpenSearch ports ${N1_HTTP},${N2_HTTP},${N1_TRANSPORT},${N2_TRANSPORT}..."
-      ufw allow "${N1_HTTP}/tcp" || true
-      ufw allow "${N2_HTTP}/tcp" || true
-      ufw allow "${N1_TRANSPORT}/tcp" || true
-      ufw allow "${N2_TRANSPORT}/tcp" || true
+      log "UFW is active; allowing OpenSearch ports..."
+      for i in $(seq 1 $NODE_COUNT); do
+        ufw allow "${NODE_HTTP_PORTS[$i]}/tcp" || true
+        ufw allow "${NODE_TRANSPORT_PORTS[$i]}/tcp" || true
+      done
     else
       warn "UFW not active; skipping firewall rules."
     fi
@@ -338,27 +354,35 @@ open_firewall() {
 
 ownership() {
   log "Setting ownership of node homes to opensearch:opensearch (one-time)..."
-  chown -R opensearch:opensearch "${NODE1_HOME}" "${NODE2_HOME}"
+  for i in $(seq 1 $NODE_COUNT); do
+    chown -R opensearch:opensearch "${NODE_HOMES[$i]}"
+  done
 }
 
 reload_enable_restart() {
   log "Reloading systemd units..."
   systemctl daemon-reload
 
-  log "Enabling services ${SVC1} and ${SVC2}..."
-  systemctl enable "${SVC1}" "${SVC2}" >/dev/null 2>&1 || true
+  log "Enabling services..."
+  for i in $(seq 1 $NODE_COUNT); do
+    systemctl enable "${SERVICE_NAMES[$i]}" >/dev/null 2>&1 || true
+  done
 
   log "Restarting services (idempotent on every run)..."
-  systemctl restart "${SVC1}" || true
-  systemctl restart "${SVC2}" || true
+  for i in $(seq 1 $NODE_COUNT); do
+    systemctl restart "${SERVICE_NAMES[$i]}" || true
+  done
 }
 
 post_checks() {
   log "Waiting up to 30s for HTTP endpoints..."
-  SECS=0
-  until curl -sf "http://127.0.0.1:${N1_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
-  SECS=0
-  until curl -sf "http://127.0.0.1:${N2_HTTP}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do sleep 1; SECS=$((SECS+1)); done
+  for i in $(seq 1 $NODE_COUNT); do
+    SECS=0
+    until curl -sf "http://127.0.0.1:${NODE_HTTP_PORTS[$i]}" >/dev/null 2>&1 || [[ $SECS -ge 30 ]]; do 
+      sleep 1
+      SECS=$((SECS+1))
+    done
+  done
 
   log "Creating performance-optimized index template..."
   curl -X PUT "http://127.0.0.1:${N1_HTTP}/_index_template/performance_template" -H 'Content-Type: application/json' -d '{
@@ -374,11 +398,20 @@ post_checks() {
 
   log "Local curl checks:"
   set +e
-  curl -s "http://127.0.0.1:${N1_HTTP}/_cluster/health?pretty" | jq . || true
-  curl -s "http://127.0.0.1:${N2_HTTP}/_nodes/http?pretty" | jq '._nodes, .nodes[].http' || true
+  curl -s "http://127.0.0.1:${NODE_HTTP_PORTS[1]}/_cluster/health?pretty" | jq . || true
+  curl -s "http://127.0.0.1:${NODE_HTTP_PORTS[1]}/_nodes/http?pretty" | jq '._nodes, .nodes[].http' || true
   set -e
 
-  ss -ltnp | egrep ":${N1_HTTP}|:${N2_HTTP}|:${N1_TRANSPORT}|:${N2_TRANSPORT}" || true
+  # Show listening ports
+  local port_pattern=""
+  for i in $(seq 1 $NODE_COUNT); do
+    if [ $i -eq 1 ]; then
+      port_pattern=":${NODE_HTTP_PORTS[$i]}|:${NODE_TRANSPORT_PORTS[$i]}"
+    else
+      port_pattern="${port_pattern}|:${NODE_HTTP_PORTS[$i]}|:${NODE_TRANSPORT_PORTS[$i]}"
+    fi
+  done
+  ss -ltnp | egrep "${port_pattern}" || true
 }
 
 # =========================
@@ -397,14 +430,16 @@ case "$action" in
     create_user
     download_dist
 
-    clone_node_home "${NODE1_HOME}"
-    clone_node_home "${NODE2_HOME}"
+    # Clone node homes and write configs
+    for i in $(seq 1 $NODE_COUNT); do
+      clone_node_home "${NODE_HOMES[$i]}"
+      write_config "${NODE_HOMES[$i]}" "node-${i}" "${NODE_HTTP_PORTS[$i]}" "${NODE_TRANSPORT_PORTS[$i]}"
+    done
 
-    write_config "${NODE1_HOME}" "node-1" "${N1_HTTP}" "${N1_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
-    write_config "${NODE2_HOME}" "node-2" "${N2_HTTP}" "${N2_TRANSPORT}" "${N1_TRANSPORT}" "${N2_TRANSPORT}"
-
-    unit_file "${SVC1}" "${NODE1_HOME}" "${N1_HTTP}"
-    unit_file "${SVC2}" "${NODE2_HOME}" "${N2_HTTP}"
+    # Create systemd unit files
+    for i in $(seq 1 $NODE_COUNT); do
+      unit_file "${SERVICE_NAMES[$i]}" "${NODE_HOMES[$i]}" "${NODE_HTTP_PORTS[$i]}"
+    done
 
     ownership
     open_firewall
@@ -414,14 +449,15 @@ case "$action" in
     log "Detected total memory: $(mem_total_gb) GB; auto heap per node: $(calc_heap_gb) GB"
     log "Detected architecture: ${UNAME_M} -> ${OS_BUNDLE_ARCH}"
     log "Done. OPENSEARCH_HOME locations:"
-    echo "  node-1: ${NODE1_HOME}"
-    echo "  node-2: ${NODE2_HOME}"
+    for i in $(seq 1 $NODE_COUNT); do
+      echo "  node-${i}: ${NODE_HOMES[$i]}"
+    done
     echo
-    log "If remote curls still RST, check your cloud/VPC firewall (ingress to 9200/9201)."
+    log "HTTP ports: $(for i in $(seq 1 $NODE_COUNT); do echo -n "${NODE_HTTP_PORTS[$i]} "; done)"
+    log "If remote curls still RST, check your cloud/VPC firewall."
     ;;
   remove)
     require_root
-    # Ports/service names and paths are already defined above.
     remove_install
     ;;
   *)
