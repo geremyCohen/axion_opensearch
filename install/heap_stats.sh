@@ -111,10 +111,12 @@ show_cluster() {
   local host_ip=$(echo "$HOST" | cut -d: -f1)
   if [ "$host_ip" != "127.0.0.1" ] && [ "$host_ip" != "localhost" ]; then
     echo "  CPU Usage: $(ssh "$host_ip" "top -bn1 | grep 'Cpu(s)' | awk '{print \$2}'" 2>/dev/null || echo "N/A")"
+    echo "  CPU Average (5s): $(ssh "$host_ip" "vmstat 1 5 | tail -1 | awk '{print 100-\$15\"%\"}'" 2>/dev/null || echo "N/A")"
     echo "  Load Average: $(ssh "$host_ip" "uptime | awk -F'load average:' '{print \$2}'" 2>/dev/null || echo "N/A")"
     echo "  Disk I/O: $(ssh "$host_ip" "iostat -x 1 1 2>/dev/null | tail -n +4 | awk 'NR>3 {print \$1 \": \" \$10 \"% util\"}' | head -3" 2>/dev/null || echo "iostat not available")"
   else
     echo "  CPU Usage: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' 2>/dev/null || echo "N/A")"
+    echo "  CPU Average (5s): $(vmstat 1 5 | tail -1 | awk '{print 100-$15"%"}' 2>/dev/null || echo "N/A")"
     echo "  Load Average: $(uptime | awk -F'load average:' '{print $2}' 2>/dev/null || echo "N/A")"
   fi
 }
