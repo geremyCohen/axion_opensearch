@@ -8,17 +8,20 @@ Usage: $0 [install|remove|update] [node_count] [remote_ip]
   remove      Stop services and remove all OpenSearch installations (auto-detects node count)
   update      Update existing cluster configuration (requires environment variables)
   node_count  Number of nodes to install (default: 2, ignored for remove/update)
-  remote_ip   Remote host IP for SSH installation (optional, installs locally if omitted)
+  remote_ip   Remote host IP for SSH installation (optional, uses IP env var if omitted)
 
 Examples:
   $0 install                    # Install 2-node cluster locally
   $0 install 4                  # Install 4-node cluster locally
   $0 install 4 10.0.0.205       # Install 4-node cluster on remote host
+  IP="10.0.0.205" $0 install 4  # Install 4-node cluster using IP env var
   $0 remove                     # Remove all nodes locally (auto-detect)
   $0 remove 10.0.0.205          # Remove all nodes from remote host (auto-detect)
+  IP="10.0.0.205" $0 remove     # Remove all nodes using IP env var
   
 Update examples:
   system_memory_percent=80 $0 update 10.0.0.205                    # Update heap to 80% memory split
+  IP="10.0.0.205" system_memory_percent=80 $0 update              # Same using IP env var
   indices_breaker_total_limit=85% $0 update 10.0.0.205            # Update total breaker limit
   system_memory_percent=70 indices_breaker_request_limit=60% $0 update 10.0.0.205  # Multiple settings
 
@@ -41,10 +44,10 @@ ACTION="${1:-install}"
 # For install, parse node_count and remote_ip normally
 if [[ "$ACTION" == "remove" || "$ACTION" == "update" ]]; then
   NODE_COUNT=0  # Will be auto-detected
-  REMOTE_IP="${2:-}"  # Second parameter is remote_ip for remove/update
+  REMOTE_IP="${2:-${IP:-}}"  # Second parameter or IP env var for remove/update
 else
   NODE_COUNT="${2:-2}"
-  REMOTE_IP="${3:-}"
+  REMOTE_IP="${3:-${IP:-}}"  # Third parameter or IP env var for install
   
   # Validate node count for install
   if ! [[ "$NODE_COUNT" =~ ^[1-9][0-9]*$ ]]; then
