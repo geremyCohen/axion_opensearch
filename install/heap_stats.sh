@@ -10,9 +10,10 @@ show_menu() {
   echo "1. Simple Node Overview"
   echo "2. Detailed Per-Node Stats" 
   echo "3. Cluster-Wide Memory Summary"
-  echo "4. All Charts (default)"
+  echo "4. CPU and System Stats"
+  echo "5. All Charts (default)"
   echo
-  read -p "Select option (1-4) or press Enter for all: " choice
+  read -p "Select option (1-5) or press Enter for all: " choice
   echo
 }
 
@@ -28,7 +29,22 @@ show_detailed() {
   curl -s "http://$HOST/_nodes/stats/jvm?pretty" | jq '.nodes | to_entries[] | {node: .value.name, heap_used_percent: .value.jvm.mem.heap_used_percent, heap_used_gb: (.value.jvm.mem.heap_used_in_bytes / 1073741824 | round), heap_max_gb: (.value.jvm.mem.heap_max_in_bytes / 1073741824 | round)}'
 }
 
-show_cluster() {
+show_cpu() {
+  echo "CPU and System Performance Stats:"
+  local host_ip=$(echo "$HOST" | cut -d: -f1)
+  if [ "$host_ip" != "127.0.0.1" ] && [ "$host_ip" != "localhost" ]; then
+    echo "  CPU Usage: $(ssh "$host_ip" "top -bn1 | grep 'Cpu(s)' | awk '{print \$2}'" 2>/dev/null || echo "N/A")"
+    echo "  CPU Average (5s): $(ssh "$host_ip" "vmstat 1 5 | tail -1 | awk '{print 100-\$15\"%\"}'" 2>/dev/null || echo "N/A")"
+    echo "  Load Average: $(ssh "$host_ip" "uptime | awk -F'load average:' '{print \$2}'" 2>/dev/null || echo "N/A")"
+    echo "  Memory Usage: $(ssh "$host_ip" "free | grep Mem | awk '{printf \"%.1f%%\", \$3/\$2 * 100}'" 2>/dev/null || echo "N/A")"
+    echo "  Disk I/O: $(ssh "$host_ip" "iostat -x 1 1 2>/dev/null | tail -n +4 | awk 'NR>3 {print \$1 \": \" \$10 \"% util\"}' | head -3" 2>/dev/null || echo "iostat not available")"
+  else
+    echo "  CPU Usage: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' 2>/dev/null || echo "N/A")"
+    echo "  CPU Average (5s): $(vmstat 1 5 | tail -1 | awk '{print 100-$15"%"}' 2>/dev/null || echo "N/A")"
+    echo "  Load Average: $(uptime | awk -F'load average:' '{print $2}' 2>/dev/null || echo "N/A")"
+    echo "  Memory Usage: $(free | grep Mem | awk '{printf "%.1f%%", $3/$2 * 100}' 2>/dev/null || echo "N/A")"
+  fi
+}
   echo "Cluster-Wide Memory Summary:"
   curl -s "http://$HOST/_cluster/stats?pretty" | jq '.nodes.jvm.mem'
   echo
@@ -110,16 +126,13 @@ show_cluster() {
   echo "System Resource Usage:"
   local host_ip=$(echo "$HOST" | cut -d: -f1)
   if [ "$host_ip" != "127.0.0.1" ] && [ "$host_ip" != "localhost" ]; then
-    echo "  CPU Usage: $(ssh "$host_ip" "top -bn1 | grep 'Cpu(s)' | awk '{print \$2}'" 2>/dev/null || echo "N/A")"
-    echo "  CPU Average (5s): $(ssh "$host_ip" "vmstat 1 5 | tail -1 | awk '{print 100-\$15\"%\"}'" 2>/dev/null || echo "N/A")"
-    echo "  Load Average: $(ssh "$host_ip" "uptime | awk -F'load average:' '{print \$2}'" 2>/dev/null || echo "N/A")"
     echo "  Disk I/O: $(ssh "$host_ip" "iostat -x 1 1 2>/dev/null | tail -n +4 | awk 'NR>3 {print \$1 \": \" \$10 \"% util\"}' | head -3" 2>/dev/null || echo "iostat not available")"
   else
-    echo "  CPU Usage: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' 2>/dev/null || echo "N/A")"
-    echo "  CPU Average (5s): $(vmstat 1 5 | tail -1 | awk '{print 100-$15"%"}' 2>/dev/null || echo "N/A")"
-    echo "  Load Average: $(uptime | awk -F'load average:' '{print $2}' 2>/dev/null || echo "N/A")"
+    echo "  Disk I/O: Local monitoring only"
   fi
 }
+
+show_cluster() {
 
 show_all() {
   echo "1. Simple Node Overview:"
@@ -130,6 +143,9 @@ show_all() {
   echo
   echo "3. Cluster-Wide Memory Summary:"
   show_cluster
+  echo
+  echo "4. CPU and System Stats:"
+  show_cpu
 }
 
 # Get user choice once
@@ -138,6 +154,7 @@ case $choice in
   1) chart_func="show_simple" ;;
   2) chart_func="show_detailed" ;;
   3) chart_func="show_cluster" ;;
+  4) chart_func="show_cpu" ;;
   *) chart_func="show_all" ;;
 esac
 
