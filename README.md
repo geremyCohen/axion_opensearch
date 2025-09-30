@@ -75,7 +75,7 @@ ssh 10.0.0.50 "sudo /tmp/dual_installer.sh remove"
 - Transport ports: 9300, 9301, 9302, 9303, etc.
 - Cluster name: `axion-cluster`
 - **Index template**: Automatically created with optimized settings:
-  - `number_of_shards: N` (matches node count for optimal load distribution)
+  - `number_of_shards: N` (tiered calculation: <10 nodes=1x, 10-50 nodes=1.5x, >50 nodes=2x)
   - `refresh_interval: 30s` (eliminates CPU stalls from 1s default)
   - `number_of_replicas: 1` (proper data distribution)
   - `merge.scheduler.max_thread_count: 4` (controlled segment merging)

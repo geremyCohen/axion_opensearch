@@ -617,11 +617,21 @@ reload_enable_restart() {
 create_index_template() {
   log "Creating index template with optimized settings..."
   
+  # Calculate optimal shard count based on cluster size
+  local shard_count
+  if [ $NODE_COUNT -lt 10 ]; then
+    shard_count=$NODE_COUNT
+  elif [ $NODE_COUNT -le 50 ]; then
+    shard_count=$((NODE_COUNT * 3 / 2))  # 1.5 * nodes
+  else
+    shard_count=$((NODE_COUNT * 2))      # 2 * nodes
+  fi
+  
   local template_json="{
     \"index_patterns\": [\"*\"],
     \"template\": {
       \"settings\": {
-        \"number_of_shards\": ${NODE_COUNT},
+        \"number_of_shards\": ${shard_count},
         \"number_of_replicas\": 1,
         \"refresh_interval\": \"30s\",
         \"merge.scheduler.max_thread_count\": 4,
@@ -648,7 +658,7 @@ create_index_template() {
   if curl -s -X PUT "http://127.0.0.1:9200/_index_template/default-template" \
        -H "Content-Type: application/json" \
        -d "$template_json" | grep -q '"acknowledged":true'; then
-    log "Index template created successfully with ${NODE_COUNT} default shards"
+    log "Index template created successfully with ${shard_count} default shards (${NODE_COUNT} nodes)"
   else
     log "Warning: Failed to create index template"
   fi
