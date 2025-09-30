@@ -164,7 +164,7 @@ get_connection_string() {
   fi
   
   # Output the complete OSB command
-  echo "opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=${target_hosts} --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+  echo "opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only --target-hosts=${target_hosts} --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
 }
 
 update_heap_config() {
@@ -808,7 +808,7 @@ case "$action" in
     # Generate OSB command
     echo
     echo "OpenSearch Benchmark command:"
-    echo -n "opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts="
+    echo -n "opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only --target-hosts="
     for i in $(seq 1 $NODE_COUNT); do
       if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
         host_ip="$REMOTE_HOST_IP"
