@@ -7,7 +7,7 @@
 set -e
 
 echo "=== OpenSearch Benchmark Installation ==="
-echo "Installing OSB 1.16.0 for OpenSearch 3.1.x compatibility"
+echo "Installing OSB 2.0.0 for OpenSearch 3.1.x compatibility"
 echo
 
 # Dependencies
@@ -31,7 +31,7 @@ source ~/opensearch-benchmark-workloads-env/bin/activate
 
 echo "Installing OpenSearch Benchmark..."
 pip install -U pip setuptools wheel
-pip install "opensearch-benchmark==1.16.0"
+pip install "opensearch-benchmark==2.0.0"
 
 echo
 echo "=== Installation Complete ==="
