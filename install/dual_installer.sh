@@ -3,12 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 [install|remove|update] [node_count] [remote_ip]
-  install     Install or upgrade OpenSearch cluster (default if omitted)
-  remove      Stop services and remove all OpenSearch installations (auto-detects node count)
-  update      Update existing cluster configuration (requires environment variables)
-  node_count  Number of nodes to install (default: 2, ignored for remove/update)
-  remote_ip   Remote host IP for SSH installation (optional, uses IP env var if omitted)
+Usage: $0 [install|remove|update|get_con_string] [node_count] [remote_ip]
+  install        Install or upgrade OpenSearch cluster (default if omitted)
+  remove         Stop services and remove all OpenSearch installations (auto-detects node count)
+  update         Update existing cluster configuration (requires environment variables)
+  get_con_string Generate OpenSearch Benchmark command line for current cluster
+  node_count     Number of nodes to install (default: 2, ignored for remove/update/get_con_string)
+  remote_ip      Remote host IP for SSH installation (optional, uses IP env var if omitted)
 
 Examples:
   $0 install                    # Install 2-node cluster locally
@@ -18,6 +19,8 @@ Examples:
   $0 remove                     # Remove all nodes locally (auto-detect)
   $0 remove 10.0.0.205          # Remove all nodes from remote host (auto-detect)
   IP="10.0.0.205" $0 remove     # Remove all nodes using IP env var
+  $0 get_con_string             # Generate OSB command for local cluster
+  IP="10.0.0.205" $0 get_con_string # Generate OSB command for remote cluster
   
 Update examples:
   system_memory_percent=80 $0 update 10.0.0.205                    # Update heap to 80% memory split
@@ -40,11 +43,11 @@ USAGE
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
 ACTION="${1:-install}"
 
-# For remove/update, node_count is ignored (auto-detected)
+# For remove/update/get_con_string, node_count is ignored (auto-detected)
 # For install, parse node_count and remote_ip normally
-if [[ "$ACTION" == "remove" || "$ACTION" == "update" ]]; then
+if [[ "$ACTION" == "remove" || "$ACTION" == "update" || "$ACTION" == "get_con_string" ]]; then
   NODE_COUNT=0  # Will be auto-detected
-  REMOTE_IP="${2:-${IP:-}}"  # Second parameter or IP env var for remove/update
+  REMOTE_IP="${2:-${IP:-}}"  # Second parameter or IP env var for remove/update/get_con_string
 else
   NODE_COUNT="${2:-2}"
   REMOTE_IP="${3:-${IP:-}}"  # Third parameter or IP env var for install
@@ -117,6 +120,52 @@ for i in $(seq 1 $NODE_COUNT); do
 done
 SVC1="opensearch-node1"
 SVC2="opensearch-node2"
+
+get_connection_string() {
+  # Auto-detect number of nodes
+  local detected_nodes=0
+  for i in {1..50}; do
+    if [[ -d "/opt/opensearch-node$i" ]]; then
+      detected_nodes=$i
+    fi
+  done
+  
+  if [[ $detected_nodes -eq 0 ]]; then
+    err "No OpenSearch nodes detected. Install a cluster first."
+    exit 1
+  fi
+  
+  # Determine host IP
+  local host_ip
+  if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
+    host_ip="$REMOTE_HOST_IP"
+  elif [[ -n "${REMOTE_IP:-}" ]]; then
+    host_ip="$REMOTE_IP"
+  else
+    # Get private IP of current machine
+    host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
+  fi
+  
+  # Build target-hosts string
+  local target_hosts=""
+  for ((i=1; i<=detected_nodes; i++)); do
+    local port=$((9199 + i))
+    if [[ $i -eq 1 ]]; then
+      target_hosts="${host_ip}:${port}"
+    else
+      target_hosts="${target_hosts},${host_ip}:${port}"
+    fi
+  done
+  
+  # Calculate bulk_indexing_clients (nodes * 4 + 20, capped at 150)
+  local bulk_clients=$((detected_nodes * 4 + 20))
+  if [[ $bulk_clients -gt 150 ]]; then
+    bulk_clients=150
+  fi
+  
+  # Output the complete OSB command
+  echo "opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=${target_hosts} --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+}
 
 update_heap_config() {
   local memory_percent="${system_memory_percent:-50}"
@@ -711,6 +760,8 @@ if [[ -n "$REMOTE_IP" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
   elif [[ "$action" == "update" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent='${system_memory_percent:-50}' indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' num_of_shards='${num_of_shards:-}' REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh update"
+  elif [[ "$action" == "get_con_string" ]]; then
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh get_con_string"
   else
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh '$action' '$NODE_COUNT'"
   fi
@@ -785,6 +836,9 @@ case "$action" in
   update)
     require_root
     update_heap_config
+    ;;
+  get_con_string)
+    get_connection_string
     ;;
   *)
     err "Unknown action: $action"
