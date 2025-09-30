@@ -187,6 +187,7 @@ update_heap_config() {
   # Handle shard count update if specified
   if [[ -n "${num_of_shards:-}" ]]; then
     log "Recreating nyc_taxis index with ${num_of_shards} shards..."
+    log "Debug: num_of_shards variable contains: '${num_of_shards}'"
     
     # Wait for cluster to be ready with timeout
     local max_attempts=15
@@ -695,7 +696,7 @@ if [[ -n "$REMOTE_IP" ]]; then
   if [[ "$action" == "remove" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
   elif [[ "$action" == "update" ]]; then
-    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent=${system_memory_percent:-50} indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' num_of_shards='${num_of_shards:-}' REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh update"
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent='${system_memory_percent:-50}' indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' num_of_shards='${num_of_shards:-}' REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh update"
   else
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP=$REMOTE_IP /tmp/dual_installer.sh $action $NODE_COUNT"
   fi
