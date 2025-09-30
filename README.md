@@ -75,6 +75,7 @@ ssh 10.0.0.50 "sudo /tmp/dual_installer.sh remove"
 - Transport ports: 9300, 9301, 9302, 9303, etc.
 - Cluster name: `axion-cluster`
 - **Index template**: Automatically created with optimized settings:
+  - `number_of_shards: N` (matches node count for optimal load distribution)
   - `refresh_interval: 30s` (eliminates CPU stalls from 1s default)
   - `number_of_replicas: 1` (proper data distribution)
   - `merge.scheduler.max_thread_count: 4` (controlled segment merging)
@@ -94,8 +95,8 @@ system_memory_percent=80 ./install/dual_installer.sh update 10.0.0.50
 # Update circuit breaker limits for higher indexing throughput
 indices_breaker_total_limit=85% indices_breaker_request_limit=70% ./install/dual_installer.sh update 10.0.0.50
 
-# Recommended: Update memory + breakers for maximum benchmark performance
-system_memory_percent=90 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% ./install/dual_installer.sh update 10.0.0.50
+# Recommended: Update memory + breakers + shards for maximum benchmark performance
+system_memory_percent=90 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% num_of_shards=10 ./install/dual_installer.sh update 10.0.0.50
 ```
 
 **Update Options:**
@@ -103,6 +104,7 @@ system_memory_percent=90 indices_breaker_total_limit=85% indices_breaker_request
 - `indices_breaker_total_limit`: Total circuit breaker limit (e.g., 85%)
 - `indices_breaker_request_limit`: Request circuit breaker limit (e.g., 70%)
 - `indices_breaker_fielddata_limit`: Fielddata circuit breaker limit (e.g., 50%)
+- `num_of_shards`: Recreate nyc_taxis index with N primary shards (distributes load across nodes)
 
 ## nyc_taxis Benchmark
 

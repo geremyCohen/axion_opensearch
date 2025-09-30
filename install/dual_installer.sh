@@ -617,19 +617,20 @@ reload_enable_restart() {
 create_index_template() {
   log "Creating index template with optimized settings..."
   
-  local template_json='{
-    "index_patterns": ["*"],
-    "template": {
-      "settings": {
-        "number_of_replicas": 1,
-        "refresh_interval": "30s",
-        "merge.scheduler.max_thread_count": 4,
-        "translog.flush_threshold_size": "1gb",
-        "index.codec": "best_compression"
+  local template_json="{
+    \"index_patterns\": [\"*\"],
+    \"template\": {
+      \"settings\": {
+        \"number_of_shards\": ${NODE_COUNT},
+        \"number_of_replicas\": 1,
+        \"refresh_interval\": \"30s\",
+        \"merge.scheduler.max_thread_count\": 4,
+        \"translog.flush_threshold_size\": \"1gb\",
+        \"index.codec\": \"best_compression\"
       }
     },
-    "priority": 100
-  }'
+    \"priority\": 100
+  }"
   
   # Wait for cluster to be ready
   local max_attempts=30
@@ -647,7 +648,7 @@ create_index_template() {
   if curl -s -X PUT "http://127.0.0.1:9200/_index_template/default-template" \
        -H "Content-Type: application/json" \
        -d "$template_json" | grep -q '"acknowledged":true'; then
-    log "Index template created successfully"
+    log "Index template created successfully with ${NODE_COUNT} default shards"
   else
     log "Warning: Failed to create index template"
   fi
