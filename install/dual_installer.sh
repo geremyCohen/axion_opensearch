@@ -40,7 +40,7 @@ USAGE
 # =========================
 # Configurable parameters
 # =========================
-OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-2.13.0}"
+OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-3.1.0}"
 ACTION="${1:-install}"
 
 # For remove/update/get_con_string, node_count is ignored (auto-detected)
