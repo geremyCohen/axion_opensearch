@@ -193,7 +193,7 @@ update_heap_config() {
     log "Debug: num_of_shards variable contains: '${num_of_shards}'"
     
     # Wait for cluster to be ready with timeout
-    local max_attempts=15
+    local max_attempts=60
     local attempt=1
     local cluster_ready=false
     
@@ -203,7 +203,7 @@ update_heap_config() {
         break
       fi
       log "Waiting for cluster... (attempt $attempt/$max_attempts)"
-      sleep 2
+      sleep 1
       ((attempt++))
     done
     
