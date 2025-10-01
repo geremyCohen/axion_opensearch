@@ -12,7 +12,13 @@ echo
 
 # Dependencies
 echo "Installing system dependencies..."
-sudo apt update && sudo apt install -y python3-pip python3-venv python3-full build-essential btop python3.11 python3.11-venv python3.11-dev software-properties-common
+sudo apt update && sudo apt install -y python3-pip python3-venv python3-full build-essential btop software-properties-common
+
+# OSB requires Python >=3.8,<3.12 - install Python 3.11
+echo "Installing Python 3.11 (OSB requires Python <3.12)..."
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv python3.11-dev
 
 # Setup git
 echo "Configuring git..."
@@ -25,7 +31,7 @@ rm -rf ~/opensearch-benchmark-workloads
 cd; git clone https://github.com/opensearch-project/opensearch-benchmark-workloads.git
 sudo chown -R $USER:$USER opensearch-benchmark-workloads
 
-echo "Creating Python virtual environment..."
+echo "Creating Python 3.11 virtual environment..."
 python3.11 -m venv ~/opensearch-benchmark-workloads-env
 source ~/opensearch-benchmark-workloads-env/bin/activate
 
@@ -40,5 +46,5 @@ echo "  source ~/opensearch-benchmark-workloads-env/bin/activate"
 echo "  opensearch-benchmark --version"
 echo
 echo "Example usage:"
-echo "  opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200 --client-options=use_ssl:false,verify_certs:false"
+echo "  opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only --target-hosts=10.0.0.203:9200 --client-options=use_ssl:false,verify_certs:false"
 echo
