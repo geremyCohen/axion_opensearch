@@ -121,6 +121,34 @@ done
 SVC1="opensearch-node1"
 SVC2="opensearch-node2"
 
+generate_osb_command() {
+  local node_count="$1"
+  local host_ip="$2"
+  
+  # Build target-hosts string
+  local target_hosts=""
+  for ((i=1; i<=node_count; i++)); do
+    local port=$((9199 + i))
+    if [[ $i -eq 1 ]]; then
+      target_hosts="${host_ip}:${port}"
+    else
+      target_hosts="${target_hosts},${host_ip}:${port}"
+    fi
+  done
+  
+  # Calculate bulk_indexing_clients (nodes * 4 + 20, capped at 150)
+  local bulk_clients=$((node_count * 4 + 20))
+  if [[ $bulk_clients -gt 150 ]]; then
+    bulk_clients=150
+  fi
+  
+  # Output the complete OSB command
+  echo "opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only \\"
+  echo " --target-hosts=${target_hosts} \\"
+  echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" \\"
+  echo " --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+}
+
 get_connection_string() {
   # Auto-detect number of nodes
   local detected_nodes=0
@@ -146,28 +174,8 @@ get_connection_string() {
     host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
   fi
   
-  # Build target-hosts string
-  local target_hosts=""
-  for ((i=1; i<=detected_nodes; i++)); do
-    local port=$((9199 + i))
-    if [[ $i -eq 1 ]]; then
-      target_hosts="${host_ip}:${port}"
-    else
-      target_hosts="${target_hosts},${host_ip}:${port}"
-    fi
-  done
-  
-  # Calculate bulk_indexing_clients (nodes * 4 + 20, capped at 150)
-  local bulk_clients=$((detected_nodes * 4 + 20))
-  if [[ $bulk_clients -gt 150 ]]; then
-    bulk_clients=150
-  fi
-  
-  # Output the complete OSB command
-  echo "opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only \\"
-  echo " --target-hosts=${target_hosts} \\"
-  echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" \\"
-  echo " --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+  # Use shared function to generate command
+  generate_osb_command "$detected_nodes" "$host_ip"
 }
 
 update_heap_config() {
@@ -811,26 +819,15 @@ case "$action" in
     # Generate OSB command
     echo
     echo "OpenSearch Benchmark command:"
-    echo -n "opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only \\"
-    echo
-    echo -n " --target-hosts="
-    for i in $(seq 1 $NODE_COUNT); do
-      if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
-        host_ip="$REMOTE_HOST_IP"
-      elif [[ -n "${REMOTE_IP:-}" ]]; then
-        host_ip="$REMOTE_IP"
-      else
-        host_ip="127.0.0.1"
-      fi
-      if [ $i -eq 1 ]; then
-        echo -n "${host_ip}:${NODE_HTTP_PORTS[$i]}"
-      else
-        echo -n ",${host_ip}:${NODE_HTTP_PORTS[$i]}"
-      fi
-    done
-    echo " \\"
-    echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" \\"
-    echo " --workload-params=\"bulk_indexing_clients:90,bulk_size:10000\""
+    local host_ip
+    if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
+      host_ip="$REMOTE_HOST_IP"
+    elif [[ -n "${REMOTE_IP:-}" ]]; then
+      host_ip="$REMOTE_IP"
+    else
+      host_ip="127.0.0.1"
+    fi
+    generate_osb_command "$NODE_COUNT" "$host_ip"
     
     if [[ -z "$REMOTE_IP" ]]; then
       log "If remote curls still RST, check your cloud/VPC firewall."
