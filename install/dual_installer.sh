@@ -3,12 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 [install|remove|update|get_con_string] [node_count] [remote_ip]
+Usage: $0 [install|remove|update|get_con_string|set-node-size] [node_count] [remote_ip]
   install        Install or upgrade OpenSearch cluster (default if omitted)
   remove         Stop services and remove all OpenSearch installations (auto-detects node count)
   update         Update existing cluster configuration (requires environment variables)
   get_con_string Generate OpenSearch Benchmark command line for current cluster
-  node_count     Number of nodes to install (default: 2, ignored for remove/update/get_con_string)
+  set-node-size  Scale cluster to specified node count (requires nodesize env var)
+  node_count     Number of nodes to install (default: 2, ignored for remove/update/get_con_string/set-node-size)
   remote_ip      Remote host IP for SSH installation (optional, uses IP env var if omitted)
 
 Examples:
@@ -21,6 +22,8 @@ Examples:
   IP="10.0.0.205" $0 remove     # Remove all nodes using IP env var
   $0 get_con_string             # Generate OSB command for local cluster
   IP="10.0.0.205" $0 get_con_string # Generate OSB command for remote cluster
+  nodesize=8 $0 set-node-size      # Scale cluster to 8 nodes locally
+  nodesize=12 IP="10.0.0.205" $0 set-node-size # Scale remote cluster to 12 nodes
   
 Update examples:
   system_memory_percent=80 $0 update 10.0.0.205                    # Update heap to 80% memory split
@@ -43,11 +46,11 @@ USAGE
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-3.1.0}"
 ACTION="${1:-install}"
 
-# For remove/update/get_con_string, node_count is ignored (auto-detected)
+# For remove/update/get_con_string/set-node-size, node_count is ignored (auto-detected)
 # For install, parse node_count and remote_ip normally
-if [[ "$ACTION" == "remove" || "$ACTION" == "update" || "$ACTION" == "get_con_string" ]]; then
+if [[ "$ACTION" == "remove" || "$ACTION" == "update" || "$ACTION" == "get_con_string" || "$ACTION" == "set-node-size" ]]; then
   NODE_COUNT=0  # Will be auto-detected
-  REMOTE_IP="${2:-${IP:-}}"  # Second parameter or IP env var for remove/update/get_con_string
+  REMOTE_IP="${2:-${IP:-}}"  # Second parameter or IP env var for remove/update/get_con_string/set-node-size
 else
   NODE_COUNT="${2:-2}"
   REMOTE_IP="${3:-${IP:-}}"  # Third parameter or IP env var for install
@@ -176,6 +179,128 @@ get_connection_string() {
   
   # Use shared function to generate command
   generate_osb_command "$detected_nodes" "$host_ip"
+}
+
+set_node_size() {
+  local target_size="${nodesize:-}"
+  
+  if [[ -z "$target_size" ]]; then
+    err "nodesize environment variable is required. Example: nodesize=8 $0 set-node-size"
+    exit 1
+  fi
+  
+  if ! [[ "$target_size" =~ ^[1-9][0-9]*$ ]] || [ "$target_size" -gt 50 ]; then
+    err "nodesize must be a positive integer between 1 and 50"
+    exit 1
+  fi
+  
+  # Auto-detect current nodes
+  local current_nodes=()
+  for i in {1..50}; do
+    if remote_exec "[ -d \"/opt/opensearch-node${i}\" ]"; then
+      current_nodes+=($i)
+    fi
+  done
+  
+  local current_size=${#current_nodes[@]}
+  
+  if [[ $current_size -eq 0 ]]; then
+    err "No existing OpenSearch installation found. Use 'install' command first."
+    exit 1
+  fi
+  
+  log "Current cluster size: $current_size nodes"
+  log "Target cluster size: $target_size nodes"
+  
+  if [[ $current_size -eq $target_size ]]; then
+    log "Cluster is already at target size of $target_size nodes"
+    return 0
+  elif [[ $current_size -lt $target_size ]]; then
+    # Scale up - add nodes
+    log "Scaling up: adding $((target_size - current_size)) nodes"
+    NODE_COUNT=$target_size
+    setup_node_arrays
+    
+    # Add new nodes
+    for ((i=current_size+1; i<=target_size; i++)); do
+      log "Adding node-$i..."
+      clone_node_home "/opt/opensearch-node$i"
+      write_config "/opt/opensearch-node$i" "node-$i" "${NODE_HTTP_PORTS[$i]}" "${NODE_TRANSPORT_PORTS[$i]}"
+      unit_file "opensearch-node$i" "/opt/opensearch-node$i" "${NODE_HTTP_PORTS[$i]}"
+      remote_exec "systemctl daemon-reload"
+      remote_exec "systemctl enable opensearch-node$i"
+      remote_exec "systemctl start opensearch-node$i"
+    done
+    
+    # Update all existing nodes with new cluster configuration
+    for node in "${current_nodes[@]}"; do
+      log "Updating node-$node configuration for new cluster size..."
+      write_config "/opt/opensearch-node$node" "node-$node" "${NODE_HTTP_PORTS[$node]}" "${NODE_TRANSPORT_PORTS[$node]}"
+      remote_exec "systemctl restart opensearch-node$node"
+    done
+    
+  else
+    # Scale down - remove nodes
+    log "Scaling down: removing $((current_size - target_size)) nodes"
+    
+    # Stop and remove excess nodes
+    for ((i=target_size+1; i<=current_size; i++)); do
+      log "Removing node-$i..."
+      remote_exec "systemctl stop opensearch-node$i || true"
+      remote_exec "systemctl disable opensearch-node$i || true"
+      remote_exec "rm -f /etc/systemd/system/opensearch-node$i.service"
+      remote_exec "rm -rf /opt/opensearch-node$i"
+    done
+    
+    remote_exec "systemctl daemon-reload"
+    
+    # Update remaining nodes with new cluster configuration
+    NODE_COUNT=$target_size
+    setup_node_arrays
+    
+    for ((i=1; i<=target_size; i++)); do
+      log "Updating node-$i configuration for new cluster size..."
+      write_config "/opt/opensearch-node$i" "node-$i" "${NODE_HTTP_PORTS[$i]}" "${NODE_TRANSPORT_PORTS[$i]}"
+      remote_exec "systemctl restart opensearch-node$i"
+    done
+  fi
+  
+  log "Waiting for cluster to stabilize..."
+  sleep 10
+  
+  # Wait for cluster health
+  local max_attempts=30
+  local attempt=1
+  while [ $attempt -le $max_attempts ]; do
+    if remote_exec "timeout 5 curl -s 'http://127.0.0.1:9200/_cluster/health' 2>/dev/null | grep -q '\"status\":\"green\\|yellow\"'"; then
+      log "Cluster is healthy with $target_size nodes"
+      break
+    fi
+    log "Waiting for cluster health... (attempt $attempt/$max_attempts)"
+    sleep 5
+    ((attempt++))
+  done
+  
+  if [ $attempt -gt $max_attempts ]; then
+    log "Warning: Cluster health check timed out, but scaling operation completed"
+  fi
+  
+  log "Cluster successfully scaled to $target_size nodes"
+}
+
+setup_node_arrays() {
+  # Generate node configurations for the current NODE_COUNT
+  declare -ga NODE_HOMES
+  declare -ga NODE_HTTP_PORTS
+  declare -ga NODE_TRANSPORT_PORTS
+  declare -ga SERVICE_NAMES
+  
+  for i in $(seq 1 $NODE_COUNT); do
+    NODE_HOMES[$i]="${BASE_DIR}/opensearch-node${i}"
+    NODE_HTTP_PORTS[$i]=$((9199 + i))
+    NODE_TRANSPORT_PORTS[$i]=$((9299 + i))
+    SERVICE_NAMES[$i]="opensearch-node${i}"
+  done
 }
 
 update_heap_config() {
@@ -766,13 +891,19 @@ if [[ -n "$REMOTE_IP" ]]; then
   log "Copying installer to remote host..."
   scp "$0" "${SUDO_USER:-$USER}@${REMOTE_IP}:/tmp/dual_installer.sh"
   
-  log "Executing remotely: sudo /tmp/dual_installer.sh $action${NODE_COUNT:+ $NODE_COUNT}"
+  if [[ "$action" == "set-node-size" ]]; then
+    log "Executing remotely: sudo /tmp/dual_installer.sh $action"
+  else
+    log "Executing remotely: sudo /tmp/dual_installer.sh $action${NODE_COUNT:+ $NODE_COUNT}"
+  fi
   if [[ "$action" == "remove" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
   elif [[ "$action" == "update" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent='${system_memory_percent:-50}' indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' num_of_shards='${num_of_shards:-}' REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh update"
   elif [[ "$action" == "get_con_string" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh get_con_string"
+  elif [[ "$action" == "set-node-size" ]]; then
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo nodesize='${nodesize:-}' REMOTE_HOST_IP='$REMOTE_IP' REMOTE_IP='' IP='' /tmp/dual_installer.sh set-node-size"
   else
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh '$action' '$NODE_COUNT'"
   fi
@@ -843,6 +974,10 @@ case "$action" in
     ;;
   get_con_string)
     get_connection_string
+    ;;
+  set-node-size)
+    require_root
+    set_node_size
     ;;
   *)
     err "Unknown action: $action"
