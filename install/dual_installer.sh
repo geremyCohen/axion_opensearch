@@ -656,11 +656,11 @@ write_config() {
   
   # Build discovery seed hosts list
   local seed_hosts=""
-  for i in $(seq 1 $NODE_COUNT); do
-    if [ $i -eq 1 ]; then
-      seed_hosts="\"127.0.0.1:${NODE_TRANSPORT_PORTS[$i]}\""
+  for j in $(seq 1 $NODE_COUNT); do
+    if [ $j -eq 1 ]; then
+      seed_hosts="\"127.0.0.1:${NODE_TRANSPORT_PORTS[$j]}\""
     else
-      seed_hosts="${seed_hosts}, \"127.0.0.1:${NODE_TRANSPORT_PORTS[$i]}\""
+      seed_hosts="${seed_hosts}, \"127.0.0.1:${NODE_TRANSPORT_PORTS[$j]}\""
     fi
   done
   
@@ -670,11 +670,11 @@ write_config() {
   if (( manager_count > 3 )); then
     manager_count=3
   fi
-  for i in $(seq 1 $manager_count); do
-    if [ $i -eq 1 ]; then
-      manager_nodes="\"node-${i}\""
+  for j in $(seq 1 $manager_count); do
+    if [ $j -eq 1 ]; then
+      manager_nodes="\"node-${j}\""
     else
-      manager_nodes="${manager_nodes}, \"node-${i}\""
+      manager_nodes="${manager_nodes}, \"node-${j}\""
     fi
   done
 
@@ -765,9 +765,9 @@ open_firewall() {
   if command -v ufw >/dev/null 2>&1; then
     if ufw status | grep -q "Status: active"; then
       log "UFW is active; allowing OpenSearch ports..."
-      for i in $(seq 1 $NODE_COUNT); do
-        ufw allow "${NODE_HTTP_PORTS[$i]}/tcp" || true
-        ufw allow "${NODE_TRANSPORT_PORTS[$i]}/tcp" || true
+      for j in $(seq 1 $NODE_COUNT); do
+        ufw allow "${NODE_HTTP_PORTS[$j]}/tcp" || true
+        ufw allow "${NODE_TRANSPORT_PORTS[$j]}/tcp" || true
       done
     else
       warn "UFW not active; skipping firewall rules."
