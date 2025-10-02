@@ -309,6 +309,20 @@ update_heap_config() {
   local request_limit="${indices_breaker_request_limit:-}"
   local fielddata_limit="${indices_breaker_fielddata_limit:-}"
   
+  # Validate circuit breaker values end with %
+  if [[ -n "$total_limit" && ! "$total_limit" =~ %$ ]]; then
+    log "ERROR: indices_breaker_total_limit must end with % (e.g., 85%). Got: '$total_limit'"
+    exit 1
+  fi
+  if [[ -n "$request_limit" && ! "$request_limit" =~ %$ ]]; then
+    log "ERROR: indices_breaker_request_limit must end with % (e.g., 70%). Got: '$request_limit'"
+    exit 1
+  fi
+  if [[ -n "$fielddata_limit" && ! "$fielddata_limit" =~ %$ ]]; then
+    log "ERROR: indices_breaker_fielddata_limit must end with % (e.g., 50%). Got: '$fielddata_limit'"
+    exit 1
+  fi
+  
   # Validate memory percentage
   if ! [[ "$memory_percent" =~ ^[1-9][0-9]*$ ]] || [ "$memory_percent" -gt 100 ]; then
     echo "[error] Invalid system_memory_percent: $memory_percent. Must be 1-100" >&2
