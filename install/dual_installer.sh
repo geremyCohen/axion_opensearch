@@ -1021,7 +1021,7 @@ case "$action" in
     
     # Final verification
     log "Verifying cluster configuration..."
-    local host_ip
+    host_ip=""
     if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
       host_ip="$REMOTE_HOST_IP"
     elif [[ -n "${REMOTE_IP:-}" ]]; then
@@ -1031,12 +1031,12 @@ case "$action" in
     fi
     
     # Verify node count
-    local actual_nodes=$(timeout 10 curl -s "http://${host_ip}:9200/_cat/nodes?h=name" 2>/dev/null | wc -l || echo "0")
-    local expected_nodes="${nodesize:-$(ls -d /opt/opensearch-node* 2>/dev/null | wc -l)}"
+    actual_nodes=$(timeout 10 curl -s "http://${host_ip}:9200/_cat/nodes?h=name" 2>/dev/null | wc -l || echo "0")
+    expected_nodes="${nodesize:-$(ls -d /opt/opensearch-node* 2>/dev/null | wc -l)}"
     
     # Verify shard count if specified
     if [[ -n "${num_of_shards:-}" ]]; then
-      local actual_shards=$(timeout 10 curl -s "http://${host_ip}:9200/_cat/shards/nyc_taxis?h=shard,prirep" 2>/dev/null | grep "p" | wc -l || echo "0")
+      actual_shards=$(timeout 10 curl -s "http://${host_ip}:9200/_cat/shards/nyc_taxis?h=shard,prirep" 2>/dev/null | grep "p" | wc -l || echo "0")
       log "✓ Nodes: ${actual_nodes}/${expected_nodes}, Shards: ${actual_shards}/${num_of_shards}"
     else
       log "✓ Nodes: ${actual_nodes}/${expected_nodes}"
