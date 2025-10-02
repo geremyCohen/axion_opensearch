@@ -899,7 +899,7 @@ if [[ -n "$REMOTE_IP" ]]; then
   if [[ "$action" == "remove" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
   elif [[ "$action" == "update" ]]; then
-    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent='${system_memory_percent:-50}' indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' num_of_shards='${num_of_shards:-}' REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh update"
+    ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo system_memory_percent='${system_memory_percent:-50}' indices_breaker_total_limit='${indices_breaker_total_limit:-}' indices_breaker_request_limit='${indices_breaker_request_limit:-}' indices_breaker_fielddata_limit='${indices_breaker_fielddata_limit:-}' num_of_shards='${num_of_shards:-}' nodesize='${nodesize:-}' REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh update"
   elif [[ "$action" == "get_con_string" ]]; then
     ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo REMOTE_HOST_IP='$REMOTE_IP' /tmp/dual_installer.sh get_con_string"
   elif [[ "$action" == "set-node-size" ]]; then
@@ -971,7 +971,9 @@ case "$action" in
   update)
     require_root
     update_heap_config
-    set_node_size
+    if [[ -n "${nodesize:-}" ]]; then
+      set_node_size
+    fi
     ;;
   get_con_string)
     get_connection_string
