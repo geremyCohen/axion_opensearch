@@ -639,10 +639,14 @@ clone_node_home() {
     remote_exec "rsync -a --delete \"${BASE_LINK}/\" \"${node_home}/\""
     # Prepare per-node dirs
     remote_exec "mkdir -p \"${node_home}/data\" \"${node_home}/logs\" \"${node_home}/tmp\" \"${node_home}/config/jvm.options.d\""
+    # Fix ownership
+    remote_exec "chown -R opensearch:opensearch \"${node_home}\""
   else
     log "Node home already exists at ${node_home}"
     # Ensure critical subdirs exist even if user pruned them
     remote_exec "mkdir -p \"${node_home}/data\" \"${node_home}/logs\" \"${node_home}/tmp\" \"${node_home}/config/jvm.options.d\""
+    # Fix ownership
+    remote_exec "chown -R opensearch:opensearch \"${node_home}\""
   fi
 }
 
