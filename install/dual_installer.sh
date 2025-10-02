@@ -377,13 +377,23 @@ update_heap_config() {
     log "Recreating nyc_taxis index with ${num_of_shards} shards..."
     log "Debug: num_of_shards variable contains: '${num_of_shards}'"
     
+    # Determine host IP
+    local host_ip
+    if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
+      host_ip="$REMOTE_HOST_IP"
+    elif [[ -n "${REMOTE_IP:-}" ]]; then
+      host_ip="$REMOTE_IP"
+    else
+      host_ip="127.0.0.1"
+    fi
+    
     # Wait for cluster to be ready with timeout
     local max_attempts=60
     local attempt=1
     local cluster_ready=false
     
     while [ $attempt -le $max_attempts ]; do
-      if timeout 5 curl -s "http://127.0.0.1:9200/_cluster/health" 2>/dev/null | grep -q '"status":"green\|yellow"'; then
+      if timeout 5 curl -s "http://${host_ip}:9200/_cluster/health" 2>/dev/null | grep -q '"status":"green\|yellow"'; then
         cluster_ready=true
         break
       fi
@@ -397,11 +407,11 @@ update_heap_config() {
     fi
     
     # Delete existing nyc_taxis index if it exists
-    timeout 10 curl -s -X DELETE "http://127.0.0.1:9200/nyc_taxis" >/dev/null 2>&1 || true
+    timeout 10 curl -s -X DELETE "http://${host_ip}:9200/nyc_taxis" >/dev/null 2>&1 || true
     sleep 1
     
     # Create new index with specified shard count
-    local create_result=$(timeout 10 curl -s -X PUT "http://127.0.0.1:9200/nyc_taxis" \
+    local create_result=$(timeout 10 curl -s -X PUT "http://${host_ip}:9200/nyc_taxis" \
          -H "Content-Type: application/json" \
          -d "{\"settings\":{\"number_of_shards\":${num_of_shards},\"number_of_replicas\":1,\"refresh_interval\":\"30s\",\"merge.scheduler.max_thread_count\":4,\"translog.flush_threshold_size\":\"1gb\",\"index.codec\":\"best_compression\"}}" 2>/dev/null)
     
@@ -411,7 +421,7 @@ update_heap_config() {
       # Show shard distribution with timeout
       sleep 2
       log "Shard distribution:"
-      timeout 10 curl -s "http://127.0.0.1:9200/_cat/shards/nyc_taxis?h=shard,prirep,node" 2>/dev/null | grep "p" | awk '{print "  Primary shard " $1 " -> " $3}' || log "  Could not retrieve shard distribution"
+      timeout 10 curl -s "http://${host_ip}:9200/_cat/shards/nyc_taxis?h=shard,prirep,node" 2>/dev/null | grep "p" | awk '{print "  Primary shard " $1 " -> " $3}' || log "  Could not retrieve shard distribution"
     else
       log "Warning: Failed to recreate nyc_taxis index"
     fi
