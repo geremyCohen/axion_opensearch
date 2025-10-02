@@ -401,6 +401,11 @@ update_heap_config() {
       host_ip="127.0.0.1"
     fi
     
+    # Delete all existing nyc indices first to prevent conflicts
+    log "Deleting existing nyc* indices..."
+    timeout 10 curl -s -X DELETE "http://${host_ip}:9200/nyc*" >/dev/null 2>&1 || true
+    sleep 1
+    
     # Wait for cluster to be ready with timeout
     local max_attempts=60
     local attempt=1
@@ -419,10 +424,6 @@ update_heap_config() {
     if [ "$cluster_ready" = false ]; then
       log "Warning: Cluster not ready, proceeding anyway..."
     fi
-    
-    # Delete existing nyc_taxis index if it exists
-    timeout 10 curl -s -X DELETE "http://${host_ip}:9200/nyc_taxis" >/dev/null 2>&1 || true
-    sleep 1
     
     # Create new index with specified shard count
     local create_result=$(timeout 10 curl -s -X PUT "http://${host_ip}:9200/nyc_taxis" \
