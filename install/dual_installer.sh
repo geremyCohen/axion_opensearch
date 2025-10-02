@@ -819,7 +819,7 @@ case "$action" in
     # Generate OSB command
     echo
     echo "OpenSearch Benchmark command:"
-    local host_ip
+    host_ip=""
     if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
       host_ip="$REMOTE_HOST_IP"
     elif [[ -n "${REMOTE_IP:-}" ]]; then
