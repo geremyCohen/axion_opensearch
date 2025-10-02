@@ -145,8 +145,8 @@ generate_osb_command() {
     bulk_clients=150
   fi
   
-  # Output the complete OSB command
-  echo "opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only \\"
+  # Output the complete OSB command with kill and delete prefix
+  echo "sudo pkill -9 -f python3.11;curl -XDELETE \"http://${host_ip}:9200/nyc*\"; opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only \\"
   echo " --target-hosts=${target_hosts} \\"
   echo " --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=\"index\" \\"
   echo " --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
