@@ -971,6 +971,7 @@ case "$action" in
   update)
     require_root
     update_heap_config
+    set_node_size
     ;;
   get_con_string)
     get_connection_string
