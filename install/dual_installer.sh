@@ -438,19 +438,22 @@ update_heap_config() {
     fi
     
     # Create new index with specified shard count
-    local create_result=$(timeout 10 curl -s -X PUT "http://${host_ip}:9200/nyc_taxis" \
+    local create_result=$(timeout 15 curl -s -X PUT "http://${host_ip}:9200/nyc_taxis" \
          -H "Content-Type: application/json" \
          -d "{\"settings\":{\"number_of_shards\":${num_of_shards},\"number_of_replicas\":1,\"refresh_interval\":\"30s\",\"merge.scheduler.max_thread_count\":4,\"translog.flush_threshold_size\":\"1gb\",\"index.codec\":\"best_compression\"}}" 2>/dev/null)
     
-    if echo "$create_result" | grep -q '"acknowledged":true'; then
+    # Check if index was created successfully
+    sleep 2
+    local actual_shards=$(timeout 10 curl -s "http://${host_ip}:9200/nyc_taxis/_settings" 2>/dev/null | grep -o '"number_of_shards":"[0-9]*"' | grep -o '[0-9]*' || echo "0")
+    
+    if [[ "$actual_shards" == "$num_of_shards" ]]; then
       log "nyc_taxis index recreated with ${num_of_shards} shards"
       
       # Show shard distribution with timeout
-      sleep 2
       log "Shard distribution:"
       timeout 10 curl -s "http://${host_ip}:9200/_cat/shards/nyc_taxis?h=shard,prirep,node" 2>/dev/null | grep "p" | awk '{print "  Primary shard " $1 " -> " $3}' || log "  Could not retrieve shard distribution"
     else
-      log "Warning: Failed to recreate nyc_taxis index"
+      log "Warning: Index creation issue - expected ${num_of_shards} shards, got ${actual_shards}"
     fi
   fi
 }
@@ -1014,6 +1017,29 @@ case "$action" in
     update_heap_config
     if [[ -n "${nodesize:-}" ]]; then
       set_node_size
+    fi
+    
+    # Final verification
+    log "Verifying cluster configuration..."
+    local host_ip
+    if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
+      host_ip="$REMOTE_HOST_IP"
+    elif [[ -n "${REMOTE_IP:-}" ]]; then
+      host_ip="$REMOTE_IP"
+    else
+      host_ip="127.0.0.1"
+    fi
+    
+    # Verify node count
+    local actual_nodes=$(timeout 10 curl -s "http://${host_ip}:9200/_cat/nodes?h=name" 2>/dev/null | wc -l || echo "0")
+    local expected_nodes="${nodesize:-$(ls -d /opt/opensearch-node* 2>/dev/null | wc -l)}"
+    
+    # Verify shard count if specified
+    if [[ -n "${num_of_shards:-}" ]]; then
+      local actual_shards=$(timeout 10 curl -s "http://${host_ip}:9200/_cat/shards/nyc_taxis?h=shard,prirep" 2>/dev/null | grep "p" | wc -l || echo "0")
+      log "✓ Nodes: ${actual_nodes}/${expected_nodes}, Shards: ${actual_shards}/${num_of_shards}"
+    else
+      log "✓ Nodes: ${actual_nodes}/${expected_nodes}"
     fi
     ;;
   get_con_string)
