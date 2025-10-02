@@ -97,6 +97,9 @@ indices_breaker_total_limit=85% indices_breaker_request_limit=70% ./install/dual
 
 # Recommended: Update memory + breakers + shards for maximum benchmark performance
 system_memory_percent=90 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% num_of_shards=10 ./install/dual_installer.sh update 10.0.0.50
+
+# Scale cluster size and update settings simultaneously
+nodesize=8 system_memory_percent=80 ./install/dual_installer.sh update 10.0.0.50
 ```
 
 **Update Options:**
@@ -105,6 +108,7 @@ system_memory_percent=90 indices_breaker_total_limit=85% indices_breaker_request
 - `indices_breaker_request_limit`: Request circuit breaker limit (e.g., 70%)
 - `indices_breaker_fielddata_limit`: Fielddata circuit breaker limit (e.g., 50%)
 - `num_of_shards`: Recreate nyc_taxis index with N primary shards (distributes load across nodes)
+- `nodesize`: Scale cluster to N nodes (1-50)
 
 ## nyc_taxis Benchmark
 
