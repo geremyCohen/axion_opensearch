@@ -309,6 +309,23 @@ update_heap_config() {
   local request_limit="${indices_breaker_request_limit:-}"
   local fielddata_limit="${indices_breaker_fielddata_limit:-}"
   
+  # Delete indices early if shard recreation is requested
+  if [[ -n "${num_of_shards:-}" ]]; then
+    # Determine host IP for early deletion
+    local host_ip
+    if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
+      host_ip="$REMOTE_HOST_IP"
+    elif [[ -n "${REMOTE_IP:-}" ]]; then
+      host_ip="$REMOTE_IP"
+    else
+      host_ip="127.0.0.1"
+    fi
+    
+    log "Deleting existing nyc* indices before cluster changes..."
+    timeout 10 curl -s -X DELETE "http://${host_ip}:9200/nyc*" >/dev/null 2>&1 || true
+    sleep 1
+  fi
+  
   # Validate circuit breaker values end with %
   if [[ -n "$total_limit" && ! "$total_limit" =~ %$ ]]; then
     log "ERROR: indices_breaker_total_limit must end with % (e.g., 85%). Got: '$total_limit'"
@@ -400,11 +417,6 @@ update_heap_config() {
     else
       host_ip="127.0.0.1"
     fi
-    
-    # Delete all existing nyc indices first to prevent conflicts
-    log "Deleting existing nyc* indices..."
-    timeout 10 curl -s -X DELETE "http://${host_ip}:9200/nyc*" >/dev/null 2>&1 || true
-    sleep 1
     
     # Wait for cluster to be ready with timeout
     local max_attempts=60
