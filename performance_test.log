@@ -1,0 +1,758 @@
+[2025-10-03T02:27:31+00:00] Starting OpenSearch performance test suite
+[2025-10-03T02:27:31+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T02:27:31+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:32:22+00:00] Cluster not ready, attempt 1/10
+[2025-10-03T02:32:32+00:00] Cluster not ready, attempt 2/10
+[2025-10-03T02:33:54+00:00] Starting OpenSearch performance test suite
+[2025-10-03T02:33:54+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T02:33:54+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:36:53+00:00] Starting OpenSearch performance test suite
+[2025-10-03T02:36:53+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T02:36:53+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:41:33+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:41:33+00:00] Test configurations: 2 client loads, 1 node config, 1 shard config, 2 reps = 4 total runs
+[2025-10-03T02:41:33+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:41:33+00:00] Processing client load: 60
+[2025-10-03T02:41:33+00:00] Processing node config: 16
+[2025-10-03T02:41:33+00:00] Processing shard config: 16
+[2025-10-03T02:41:33+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:42:36+00:00] Cluster is active
+[2025-10-03T02:42:36+00:00] Processing repetition: 1
+[2025-10-03T02:42:36+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T02:42:38+00:00] Executing: timeout 300 ~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis         --target-hosts=10.0.0.122:9200,10.0.0.122:9201         --client-options=use_ssl:false,verify_certs:false,timeout:60         --kill-running-processes --include-tasks=index         --workload-params=bulk_indexing_clients:60,bulk_size:1000
+[2025-10-03T02:42:38+00:00] OSB execution failed for 60_16-16_1, checking output...
+[2025-10-03T02:42:38+00:00] OSB: timeout: failed to run command ‘/home/geremy_cohen_arm_com/benchmark-env/bin/opensearch-benchmark’: No such file or directory
+[2025-10-03T02:42:38+00:00] ERROR: OSB execution failed for 60_16-16_1
+[2025-10-03T02:42:51+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:42:51+00:00] Test configurations: 2 client loads, 1 node config, 1 shard config, 2 reps = 4 total runs
+[2025-10-03T02:42:51+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:42:51+00:00] Processing client load: 60
+[2025-10-03T02:42:51+00:00] Processing node config: 16
+[2025-10-03T02:42:51+00:00] Processing shard config: 16
+[2025-10-03T02:42:51+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:43:53+00:00] Cluster is active
+[2025-10-03T02:43:53+00:00] Processing repetition: 1
+[2025-10-03T02:43:53+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T02:43:55+00:00] Executing: timeout 300 /home/geremy_cohen_arm_com/opensearch-benchmark-workloads-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis         --target-hosts=10.0.0.122:9200,10.0.0.122:9201         --client-options=use_ssl:false,verify_certs:false,timeout:60         --kill-running-processes --include-tasks=index         --workload-params=bulk_indexing_clients:60,bulk_size:1000
+[2025-10-03T02:43:56+00:00] OSB execution failed for 60_16-16_1, checking output...
+[2025-10-03T02:43:56+00:00] OSB: [INFO] Did you mean 'run'?
+[2025-10-03T02:43:56+00:00] OSB: [INFO] Example: opensearch-benchmark run --workload=geonames --test-mode
+[2025-10-03T02:43:56+00:00] OSB: [INFO] For more information, run: opensearch-benchmark run --help
+[2025-10-03T02:43:56+00:00] ERROR: OSB execution failed for 60_16-16_1
+[2025-10-03T02:44:04+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:44:04+00:00] Test configurations: 2 client loads, 1 node config, 1 shard config, 2 reps = 4 total runs
+[2025-10-03T02:44:04+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:44:04+00:00] Processing client load: 60
+[2025-10-03T02:44:04+00:00] Processing node config: 16
+[2025-10-03T02:44:04+00:00] Processing shard config: 16
+[2025-10-03T02:44:04+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:46:00+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:46:00+00:00] Test configurations: 2 client loads, 1 node config, 1 shard config, 2 reps = 4 total runs
+[2025-10-03T02:46:00+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:46:00+00:00] Processing client load: 60
+[2025-10-03T02:46:00+00:00] Processing node config: 16
+[2025-10-03T02:46:00+00:00] Processing shard config: 16
+[2025-10-03T02:46:00+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:47:02+00:00] Cluster is active
+[2025-10-03T02:47:02+00:00] Processing repetition: 1
+[2025-10-03T02:47:02+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T02:47:04+00:00] Executing: timeout 300 opensearch-benchmark run --workload=nyc_taxis         --target-hosts=10.0.0.122:9200,10.0.0.122:9201         --client-options=use_ssl:false,verify_certs:false,timeout:60         --kill-running-processes --include-tasks=index         --workload-params=bulk_indexing_clients:60,bulk_size:1000
+[2025-10-03T02:51:59+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:51:59+00:00] Test configurations: 2 client loads, 1 node config, 1 shard config, 2 reps = 4 total runs
+[2025-10-03T02:51:59+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:51:59+00:00] Processing client load: 60
+[2025-10-03T02:51:59+00:00] Processing node config: 16
+[2025-10-03T02:51:59+00:00] Processing shard config: 16
+[2025-10-03T02:51:59+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:55:10+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:55:10+00:00] Test configurations: 2 client loads, 2 node/shard configs, 4 reps = 8 total runs
+[2025-10-03T02:55:10+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:55:10+00:00] Processing client load: 60
+[2025-10-03T02:55:10+00:00] Processing node config: 16
+[2025-10-03T02:55:10+00:00] Processing shard config: 16
+[2025-10-03T02:55:10+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:55:57+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:55:57+00:00] Test configurations: 2 client loads, 2 node/shard configs, 4 reps = 8 total runs
+[2025-10-03T02:55:57+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:55:57+00:00] Processing client load: 60
+[2025-10-03T02:55:57+00:00] Processing node config: 16
+[2025-10-03T02:55:57+00:00] Processing shard config: 16
+[2025-10-03T02:55:57+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:57:06+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:57:06+00:00] Test configurations: 2 client loads, 2 node/shard configs, 4 reps = 8 total runs
+[2025-10-03T02:57:06+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:57:06+00:00] Processing client load: 60
+[2025-10-03T02:57:06+00:00] Processing node config: 16
+[2025-10-03T02:57:06+00:00] Processing shard config: 16
+[2025-10-03T02:57:06+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:58:10+00:00] Starting OpenSearch performance test suite (TEST VERSION)
+[2025-10-03T02:58:10+00:00] Test configurations: 2 client loads, 2 node/shard configs, 4 reps = 8 total runs
+[2025-10-03T02:58:10+00:00] Starting fresh - no checkpoint found
+[2025-10-03T02:58:10+00:00] Processing configuration: 60 clients, 16 nodes, 16 shards
+[2025-10-03T02:58:10+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T02:58:47+00:00] Cluster is active
+[2025-10-03T02:58:47+00:00] Processing repetition: 1
+[2025-10-03T02:58:47+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T02:58:49+00:00] Executing: opensearch-benchmark run --workload=nyc_taxis         --target-hosts=10.0.0.122:9200,10.0.0.122:9201         --client-options=use_ssl:false,verify_certs:false,timeout:60         --kill-running-processes --include-tasks=index         --workload-params=bulk_indexing_clients:60,bulk_size:1000
+[2025-10-03T04:04:28+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:04:28+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:04:28+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:04:33+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T04:05:18+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:05:18+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:05:18+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:05:21+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T04:05:28+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:05:28+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:05:28+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:08:56+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T04:11:44+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:11:44+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:11:44+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:11:47+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T04:11:52+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:11:52+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:11:52+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:15:35+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T04:15:50+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:15:50+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:15:50+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:17:19+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:17:19+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:17:19+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:18:16+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:18:16+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:18:16+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:19:34+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:19:34+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:19:34+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:20:42+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:20:42+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:20:42+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:20:42+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:21:39+00:00] Cluster configured, verifying...
+[2025-10-03T04:21:39+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:21:39+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:23:21+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:23:21+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:23:21+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:23:21+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:24:12+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:24:12+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:24:12+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:24:12+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:25:09+00:00] Cluster configured, verifying...
+[2025-10-03T04:25:09+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:25:09+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:25:24+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:25:24+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:25:24+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:25:24+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:26:21+00:00] Cluster configured, verifying...
+[2025-10-03T04:26:21+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:26:21+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:27:36+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:27:36+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:27:36+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:27:36+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:28:33+00:00] Cluster configured, verifying...
+[2025-10-03T04:28:33+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:28:33+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:29:00+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:29:00+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:29:00+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:29:00+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:29:57+00:00] Cluster configured, verifying...
+[2025-10-03T04:29:57+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:29:57+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:30:19+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:30:19+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:30:19+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:30:19+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:31:16+00:00] Cluster configured, verifying...
+[2025-10-03T04:31:16+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:31:16+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:31:31+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:31:31+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:31:31+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:31:31+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T04:32:28+00:00] Cluster configured, verifying...
+[2025-10-03T04:32:28+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T04:32:28+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T04:32:28+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T04:32:28+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T04:32:40+00:00] Activating virtual environment...
+[2025-10-03T04:32:40+00:00] Virtual environment activated
+[2025-10-03T04:32:40+00:00] opensearch-benchmark command is available
+[2025-10-03T04:32:40+00:00] Starting OpenSearch performance test suite
+[2025-10-03T04:32:40+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T04:32:40+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T04:32:40+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T15:48:55+00:00] Activating virtual environment...
+[2025-10-03T15:48:55+00:00] Virtual environment activated
+[2025-10-03T15:48:55+00:00] opensearch-benchmark command is available
+[2025-10-03T15:48:55+00:00] Starting OpenSearch performance test suite
+[2025-10-03T15:48:55+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T15:48:55+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T15:48:55+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T15:48:55+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T15:54:35+00:00] Activating virtual environment...
+[2025-10-03T15:54:35+00:00] Virtual environment activated
+[2025-10-03T15:54:35+00:00] opensearch-benchmark command is available
+[2025-10-03T15:54:35+00:00] Starting OpenSearch performance test suite
+[2025-10-03T15:54:35+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T15:54:35+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T15:54:35+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T15:54:39+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T15:56:00+00:00] Activating virtual environment...
+[2025-10-03T15:56:00+00:00] Virtual environment activated
+[2025-10-03T15:56:00+00:00] opensearch-benchmark command is available
+[2025-10-03T15:56:00+00:00] Starting OpenSearch performance test suite
+[2025-10-03T15:56:00+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T15:56:00+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T15:56:00+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T15:56:56+00:00] Cluster configured, verifying...
+[2025-10-03T15:56:56+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T15:56:56+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T15:56:56+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T15:56:56+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T15:57:25+00:00] Activating virtual environment...
+[2025-10-03T15:57:25+00:00] Virtual environment activated
+[2025-10-03T15:57:25+00:00] opensearch-benchmark command is available
+[2025-10-03T15:57:25+00:00] Starting OpenSearch performance test suite
+[2025-10-03T15:57:25+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T15:57:25+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T15:57:25+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T15:58:26+00:00] Cluster configured, verifying...
+[2025-10-03T15:58:26+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T15:58:26+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T15:58:26+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T15:58:26+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T15:58:38+00:00] Activating virtual environment...
+[2025-10-03T15:58:38+00:00] Virtual environment activated
+[2025-10-03T15:58:38+00:00] opensearch-benchmark command is available
+[2025-10-03T15:58:38+00:00] Starting OpenSearch performance test suite
+[2025-10-03T15:58:38+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T15:58:38+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T15:58:38+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T15:59:34+00:00] Cluster configured, verifying...
+[2025-10-03T15:59:34+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T15:59:34+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T15:59:34+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T15:59:34+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T15:59:46+00:00] Activating virtual environment...
+[2025-10-03T15:59:46+00:00] Virtual environment activated
+[2025-10-03T15:59:46+00:00] opensearch-benchmark command is available
+[2025-10-03T15:59:46+00:00] Starting OpenSearch performance test suite
+[2025-10-03T15:59:46+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T15:59:46+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T15:59:46+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T16:00:43+00:00] Cluster configured, verifying...
+[2025-10-03T16:00:43+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T16:00:43+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T16:00:43+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T16:00:43+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T16:00:43+00:00] About to increment total_runs (current value: 0)
+[2025-10-03T16:00:43+00:00] ERROR: Failed to increment total_runs
+[2025-10-03T16:01:10+00:00] Activating virtual environment...
+[2025-10-03T16:01:10+00:00] Virtual environment activated
+[2025-10-03T16:01:10+00:00] opensearch-benchmark command is available
+[2025-10-03T16:01:10+00:00] Starting OpenSearch performance test suite
+[2025-10-03T16:01:10+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T16:01:10+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T16:01:10+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T16:02:08+00:00] Cluster configured, verifying...
+[2025-10-03T16:02:08+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T16:02:08+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T16:02:08+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T16:02:08+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T16:02:08+00:00] About to increment total_runs (current value: 0)
+[2025-10-03T16:02:08+00:00] total_runs incremented to: 1
+[2025-10-03T16:02:08+00:00] About to call run_benchmark function...
+[2025-10-03T16:02:08+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=1
+[2025-10-03T16:02:08+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T16:02:08+00:00] Clearing indices...
+[2025-10-03T16:02:13+00:00] Forcing compaction...
+[2025-10-03T16:02:13+00:00] Forcing index compaction
+[2025-10-03T16:02:13+00:00] Executing OSB for 60_16-16_1...
+[2025-10-03T16:02:13+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.122:9200,10.0.0.122:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T16:02:13+00:00] About to execute OSB command...
+[2025-10-03T17:36:46+00:00] Activating virtual environment...
+[2025-10-03T17:36:46+00:00] Virtual environment activated
+[2025-10-03T17:36:46+00:00] opensearch-benchmark command is available
+[2025-10-03T17:36:46+00:00] Starting OpenSearch performance test suite
+[2025-10-03T17:36:46+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T17:36:46+00:00] Starting fresh - no checkpoint found
+[2025-10-03T17:36:46+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T17:36:46+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T17:37:48+00:00] Cluster configured, verifying...
+[2025-10-03T17:37:48+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T17:37:48+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T17:37:48+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T17:37:48+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T17:37:48+00:00] About to increment total_runs (current value: 0)
+[2025-10-03T17:37:48+00:00] total_runs incremented to: 1
+[2025-10-03T17:37:48+00:00] About to call run_benchmark function...
+[2025-10-03T17:37:48+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=1
+[2025-10-03T17:37:48+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T17:37:48+00:00] Clearing indices...
+[2025-10-03T17:37:54+00:00] Forcing compaction...
+[2025-10-03T17:37:54+00:00] Forcing index compaction
+[2025-10-03T17:37:54+00:00] Executing OSB for 60_16-16_1...
+[2025-10-03T17:37:54+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.122:9200,10.0.0.122:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T17:37:54+00:00] About to execute OSB command...
+[2025-10-03T17:43:21+00:00] OSB execution completed for 60_16-16_1
+[2025-10-03T17:43:21+00:00] Forcing index compaction
+[2025-10-03T17:49:31+00:00] Completed benchmark: 60_16-16_1
+[2025-10-03T17:49:31+00:00] run_benchmark completed successfully
+[2025-10-03T17:49:31+00:00] Progress: 1/500 runs completed
+[2025-10-03T17:49:31+00:00] Processing repetition 2 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T17:49:31+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T17:49:31+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T17:49:31+00:00] About to increment total_runs (current value: 1)
+[2025-10-03T17:49:31+00:00] total_runs incremented to: 2
+[2025-10-03T17:49:31+00:00] About to call run_benchmark function...
+[2025-10-03T17:49:31+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=2
+[2025-10-03T17:49:31+00:00] Starting benchmark: 60_16-16_2
+[2025-10-03T17:49:31+00:00] Clearing indices...
+[2025-10-03T17:49:37+00:00] Forcing compaction...
+[2025-10-03T17:49:37+00:00] Forcing index compaction
+[2025-10-03T17:49:37+00:00] Executing OSB for 60_16-16_2...
+[2025-10-03T17:49:37+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.122:9200,10.0.0.122:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T17:49:37+00:00] About to execute OSB command...
+[2025-10-03T17:54:50+00:00] OSB execution completed for 60_16-16_2
+[2025-10-03T17:54:50+00:00] Forcing index compaction
+[2025-10-03T18:01:49+00:00] Activating virtual environment...
+[2025-10-03T18:01:49+00:00] Virtual environment activated
+[2025-10-03T18:01:49+00:00] opensearch-benchmark command is available
+[2025-10-03T18:01:49+00:00] Starting OpenSearch performance test suite
+[2025-10-03T18:01:49+00:00] Total configurations: 125, Total runs: 500
+[2025-10-03T18:01:49+00:00] Starting fresh - no checkpoint found
+[2025-10-03T18:01:49+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T18:01:49+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T18:02:52+00:00] Cluster configured, verifying...
+[2025-10-03T18:02:52+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T18:02:52+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T18:02:52+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T18:02:52+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T18:02:52+00:00] About to increment total_runs (current value: 0)
+[2025-10-03T18:02:52+00:00] total_runs incremented to: 1
+[2025-10-03T18:02:52+00:00] About to call run_benchmark function...
+[2025-10-03T18:02:52+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=1
+[2025-10-03T18:02:52+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T18:02:52+00:00] Clearing indices...
+[2025-10-03T18:02:57+00:00] Executing OSB for 60_16-16_1...
+[2025-10-03T18:02:57+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.122:9200,10.0.0.122:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T18:02:57+00:00] About to execute OSB command...
+[2025-10-03T18:08:22+00:00] OSB execution completed for 60_16-16_1
+[2025-10-03T18:08:22+00:00] Completed benchmark: 60_16-16_1
+[2025-10-03T18:08:22+00:00] run_benchmark completed successfully
+[2025-10-03T18:08:22+00:00] Progress: 1/500 runs completed
+[2025-10-03T18:08:22+00:00] Processing repetition 2 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T18:08:22+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T18:08:22+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T18:08:22+00:00] About to increment total_runs (current value: 1)
+[2025-10-03T18:08:22+00:00] total_runs incremented to: 2
+[2025-10-03T18:08:22+00:00] About to call run_benchmark function...
+[2025-10-03T18:08:22+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=2
+[2025-10-03T18:08:22+00:00] Starting benchmark: 60_16-16_2
+[2025-10-03T18:08:22+00:00] Clearing indices...
+[2025-10-03T18:08:53+00:00] Executing OSB for 60_16-16_2...
+[2025-10-03T18:08:53+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.122:9200,10.0.0.122:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T18:08:53+00:00] About to execute OSB command...
+[2025-10-03T18:14:11+00:00] OSB execution completed for 60_16-16_2
+[2025-10-03T18:14:11+00:00] Completed benchmark: 60_16-16_2
+[2025-10-03T18:14:11+00:00] run_benchmark completed successfully
+[2025-10-03T18:14:11+00:00] Progress: 2/500 runs completed
+[2025-10-03T18:14:11+00:00] Processing repetition 3 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T18:14:11+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T18:14:11+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T18:14:11+00:00] About to increment total_runs (current value: 2)
+[2025-10-03T18:14:11+00:00] total_runs incremented to: 3
+[2025-10-03T18:14:11+00:00] About to call run_benchmark function...
+[2025-10-03T18:14:11+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=3
+[2025-10-03T18:14:11+00:00] Starting benchmark: 60_16-16_3
+[2025-10-03T18:14:11+00:00] Clearing indices...
+[2025-10-03T18:14:33+00:00] Executing OSB for 60_16-16_3...
+[2025-10-03T18:14:33+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.122:9200,10.0.0.122:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T18:14:33+00:00] About to execute OSB command...
+[2025-10-03T18:18:54+00:00] OSB execution failed for 60_16-16_3, checking output...
+[2025-10-03T18:18:54+00:00] OSB output file exists, showing last 10 lines:
+[2025-10-03T18:18:54+00:00] OSB: [1mGetting further help:[0m
+[2025-10-03T18:18:54+00:00] OSB: *********************
+[2025-10-03T18:18:54+00:00] OSB: * Check the log files in /home/geremy_cohen_arm_com/.osb/logs for errors.
+[2025-10-03T18:18:54+00:00] OSB: * Read the documentation at [4mhttps://opensearch.org/docs[0m.
+[2025-10-03T18:18:54+00:00] OSB: * Ask a question on the forum at [4mhttps://forum.opensearch.org/[0m.
+[2025-10-03T18:18:54+00:00] OSB: * Raise an issue at [4mhttps://github.com/opensearch-project/OpenSearch-Benchmark/issues[0m and include the log files in /home/geremy_cohen_arm_com/.osb/logs.
+[2025-10-03T18:18:54+00:00] OSB: 
+[2025-10-03T18:18:54+00:00] OSB: -----------------------------------
+[2025-10-03T18:18:54+00:00] OSB: [INFO] ❌ FAILURE (took 259 seconds)
+[2025-10-03T18:18:54+00:00] OSB: -----------------------------------
+[2025-10-03T18:18:54+00:00] Continuing despite OSB failure...
+[2025-10-03T18:18:54+00:00] run_benchmark failed, but continuing...
+[2025-10-03T18:18:54+00:00] Progress: 3/500 runs completed
+[2025-10-03T18:18:54+00:00] Processing repetition 4 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T18:18:54+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T18:18:54+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T18:18:54+00:00] About to increment total_runs (current value: 3)
+[2025-10-03T18:18:54+00:00] total_runs incremented to: 4
+[2025-10-03T18:18:54+00:00] About to call run_benchmark function...
+[2025-10-03T18:18:54+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=4
+[2025-10-03T18:18:54+00:00] Starting benchmark: 60_16-16_4
+[2025-10-03T18:18:54+00:00] Clearing indices...
+[2025-10-03T19:47:59+00:00] Activating virtual environment...
+[2025-10-03T19:47:59+00:00] Virtual environment activated
+[2025-10-03T19:47:59+00:00] opensearch-benchmark command is available
+[2025-10-03T19:47:59+00:00] Starting OpenSearch performance test suite
+[2025-10-03T19:47:59+00:00] Total configurations: 25, Total runs: 100
+[2025-10-03T19:47:59+00:00] Starting fresh - no checkpoint found
+[2025-10-03T19:47:59+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T19:47:59+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T19:49:55+00:00] ERROR: Failed to configure cluster with 16 nodes, 16 shards
+[2025-10-03T19:58:45+00:00] Activating virtual environment...
+[2025-10-03T19:58:45+00:00] Virtual environment activated
+[2025-10-03T19:58:45+00:00] opensearch-benchmark command is available
+[2025-10-03T19:58:45+00:00] Starting OpenSearch performance test suite
+[2025-10-03T19:58:45+00:00] Total configurations: 25, Total runs: 100
+[2025-10-03T19:58:45+00:00] Starting fresh - no checkpoint found
+[2025-10-03T19:58:45+00:00] About to configure cluster: 16 nodes, 16 shards
+[2025-10-03T19:58:45+00:00] Configuring cluster: 16 nodes, 16 shards
+[2025-10-03T20:00:27+00:00] Cluster configured, verifying...
+[2025-10-03T20:00:27+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T20:00:27+00:00] Processing repetition 1 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T20:00:27+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:00:27+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:00:27+00:00] About to increment total_runs (current value: 0)
+[2025-10-03T20:00:27+00:00] total_runs incremented to: 1
+[2025-10-03T20:00:27+00:00] About to call run_benchmark function...
+[2025-10-03T20:00:27+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=1
+[2025-10-03T20:00:27+00:00] Starting benchmark: 60_16-16_1
+[2025-10-03T20:00:27+00:00] Clearing indices...
+[2025-10-03T20:00:32+00:00] Executing OSB for 60_16-16_1...
+[2025-10-03T20:00:32+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:00:32+00:00] About to execute OSB command...
+[2025-10-03T20:06:08+00:00] OSB execution completed for 60_16-16_1
+[2025-10-03T20:06:08+00:00] Completed benchmark: 60_16-16_1
+[2025-10-03T20:06:08+00:00] run_benchmark completed successfully
+[2025-10-03T20:06:08+00:00] Progress: 1/100 runs completed
+[2025-10-03T20:06:08+00:00] Processing repetition 2 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T20:06:08+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:06:08+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:06:08+00:00] About to increment total_runs (current value: 1)
+[2025-10-03T20:06:08+00:00] total_runs incremented to: 2
+[2025-10-03T20:06:08+00:00] About to call run_benchmark function...
+[2025-10-03T20:06:08+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=2
+[2025-10-03T20:06:08+00:00] Starting benchmark: 60_16-16_2
+[2025-10-03T20:06:08+00:00] Clearing indices...
+[2025-10-03T20:06:16+00:00] Executing OSB for 60_16-16_2...
+[2025-10-03T20:06:16+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:06:16+00:00] About to execute OSB command...
+[2025-10-03T20:11:39+00:00] OSB execution completed for 60_16-16_2
+[2025-10-03T20:11:39+00:00] Completed benchmark: 60_16-16_2
+[2025-10-03T20:11:39+00:00] run_benchmark completed successfully
+[2025-10-03T20:11:39+00:00] Progress: 2/100 runs completed
+[2025-10-03T20:11:39+00:00] Processing repetition 3 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T20:11:39+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:11:39+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:11:39+00:00] About to increment total_runs (current value: 2)
+[2025-10-03T20:11:39+00:00] total_runs incremented to: 3
+[2025-10-03T20:11:39+00:00] About to call run_benchmark function...
+[2025-10-03T20:11:39+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=3
+[2025-10-03T20:11:39+00:00] Starting benchmark: 60_16-16_3
+[2025-10-03T20:11:39+00:00] Clearing indices...
+[2025-10-03T20:11:47+00:00] Executing OSB for 60_16-16_3...
+[2025-10-03T20:11:47+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:11:47+00:00] About to execute OSB command...
+[2025-10-03T20:17:06+00:00] OSB execution completed for 60_16-16_3
+[2025-10-03T20:17:06+00:00] Completed benchmark: 60_16-16_3
+[2025-10-03T20:17:06+00:00] run_benchmark completed successfully
+[2025-10-03T20:17:06+00:00] Progress: 3/100 runs completed
+[2025-10-03T20:17:06+00:00] Processing repetition 4 for 60 clients, 16 nodes, 16 shards
+[2025-10-03T20:17:06+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:17:06+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:17:06+00:00] About to increment total_runs (current value: 3)
+[2025-10-03T20:17:06+00:00] total_runs incremented to: 4
+[2025-10-03T20:17:06+00:00] About to call run_benchmark function...
+[2025-10-03T20:17:06+00:00] Function parameters: clients=60 nodes=16 shards=16 rep=4
+[2025-10-03T20:17:06+00:00] Starting benchmark: 60_16-16_4
+[2025-10-03T20:17:06+00:00] Clearing indices...
+[2025-10-03T20:17:14+00:00] Executing OSB for 60_16-16_4...
+[2025-10-03T20:17:14+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:17:14+00:00] About to execute OSB command...
+[2025-10-03T20:22:33+00:00] OSB execution completed for 60_16-16_4
+[2025-10-03T20:22:33+00:00] Completed benchmark: 60_16-16_4
+[2025-10-03T20:22:33+00:00] run_benchmark completed successfully
+[2025-10-03T20:22:33+00:00] Progress: 4/100 runs completed
+[2025-10-03T20:22:33+00:00] About to configure cluster: 20 nodes, 20 shards
+[2025-10-03T20:22:33+00:00] Configuring cluster: 20 nodes, 20 shards
+[2025-10-03T20:24:19+00:00] Cluster configured, verifying...
+[2025-10-03T20:24:19+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T20:24:19+00:00] Processing repetition 1 for 60 clients, 20 nodes, 20 shards
+[2025-10-03T20:24:19+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:24:19+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:24:19+00:00] About to increment total_runs (current value: 4)
+[2025-10-03T20:24:19+00:00] total_runs incremented to: 5
+[2025-10-03T20:24:19+00:00] About to call run_benchmark function...
+[2025-10-03T20:24:19+00:00] Function parameters: clients=60 nodes=20 shards=20 rep=1
+[2025-10-03T20:24:19+00:00] Starting benchmark: 60_20-20_1
+[2025-10-03T20:24:19+00:00] Clearing indices...
+[2025-10-03T20:24:24+00:00] Executing OSB for 60_20-20_1...
+[2025-10-03T20:24:24+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:24:24+00:00] About to execute OSB command...
+[2025-10-03T20:30:03+00:00] OSB execution completed for 60_20-20_1
+[2025-10-03T20:30:03+00:00] Completed benchmark: 60_20-20_1
+[2025-10-03T20:30:03+00:00] run_benchmark completed successfully
+[2025-10-03T20:30:03+00:00] Progress: 5/100 runs completed
+[2025-10-03T20:30:03+00:00] Processing repetition 2 for 60 clients, 20 nodes, 20 shards
+[2025-10-03T20:30:03+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:30:03+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:30:03+00:00] About to increment total_runs (current value: 5)
+[2025-10-03T20:30:03+00:00] total_runs incremented to: 6
+[2025-10-03T20:30:03+00:00] About to call run_benchmark function...
+[2025-10-03T20:30:03+00:00] Function parameters: clients=60 nodes=20 shards=20 rep=2
+[2025-10-03T20:30:03+00:00] Starting benchmark: 60_20-20_2
+[2025-10-03T20:30:03+00:00] Clearing indices...
+[2025-10-03T20:30:12+00:00] Executing OSB for 60_20-20_2...
+[2025-10-03T20:30:12+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:30:12+00:00] About to execute OSB command...
+[2025-10-03T20:35:41+00:00] OSB execution completed for 60_20-20_2
+[2025-10-03T20:35:41+00:00] Completed benchmark: 60_20-20_2
+[2025-10-03T20:35:41+00:00] run_benchmark completed successfully
+[2025-10-03T20:35:41+00:00] Progress: 6/100 runs completed
+[2025-10-03T20:35:41+00:00] Processing repetition 3 for 60 clients, 20 nodes, 20 shards
+[2025-10-03T20:35:41+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:35:41+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:35:41+00:00] About to increment total_runs (current value: 6)
+[2025-10-03T20:35:41+00:00] total_runs incremented to: 7
+[2025-10-03T20:35:41+00:00] About to call run_benchmark function...
+[2025-10-03T20:35:41+00:00] Function parameters: clients=60 nodes=20 shards=20 rep=3
+[2025-10-03T20:35:41+00:00] Starting benchmark: 60_20-20_3
+[2025-10-03T20:35:41+00:00] Clearing indices...
+[2025-10-03T20:35:49+00:00] Executing OSB for 60_20-20_3...
+[2025-10-03T20:35:49+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:35:49+00:00] About to execute OSB command...
+[2025-10-03T20:41:19+00:00] OSB execution completed for 60_20-20_3
+[2025-10-03T20:41:19+00:00] Completed benchmark: 60_20-20_3
+[2025-10-03T20:41:19+00:00] run_benchmark completed successfully
+[2025-10-03T20:41:19+00:00] Progress: 7/100 runs completed
+[2025-10-03T20:41:19+00:00] Processing repetition 4 for 60 clients, 20 nodes, 20 shards
+[2025-10-03T20:41:19+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:41:19+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:41:19+00:00] About to increment total_runs (current value: 7)
+[2025-10-03T20:41:19+00:00] total_runs incremented to: 8
+[2025-10-03T20:41:19+00:00] About to call run_benchmark function...
+[2025-10-03T20:41:19+00:00] Function parameters: clients=60 nodes=20 shards=20 rep=4
+[2025-10-03T20:41:19+00:00] Starting benchmark: 60_20-20_4
+[2025-10-03T20:41:19+00:00] Clearing indices...
+[2025-10-03T20:41:29+00:00] Executing OSB for 60_20-20_4...
+[2025-10-03T20:41:29+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:41:29+00:00] About to execute OSB command...
+[2025-10-03T20:46:58+00:00] OSB execution completed for 60_20-20_4
+[2025-10-03T20:46:58+00:00] Completed benchmark: 60_20-20_4
+[2025-10-03T20:46:58+00:00] run_benchmark completed successfully
+[2025-10-03T20:46:58+00:00] Progress: 8/100 runs completed
+[2025-10-03T20:46:58+00:00] About to configure cluster: 24 nodes, 24 shards
+[2025-10-03T20:46:58+00:00] Configuring cluster: 24 nodes, 24 shards
+[2025-10-03T20:49:01+00:00] Cluster configured, verifying...
+[2025-10-03T20:49:01+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T20:49:01+00:00] Processing repetition 1 for 60 clients, 24 nodes, 24 shards
+[2025-10-03T20:49:01+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:49:01+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:49:01+00:00] About to increment total_runs (current value: 8)
+[2025-10-03T20:49:01+00:00] total_runs incremented to: 9
+[2025-10-03T20:49:01+00:00] About to call run_benchmark function...
+[2025-10-03T20:49:01+00:00] Function parameters: clients=60 nodes=24 shards=24 rep=1
+[2025-10-03T20:49:01+00:00] Starting benchmark: 60_24-24_1
+[2025-10-03T20:49:01+00:00] Clearing indices...
+[2025-10-03T20:49:06+00:00] Executing OSB for 60_24-24_1...
+[2025-10-03T20:49:06+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:49:06+00:00] About to execute OSB command...
+[2025-10-03T20:54:50+00:00] OSB execution completed for 60_24-24_1
+[2025-10-03T20:54:50+00:00] Completed benchmark: 60_24-24_1
+[2025-10-03T20:54:50+00:00] run_benchmark completed successfully
+[2025-10-03T20:54:50+00:00] Progress: 9/100 runs completed
+[2025-10-03T20:54:50+00:00] Processing repetition 2 for 60 clients, 24 nodes, 24 shards
+[2025-10-03T20:54:50+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T20:54:50+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T20:54:50+00:00] About to increment total_runs (current value: 9)
+[2025-10-03T20:54:50+00:00] total_runs incremented to: 10
+[2025-10-03T20:54:50+00:00] About to call run_benchmark function...
+[2025-10-03T20:54:50+00:00] Function parameters: clients=60 nodes=24 shards=24 rep=2
+[2025-10-03T20:54:50+00:00] Starting benchmark: 60_24-24_2
+[2025-10-03T20:54:50+00:00] Clearing indices...
+[2025-10-03T20:55:00+00:00] Executing OSB for 60_24-24_2...
+[2025-10-03T20:55:00+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T20:55:00+00:00] About to execute OSB command...
+[2025-10-03T21:00:29+00:00] OSB execution completed for 60_24-24_2
+[2025-10-03T21:00:29+00:00] Completed benchmark: 60_24-24_2
+[2025-10-03T21:00:29+00:00] run_benchmark completed successfully
+[2025-10-03T21:00:29+00:00] Progress: 10/100 runs completed
+[2025-10-03T21:00:29+00:00] Processing repetition 3 for 60 clients, 24 nodes, 24 shards
+[2025-10-03T21:00:29+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:00:29+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:00:29+00:00] About to increment total_runs (current value: 10)
+[2025-10-03T21:00:29+00:00] total_runs incremented to: 11
+[2025-10-03T21:00:29+00:00] About to call run_benchmark function...
+[2025-10-03T21:00:29+00:00] Function parameters: clients=60 nodes=24 shards=24 rep=3
+[2025-10-03T21:00:29+00:00] Starting benchmark: 60_24-24_3
+[2025-10-03T21:00:29+00:00] Clearing indices...
+[2025-10-03T21:00:37+00:00] Executing OSB for 60_24-24_3...
+[2025-10-03T21:00:37+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:00:37+00:00] About to execute OSB command...
+[2025-10-03T21:06:06+00:00] OSB execution completed for 60_24-24_3
+[2025-10-03T21:06:06+00:00] Completed benchmark: 60_24-24_3
+[2025-10-03T21:06:06+00:00] run_benchmark completed successfully
+[2025-10-03T21:06:06+00:00] Progress: 11/100 runs completed
+[2025-10-03T21:06:06+00:00] Processing repetition 4 for 60 clients, 24 nodes, 24 shards
+[2025-10-03T21:06:06+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:06:06+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:06:06+00:00] About to increment total_runs (current value: 11)
+[2025-10-03T21:06:06+00:00] total_runs incremented to: 12
+[2025-10-03T21:06:06+00:00] About to call run_benchmark function...
+[2025-10-03T21:06:06+00:00] Function parameters: clients=60 nodes=24 shards=24 rep=4
+[2025-10-03T21:06:06+00:00] Starting benchmark: 60_24-24_4
+[2025-10-03T21:06:06+00:00] Clearing indices...
+[2025-10-03T21:06:16+00:00] Executing OSB for 60_24-24_4...
+[2025-10-03T21:06:16+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:06:16+00:00] About to execute OSB command...
+[2025-10-03T21:11:50+00:00] OSB execution completed for 60_24-24_4
+[2025-10-03T21:11:50+00:00] Completed benchmark: 60_24-24_4
+[2025-10-03T21:11:50+00:00] run_benchmark completed successfully
+[2025-10-03T21:11:50+00:00] Progress: 12/100 runs completed
+[2025-10-03T21:11:50+00:00] About to configure cluster: 28 nodes, 28 shards
+[2025-10-03T21:11:50+00:00] Configuring cluster: 28 nodes, 28 shards
+[2025-10-03T21:13:58+00:00] Cluster configured, verifying...
+[2025-10-03T21:13:58+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T21:13:58+00:00] Processing repetition 1 for 60 clients, 28 nodes, 28 shards
+[2025-10-03T21:13:58+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:13:58+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:13:58+00:00] About to increment total_runs (current value: 12)
+[2025-10-03T21:13:58+00:00] total_runs incremented to: 13
+[2025-10-03T21:13:58+00:00] About to call run_benchmark function...
+[2025-10-03T21:13:58+00:00] Function parameters: clients=60 nodes=28 shards=28 rep=1
+[2025-10-03T21:13:58+00:00] Starting benchmark: 60_28-28_1
+[2025-10-03T21:13:58+00:00] Clearing indices...
+[2025-10-03T21:14:03+00:00] Executing OSB for 60_28-28_1...
+[2025-10-03T21:14:03+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:14:03+00:00] About to execute OSB command...
+[2025-10-03T21:19:52+00:00] OSB execution completed for 60_28-28_1
+[2025-10-03T21:19:52+00:00] Completed benchmark: 60_28-28_1
+[2025-10-03T21:19:52+00:00] run_benchmark completed successfully
+[2025-10-03T21:19:52+00:00] Progress: 13/100 runs completed
+[2025-10-03T21:19:52+00:00] Processing repetition 2 for 60 clients, 28 nodes, 28 shards
+[2025-10-03T21:19:52+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:19:52+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:19:52+00:00] About to increment total_runs (current value: 13)
+[2025-10-03T21:19:52+00:00] total_runs incremented to: 14
+[2025-10-03T21:19:52+00:00] About to call run_benchmark function...
+[2025-10-03T21:19:52+00:00] Function parameters: clients=60 nodes=28 shards=28 rep=2
+[2025-10-03T21:19:52+00:00] Starting benchmark: 60_28-28_2
+[2025-10-03T21:19:52+00:00] Clearing indices...
+[2025-10-03T21:19:59+00:00] Executing OSB for 60_28-28_2...
+[2025-10-03T21:19:59+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:19:59+00:00] About to execute OSB command...
+[2025-10-03T21:25:34+00:00] OSB execution completed for 60_28-28_2
+[2025-10-03T21:25:34+00:00] Completed benchmark: 60_28-28_2
+[2025-10-03T21:25:34+00:00] run_benchmark completed successfully
+[2025-10-03T21:25:34+00:00] Progress: 14/100 runs completed
+[2025-10-03T21:25:34+00:00] Processing repetition 3 for 60 clients, 28 nodes, 28 shards
+[2025-10-03T21:25:34+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:25:34+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:25:34+00:00] About to increment total_runs (current value: 14)
+[2025-10-03T21:25:34+00:00] total_runs incremented to: 15
+[2025-10-03T21:25:34+00:00] About to call run_benchmark function...
+[2025-10-03T21:25:34+00:00] Function parameters: clients=60 nodes=28 shards=28 rep=3
+[2025-10-03T21:25:34+00:00] Starting benchmark: 60_28-28_3
+[2025-10-03T21:25:34+00:00] Clearing indices...
+[2025-10-03T21:25:45+00:00] Executing OSB for 60_28-28_3...
+[2025-10-03T21:25:45+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:25:45+00:00] About to execute OSB command...
+[2025-10-03T21:31:19+00:00] OSB execution completed for 60_28-28_3
+[2025-10-03T21:31:19+00:00] Completed benchmark: 60_28-28_3
+[2025-10-03T21:31:19+00:00] run_benchmark completed successfully
+[2025-10-03T21:31:19+00:00] Progress: 15/100 runs completed
+[2025-10-03T21:31:19+00:00] Processing repetition 4 for 60 clients, 28 nodes, 28 shards
+[2025-10-03T21:31:19+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:31:19+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:31:19+00:00] About to increment total_runs (current value: 15)
+[2025-10-03T21:31:19+00:00] total_runs incremented to: 16
+[2025-10-03T21:31:19+00:00] About to call run_benchmark function...
+[2025-10-03T21:31:19+00:00] Function parameters: clients=60 nodes=28 shards=28 rep=4
+[2025-10-03T21:31:19+00:00] Starting benchmark: 60_28-28_4
+[2025-10-03T21:31:19+00:00] Clearing indices...
+[2025-10-03T21:31:31+00:00] Executing OSB for 60_28-28_4...
+[2025-10-03T21:31:31+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:31:31+00:00] About to execute OSB command...
+[2025-10-03T21:37:05+00:00] OSB execution completed for 60_28-28_4
+[2025-10-03T21:37:05+00:00] Completed benchmark: 60_28-28_4
+[2025-10-03T21:37:05+00:00] run_benchmark completed successfully
+[2025-10-03T21:37:05+00:00] Progress: 16/100 runs completed
+[2025-10-03T21:37:05+00:00] About to configure cluster: 32 nodes, 32 shards
+[2025-10-03T21:37:05+00:00] Configuring cluster: 32 nodes, 32 shards
+[2025-10-03T21:39:14+00:00] Cluster configured, verifying...
+[2025-10-03T21:39:14+00:00] Cluster verified, starting benchmark runs...
+[2025-10-03T21:39:14+00:00] Processing repetition 1 for 60 clients, 32 nodes, 32 shards
+[2025-10-03T21:39:14+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:39:14+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:39:14+00:00] About to increment total_runs (current value: 16)
+[2025-10-03T21:39:14+00:00] total_runs incremented to: 17
+[2025-10-03T21:39:14+00:00] About to call run_benchmark function...
+[2025-10-03T21:39:14+00:00] Function parameters: clients=60 nodes=32 shards=32 rep=1
+[2025-10-03T21:39:14+00:00] Starting benchmark: 60_32-32_1
+[2025-10-03T21:39:14+00:00] Clearing indices...
+[2025-10-03T21:39:19+00:00] Executing OSB for 60_32-32_1...
+[2025-10-03T21:39:19+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:39:19+00:00] About to execute OSB command...
+[2025-10-03T21:45:14+00:00] OSB execution completed for 60_32-32_1
+[2025-10-03T21:45:14+00:00] Completed benchmark: 60_32-32_1
+[2025-10-03T21:45:14+00:00] run_benchmark completed successfully
+[2025-10-03T21:45:14+00:00] Progress: 17/100 runs completed
+[2025-10-03T21:45:14+00:00] Processing repetition 2 for 60 clients, 32 nodes, 32 shards
+[2025-10-03T21:45:14+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:45:14+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:45:14+00:00] About to increment total_runs (current value: 17)
+[2025-10-03T21:45:14+00:00] total_runs incremented to: 18
+[2025-10-03T21:45:14+00:00] About to call run_benchmark function...
+[2025-10-03T21:45:14+00:00] Function parameters: clients=60 nodes=32 shards=32 rep=2
+[2025-10-03T21:45:14+00:00] Starting benchmark: 60_32-32_2
+[2025-10-03T21:45:14+00:00] Clearing indices...
+[2025-10-03T21:45:21+00:00] Executing OSB for 60_32-32_2...
+[2025-10-03T21:45:21+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:45:21+00:00] About to execute OSB command...
+[2025-10-03T21:51:00+00:00] OSB execution completed for 60_32-32_2
+[2025-10-03T21:51:00+00:00] Completed benchmark: 60_32-32_2
+[2025-10-03T21:51:00+00:00] run_benchmark completed successfully
+[2025-10-03T21:51:00+00:00] Progress: 18/100 runs completed
+[2025-10-03T21:51:00+00:00] Processing repetition 3 for 60 clients, 32 nodes, 32 shards
+[2025-10-03T21:51:00+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:51:00+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:51:00+00:00] About to increment total_runs (current value: 18)
+[2025-10-03T21:51:00+00:00] total_runs incremented to: 19
+[2025-10-03T21:51:00+00:00] About to call run_benchmark function...
+[2025-10-03T21:51:00+00:00] Function parameters: clients=60 nodes=32 shards=32 rep=3
+[2025-10-03T21:51:00+00:00] Starting benchmark: 60_32-32_3
+[2025-10-03T21:51:00+00:00] Clearing indices...
+[2025-10-03T21:51:08+00:00] Executing OSB for 60_32-32_3...
+[2025-10-03T21:51:08+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:51:08+00:00] About to execute OSB command...
+[2025-10-03T21:56:47+00:00] OSB execution completed for 60_32-32_3
+[2025-10-03T21:56:47+00:00] Completed benchmark: 60_32-32_3
+[2025-10-03T21:56:47+00:00] run_benchmark completed successfully
+[2025-10-03T21:56:47+00:00] Progress: 19/100 runs completed
+[2025-10-03T21:56:47+00:00] Processing repetition 4 for 60 clients, 32 nodes, 32 shards
+[2025-10-03T21:56:47+00:00] Checkpoint values: CURRENT_CLIENTS=0, CURRENT_NODES=0, CURRENT_SHARDS=0, CURRENT_REP=0
+[2025-10-03T21:56:47+00:00] Checkpoint check passed, proceeding with benchmark
+[2025-10-03T21:56:47+00:00] About to increment total_runs (current value: 19)
+[2025-10-03T21:56:47+00:00] total_runs incremented to: 20
+[2025-10-03T21:56:47+00:00] About to call run_benchmark function...
+[2025-10-03T21:56:47+00:00] Function parameters: clients=60 nodes=32 shards=32 rep=4
+[2025-10-03T21:56:47+00:00] Starting benchmark: 60_32-32_4
+[2025-10-03T21:56:47+00:00] Clearing indices...
+[2025-10-03T21:56:55+00:00] Executing OSB for 60_32-32_4...
+[2025-10-03T21:56:55+00:00] OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=10.0.0.120:9200,10.0.0.120:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:60,bulk_size:10000
+[2025-10-03T21:56:55+00:00] About to execute OSB command...
+[2025-10-03T22:02:29+00:00] OSB execution completed for 60_32-32_4
+[2025-10-03T22:02:29+00:00] Completed benchmark: 60_32-32_4
+[2025-10-03T22:02:29+00:00] run_benchmark completed successfully
+[2025-10-03T22:02:29+00:00] Progress: 20/100 runs completed
+[2025-10-03T22:02:29+00:00] Performance test suite completed successfully
