@@ -3,13 +3,14 @@
 set -euo pipefail
 
 # Configuration
-TARGET_HOST="10.0.0.122"
+TARGET_HOST="$IP"
 RESULTS_DIR="./results/optimization/c4a-64/4k/nyc_taxis"
 CHECKPOINT_FILE="./test_progress.checkpoint"
 LOG_FILE="./performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(60 70 80 90 100)
+CLIENT_LOADS=(60)
+#CLIENT_LOADS=(60 70 80 90 100)
 NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
 
