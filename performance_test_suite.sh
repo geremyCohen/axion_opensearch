@@ -133,13 +133,13 @@ run_benchmark() {
     force_compaction
     
     # Run OSB
-    local osb_cmd="~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis \
+    local osb_cmd="opensearch-benchmark run --workload=nyc_taxis \
         --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
         --client-options=use_ssl:false,verify_certs:false,timeout:60 \
         --kill-running-processes --include-tasks=index \
         --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
-    if ! timeout 7200 bash -c "$osb_cmd" > "$osb_output" 2>&1; then
+    if ! eval "$osb_cmd" > "$osb_output" 2>&1; then
         kill $metrics_pid 2>/dev/null || true
         error_exit "OSB execution failed for $test_name"
     fi
@@ -167,6 +167,9 @@ run_benchmark() {
 }
 
 main() {
+    # Activate OpenSearch Benchmark environment
+    source ~/opensearch-benchmark-workloads-env/bin/activate
+    
     log "Starting OpenSearch performance test suite"
     log "Total configurations: 125, Total runs: 500"
     
