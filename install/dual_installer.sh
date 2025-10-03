@@ -243,10 +243,16 @@ set_node_size() {
     # Scale down - remove nodes
     log "Scaling down: removing $((current_size - target_size)) nodes"
     
-    # Stop and remove excess nodes
+    # Stop and remove excess nodes in parallel
+    log "Stopping excess nodes in parallel..."
+    for ((i=target_size+1; i<=current_size; i++)); do
+      remote_exec "systemctl stop opensearch-node$i || true" &
+    done
+    wait
+    
+    # Remove nodes sequentially after all are stopped
     for ((i=target_size+1; i<=current_size; i++)); do
       log "Removing node-$i..."
-      remote_exec "systemctl stop opensearch-node$i || true"
       remote_exec "systemctl disable opensearch-node$i || true"
       remote_exec "rm -f /etc/systemd/system/opensearch-node$i.service"
       remote_exec "rm -rf /opt/opensearch-node$i"
@@ -368,11 +374,12 @@ update_heap_config() {
   [[ -n "$request_limit" ]] && log "  - indices.breaker.request.limit: ${request_limit}"
   [[ -n "$fielddata_limit" ]] && log "  - indices.breaker.fielddata.limit: ${fielddata_limit}"
   
-  # Stop services
+  # Stop services in parallel
   log "Stopping OpenSearch services..."
   for node in "${detected_nodes[@]}"; do
-    remote_exec "systemctl stop opensearch-node${node} 2>/dev/null || true"
+    remote_exec "systemctl stop opensearch-node${node} 2>/dev/null || true" &
   done
+  wait
   
   # Update configurations for each node
   for node in "${detected_nodes[@]}"; do
@@ -480,8 +487,9 @@ remove_install() {
   log "Stopping services if running..."
   set +e
   for service in "${detected_services[@]}"; do
-    remote_exec "systemctl stop \"${service}\" 2>/dev/null || true"
+    remote_exec "systemctl stop \"${service}\" 2>/dev/null || true" &
   done
+  wait
   set -e
 
   log "Disabling services..."
@@ -649,7 +657,20 @@ download_dist() {
   if ! remote_exec "[ -d \"${BASE_DIST_DIR}\" ]"; then
     log "Downloading OpenSearch ${OPENSEARCH_VERSION} for ${OS_BUNDLE_ARCH}..."
     local TMP_TGZ="${TARBALL_PATH}"
-    if ! remote_exec "[ -f \"${TMP_TGZ}\" ]"; then
+    
+    # Check if tarball exists and has reasonable size (>100MB)
+    local need_download=true
+    if remote_exec "[ -f \"${TMP_TGZ}\" ]"; then
+      local file_size=$(remote_exec "stat -c%s \"${TMP_TGZ}\" 2>/dev/null || echo 0")
+      if [[ "$file_size" -gt 104857600 ]]; then  # 100MB minimum
+        log "Using existing tarball (${file_size} bytes)"
+        need_download=false
+      else
+        log "Existing tarball too small (${file_size} bytes), will re-download"
+      fi
+    fi
+    
+    if [[ "$need_download" == "true" ]]; then
       log "Fetching bundle for arch ${OS_BUNDLE_ARCH}..."
       if [[ -n "$REMOTE_IP" ]]; then
         # Download locally then copy to remote
@@ -659,7 +680,9 @@ download_dist() {
       else
         curl -fL "https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}/opensearch-${OPENSEARCH_VERSION}-${OS_BUNDLE_ARCH}.tar.gz" -o "${TMP_TGZ}"
       fi
+      log "Download completed"
     fi
+    
     log "Extracting to ${BASE_DIST_DIR}..."
     remote_exec "mkdir -p \"${BASE_DIST_DIR}\""
     remote_exec "tar -xzf \"${TMP_TGZ}\" -C \"${BASE_DIR}\""
