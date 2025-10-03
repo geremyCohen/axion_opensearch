@@ -60,7 +60,7 @@ configure_cluster() {
     
     log "Configuring cluster: $nodes nodes, $shards shards"
     
-    if ! nodesize=$nodes system_memory_percent=90 indices_breaker_total_limit=85% \
+    if ! nodesize=$nodes system_memory_percent=80 indices_breaker_total_limit=85% \
          indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% \
          num_of_shards=$shards ./install/dual_installer.sh update "$TARGET_HOST"; then
         error_exit "Failed to configure cluster with $nodes nodes, $shards shards"
