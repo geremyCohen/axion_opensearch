@@ -435,6 +435,30 @@ update_heap_config() {
         cluster_ready=true
         break
       fi
+      
+      if [ $attempt -eq 30 ]; then
+        log "Cluster health check failed after 30 attempts. Performing automatic cleanup and reinstall..."
+        
+        # Determine current node count for reinstall
+        local current_nodes=$(ls -d /opt/opensearch-node* 2>/dev/null | wc -l || echo "16")
+        
+        # Remove existing cluster
+        log "Removing existing cluster..."
+        if [[ -n "$REMOTE_IP" ]]; then
+          ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh remove"
+          sleep 5
+          ssh "${SUDO_USER:-$USER}@${REMOTE_IP}" "sudo /tmp/dual_installer.sh install $current_nodes"
+        else
+          bash "$0" remove
+          sleep 5
+          bash "$0" install "$current_nodes"
+        fi
+        
+        log "Cluster cleanup and reinstall completed, continuing with shard creation..."
+        cluster_ready=true
+        break
+      fi
+      
       log "Waiting for cluster... (attempt $attempt/$max_attempts)"
       sleep 1
       ((attempt++))
