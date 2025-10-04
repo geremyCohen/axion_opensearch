@@ -4,9 +4,10 @@ set -euo pipefail
 
 # Configuration
 TARGET_HOST="$IP"
-RESULTS_DIR="./results/optimization/c4a-64/4k/nyc_taxis"
-CHECKPOINT_FILE="./test_progress.checkpoint"
-LOG_FILE="./performance_test.log"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+RESULTS_DIR="./results/optimization/$TIMESTAMP/c4a-64/4k/nyc_taxis"
+CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
+LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
 
 # Test parameters
 CLIENT_LOADS=(60)
@@ -16,6 +17,7 @@ REPETITIONS=4
 
 # Initialize
 mkdir -p "$RESULTS_DIR"
+mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
 
 log() {
@@ -116,6 +118,7 @@ run_benchmark() {
     
     local test_name="${clients}_${nodes}-${shards}_${rep}"
     local osb_output="$RESULTS_DIR/${test_name}.json"
+    local osb_log="$RESULTS_DIR/${test_name}.log"
     local metrics_file="$RESULTS_DIR/metrics_${test_name}"
     
     log "Starting benchmark: $test_name"
@@ -127,7 +130,6 @@ run_benchmark() {
     
     # Run OSB
     log "Executing OSB for $test_name..."
-    log "OSB command will be: opensearch-benchmark run --workload=nyc_taxis --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks=index --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
     local osb_cmd="opensearch-benchmark run --workload=nyc_taxis \
         --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
@@ -136,11 +138,11 @@ run_benchmark() {
         --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
     log "About to execute OSB command..."
-    if ! eval "$osb_cmd" > "$osb_output" 2>&1; then
+    if ! eval "$osb_cmd" > "$osb_log" 2>&1; then
         log "OSB execution failed for $test_name, checking output..."
-        if [[ -f "$osb_output" ]]; then
+        if [[ -f "$osb_log" ]]; then
             log "OSB output file exists, showing last 10 lines:"
-            tail -10 "$osb_output" | while read line; do log "OSB: $line"; done
+            tail -10 "$osb_log" | while read line; do log "OSB: $line"; done
         else
             log "OSB output file does not exist"
         fi
@@ -151,19 +153,40 @@ run_benchmark() {
     
     log "OSB execution completed for $test_name"
     
-    # Verify success
-    if ! grep -q "SUCCESS\|Cumulative indexing time" "$osb_output"; then
-        log "Warning: Success marker not found in $test_name output"
+    # Extract test-run-id from OSB output
+    local test_run_id=$(grep -o '\[Test Run ID\]: [a-f0-9-]*' "$osb_log" | cut -d' ' -f4)
+    if [[ -n "$test_run_id" ]]; then
+        log "Found test-run-id: $test_run_id"
+        
+        # Copy JSON results from OSB data directory
+        local osb_json_file="$HOME/.benchmark/benchmarks/test-runs/$test_run_id/test_run.json"
+        if [[ -f "$osb_json_file" ]]; then
+            cp "$osb_json_file" "$osb_output"
+            log "Copied OSB JSON results to $osb_output"
+            
+            # Create summary JSON
+            if command -v jq >/dev/null 2>&1; then
+                jq '{
+                    test_run_id: ."test-run-id",
+                    throughput: .results.op_metrics[0].throughput,
+                    latency: .results.op_metrics[0].latency,
+                    service_time: .results.op_metrics[0].service_time,
+                    error_rate: .results.op_metrics[0].error_rate // 0
+                }' "$osb_output" > "${osb_output%.json}_summary.json" 2>/dev/null || {
+                    log "Warning: Failed to create summary JSON for $test_name"
+                    echo '{"error": "Failed to parse results"}' > "${osb_output%.json}_summary.json"
+                }
+            fi
+        else
+            log "Warning: OSB JSON results file not found: $osb_json_file"
+        fi
+    else
+        log "Warning: Could not extract test-run-id from OSB output"
     fi
     
-    # Parse and save summary
-    if command -v jq >/dev/null 2>&1; then
-        jq '{
-            throughput: .["service-time"] // 0,
-            latency: .["latency-percentiles"] // {},
-            indexing_rate: .["indexing-rate"] // 0,
-            errors: .["error-count"] // 0
-        }' "$osb_output" > "${osb_output%.json}_summary.json" 2>/dev/null || true
+    # Verify success
+    if ! grep -q "SUCCESS\|✅ SUCCESS" "$osb_log"; then
+        log "Warning: Success marker not found in $test_name output"
     fi
     
     log "Completed benchmark: $test_name"
