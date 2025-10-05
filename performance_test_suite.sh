@@ -170,7 +170,7 @@ run_benchmark() {
                     throughput: .results.op_metrics[0].throughput,
                     latency: .results.op_metrics[0].latency,
                     service_time: .results.op_metrics[0].service_time,
-                    error_rate: .results.op_metrics[0].error_rate // 0
+                    error_rate: (.results.op_metrics[0].error_rate // 0)
                 }' "$osb_output" > "${osb_output%.json}_summary.json" 2>/dev/null || {
                     log "Warning: Failed to create summary JSON for $test_name"
                     echo '{"error": "Failed to parse results"}' > "${osb_output%.json}_summary.json"
