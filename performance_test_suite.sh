@@ -90,6 +90,18 @@ configure_cluster() {
     
     log "Configuring cluster: $nodes nodes, $shards shards"
     
+    # Check for red cluster status and fix unassigned shards
+    local cluster_status=$(curl -s "http://$TARGET_HOST:9200/_cluster/health" | jq -r '.status // "unknown"')
+    if [[ "$cluster_status" == "red" ]]; then
+        log "Cluster is red - checking for unassigned shards"
+        local unassigned=$(curl -s "http://$TARGET_HOST:9200/_cluster/health" | jq -r '.unassigned_shards // 0')
+        if [[ $unassigned -gt 0 ]]; then
+            log "Found $unassigned unassigned shards - cleaning up indices before cluster update"
+            curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null || true
+            sleep 2
+        fi
+    fi
+    
     if ! nodesize=$nodes system_memory_percent=80 indices_breaker_total_limit=85% \
          indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% \
          num_of_shards=$shards ./install/dual_installer.sh update "$TARGET_HOST"; then
