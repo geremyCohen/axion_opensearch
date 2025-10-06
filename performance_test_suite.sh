@@ -231,7 +231,7 @@ main() {
             
             # Skip if we haven't reached the checkpoint yet
             if [[ $clients -lt $CURRENT_CLIENTS ]] || \
-               [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]]; then
+               [[ $clients -eq $CURRENT_CLIENTS && $nodes -le $CURRENT_NODES ]]; then
                 continue
             fi
             
