@@ -6,7 +6,12 @@ set -euo pipefail
 TARGET_HOST="$IP"
 
 # Find existing run or create new timestamp
-EXISTING_RUN=$(find ./results/optimization -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
+if [[ -d "./results/optimization" ]]; then
+    EXISTING_RUN=$(find ./results/optimization -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
+else
+    EXISTING_RUN=""
+fi
+
 if [[ -n "$EXISTING_RUN" ]]; then
     TIMESTAMP=$(basename $(dirname "$EXISTING_RUN"))
     echo "Found existing run: $TIMESTAMP"
@@ -22,8 +27,10 @@ LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
 # Test parameters
 CLIENT_LOADS=(70)
 #CLIENT_LOADS=(60 70 80 90 100)
-NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
-REPETITIONS=4
+NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
+#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
+REPETITIONS=2
+#REPETITIONS=4
 
 # Initialize
 mkdir -p "$RESULTS_DIR"
