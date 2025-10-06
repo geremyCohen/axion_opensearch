@@ -114,10 +114,7 @@ def generate_html_report(data_dir, output_dir):
     # Create charts
     charts = create_charts(df)
     
-    # Load markdown report
-    report_path = "/home/geremy_cohen_arm_com/axion_opensearch/final_analysis_report.md"
-    with open(report_path, 'r') as f:
-        markdown_content = f.read()
+    # Skip markdown loading - generate self-contained report
     
     # Generate HTML
     html_content = f"""
