@@ -41,7 +41,7 @@ error_exit() {
 load_checkpoint() {
     if [[ -f "$CHECKPOINT_FILE" ]]; then
         source "$CHECKPOINT_FILE"
-        log "Resuming from checkpoint: clients=$CURRENT_CLIENTS, nodes=$CURRENT_NODES, shards=$CURRENT_SHARDS, rep=$CURRENT_REP"
+        log "Checkpoint found: resuming from clients=$CURRENT_CLIENTS, nodes=$CURRENT_NODES, shards=$CURRENT_SHARDS, rep=$CURRENT_REP"
         
         # Clean up incomplete run files from the next run that would have been attempted
         local next_rep=$((CURRENT_REP + 1))
@@ -57,7 +57,7 @@ load_checkpoint() {
         CURRENT_NODES=0
         CURRENT_SHARDS=0
         CURRENT_REP=0
-        log "Starting fresh - no checkpoint found"
+        log "No checkpoint found - starting fresh"
     fi
 }
 
