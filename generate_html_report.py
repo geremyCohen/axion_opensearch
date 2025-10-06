@@ -65,12 +65,12 @@ def create_charts(df):
     fig, ax = plt.subplots(figsize=(10, 6))
     for config in df['config'].unique():
         config_data = df[df['config'] == config]
-        ax.scatter(config_data['latency_p99'], config_data['throughput_mean'], 
+        ax.scatter(config_data['latency_p90'], config_data['throughput_mean'], 
                   label=config, alpha=0.7, s=100)
     
-    ax.set_xlabel('P99 Latency (ms)')
+    ax.set_xlabel('P90 Latency (ms)')
     ax.set_ylabel('Throughput (docs/s)')
-    ax.set_title('Throughput vs P99 Latency')
+    ax.set_title('Throughput vs P90 Latency')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
@@ -239,8 +239,8 @@ def generate_html_report(data_dir, output_dir):
                 <div class="metric-label">Average Throughput (docs/s)</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value">{df['latency_p99'].mean():.0f}</div>
-                <div class="metric-label">P99 Latency (ms)</div>
+                <div class="metric-value">{df['latency_p90'].mean():.0f}</div>
+                <div class="metric-label">P90 Latency (ms)</div>
             </div>
             <div class="metric-card">
                 <div class="metric-value">{df['throughput_mean'].mean()/16:.0f}</div>
@@ -254,7 +254,7 @@ def generate_html_report(data_dir, output_dir):
         
         <h2>Performance Charts</h2>
         
-        {f'<div class="chart-container"><h3>Throughput vs P99 Latency</h3><img src="data:image/png;base64,{charts["throughput_latency"]}" alt="Throughput vs Latency Chart"></div>' if 'throughput_latency' in charts else ''}
+        {f'<div class="chart-container"><h3>Throughput vs P90 Latency</h3><img src="data:image/png;base64,{charts["throughput_latency"]}" alt="Throughput vs Latency Chart"></div>' if 'throughput_latency' in charts else ''}
         
         {f'<div class="chart-container"><h3>Latency Percentiles</h3><img src="data:image/png;base64,{charts["latency_percentiles"]}" alt="Latency Percentiles Chart"></div>' if 'latency_percentiles' in charts else ''}
         
@@ -283,8 +283,8 @@ def generate_html_report(data_dir, output_dir):
                 <div class="metric-label">Throughput CV</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value">{(df['latency_p99'].std() / df['latency_p99'].mean() * 100):.1f}%</div>
-                <div class="metric-label">P99 Latency CV</div>
+                <div class="metric-value">{(df['latency_p90'].std() / df['latency_p90'].mean() * 100):.1f}%</div>
+                <div class="metric-label">P90 Latency CV</div>
             </div>
         </div>
         <p class="status-good">Excellent repeatability with CV &lt; 5% for both metrics.</p>
