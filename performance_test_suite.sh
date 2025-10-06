@@ -4,7 +4,17 @@ set -euo pipefail
 
 # Configuration
 TARGET_HOST="$IP"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+# Find existing run or create new timestamp
+EXISTING_RUN=$(find ./results/optimization -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
+if [[ -n "$EXISTING_RUN" ]]; then
+    TIMESTAMP=$(basename $(dirname "$EXISTING_RUN"))
+    echo "Found existing run: $TIMESTAMP"
+else
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    echo "Starting new run: $TIMESTAMP"
+fi
+
 RESULTS_DIR="./results/optimization/$TIMESTAMP/c4a-64/4k/nyc_taxis"
 CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
 LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
