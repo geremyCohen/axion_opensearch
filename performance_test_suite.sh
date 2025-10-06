@@ -217,12 +217,18 @@ main() {
     fi
     
     log "Starting OpenSearch performance test suite"
-    log "Total configurations: 25, Total runs: 100"
+    
+    # Calculate total configurations and runs
+    local total_configs=$((${#CLIENT_LOADS[@]} * ${#NODE_SHARD_CONFIGS[@]}))
+    local total_runs=$((total_configs * REPETITIONS))
+    log "Total configurations: $total_configs, Total runs: $total_runs"
+    log "CLIENT_LOADS: ${CLIENT_LOADS[*]}"
+    log "NODE_SHARD_CONFIGS: ${NODE_SHARD_CONFIGS[*]}"
     
     load_checkpoint
     
-    local total_runs=0
     local completed_runs=0
+    local all_combinations_complete=true
     
     for clients in "${CLIENT_LOADS[@]}"; do
         for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
@@ -232,8 +238,12 @@ main() {
             # Skip if we haven't reached the checkpoint yet
             if [[ $clients -lt $CURRENT_CLIENTS ]] || \
                [[ $clients -eq $CURRENT_CLIENTS && $nodes -le $CURRENT_NODES ]]; then
+                completed_runs=$((completed_runs + REPETITIONS))
                 continue
             fi
+            
+            # If we reach here, we have work to do
+            all_combinations_complete=false
             
             # Configure cluster once per node/shard combination
             log "About to configure cluster: $nodes nodes, $shards shards"
@@ -254,12 +264,6 @@ main() {
                 fi
                 
                 log "Checkpoint check passed, proceeding with benchmark"
-                log "About to increment total_runs (current value: $total_runs)"
-                total_runs=$((total_runs + 1))
-                log "total_runs incremented to: $total_runs"
-                
-                log "About to call run_benchmark function..."
-                log "Function parameters: clients=$clients nodes=$nodes shards=$shards rep=$rep"
                 
                 if run_benchmark "$clients" "$nodes" "$shards" "$rep"; then
                     log "run_benchmark completed successfully"
@@ -270,10 +274,18 @@ main() {
                 
                 completed_runs=$((completed_runs + 1))
                 
-                log "Progress: $completed_runs/100 runs completed"
+                log "Progress: $completed_runs/$total_runs runs completed"
             done
         done
     done
+    
+    # Check if all combinations were already complete
+    if [[ $all_combinations_complete == true ]]; then
+        log "All defined combinations already completed. Nothing to do."
+        rm -f "$CHECKPOINT_FILE"
+        log "Performance test suite completed - all work done"
+        return 0
+    fi
     
     rm -f "$CHECKPOINT_FILE"
     log "Performance test suite completed successfully"
