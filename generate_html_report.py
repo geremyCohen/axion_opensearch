@@ -357,8 +357,8 @@ def generate_html_report(data_dir, output_dir):
     return html_path
 
 def main():
-    data_dir = "/home/geremy_cohen_arm_com/axion_opensearch/results/optimization/20251006_193245/c4a-64/4k/nyc_taxis"
-    output_dir = "/home/geremy_cohen_arm_com/axion_opensearch/analysis_output"
+    data_dir = "results/optimization/20251006_193245/c4a-64/4k/nyc_taxis"
+    output_dir = "analysis_output"
     
     html_path = generate_html_report(data_dir, output_dir)
     print(f"Open the report: file://{html_path}")
