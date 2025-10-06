@@ -20,7 +20,8 @@ CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
 LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(60 70 80 90 100)
+CLIENT_LOADS=(70)
+#CLIENT_LOADS=(60 70 80 90 100)
 NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
 
@@ -147,7 +148,20 @@ run_benchmark() {
         --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
     log "About to execute OSB command..."
+    
+    # Start metrics collection in background
+    (
+        local sample=1
+        while kill -0 $$ 2>/dev/null; do
+            collect_metrics "$metrics_file" "$sample"
+            sample=$((sample + 1))
+            sleep 60
+        done
+    ) &
+    local metrics_pid=$!
+    
     if ! eval "$osb_cmd" > "$osb_log" 2>&1; then
+        kill $metrics_pid 2>/dev/null
         log "OSB execution failed for $test_name, checking output..."
         if [[ -f "$osb_log" ]]; then
             log "OSB output file exists, showing last 10 lines:"
@@ -159,6 +173,9 @@ run_benchmark() {
         set -e  # Re-enable exit on error
         return 1
     fi
+    
+    # Stop metrics collection
+    kill $metrics_pid 2>/dev/null
     
     log "OSB execution completed for $test_name"
     
