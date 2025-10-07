@@ -512,16 +512,20 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             {rep_analysis['cv_analysis'].sort_index(ascending=False).to_html(classes='table')}
             
             <h3>Outlier Detection (>2σ)</h3>
+            <p>Identifies individual repetitions that deviate significantly from the mean within each configuration using statistical analysis (>2 standard deviations).</p>
+            <p><strong>Purpose:</strong> Flag potentially unreliable runs caused by system interference, network issues, or other environmental factors that should be investigated or excluded from analysis.</p>
             {rep_analysis['outliers'].to_html(index=False, classes='table') if not rep_analysis['outliers'].empty else '<p>No outliers detected</p>'}
             
             <div class="metrics-grid">
                 <div id="throughput_box"></div>
                 <div id="latency_p90_box"></div>
             </div>
+            <p><strong>Throughput and Latency Distribution:</strong> Box plots showing the spread and consistency of performance metrics across repetitions within each configuration. Wider boxes indicate more variability.</p>
             
             <div class="chart-container">
                 <div id="scatter_plot"></div>
             </div>
+            <p><strong>Throughput vs Latency Correlation:</strong> Scatter plot showing the relationship between throughput and P90 latency for each individual repetition. Helps identify performance trade-offs and optimal operating points.</p>
         </div>
         
         <!-- Tab 2: Run Level Analysis -->
