@@ -560,12 +560,24 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             <p><strong>In the dashboard:</strong><br>
             • <strong>throughput_mean_cv</strong>: How consistent throughput is across repetitions<br>
             • <strong>latency_p50_cv, latency_p90_cv, latency_p99_cv</strong>: How consistent latency percentiles are<br>
-            • <strong>error_rate_cv</strong>: How consistent error rates are</p>
+            • <strong>error_rate_cv</strong>: How consistent error rates are<br>
+            • <strong>cpu_avg_cv</strong>: How consistent average CPU utilization is across repetitions<br>
+            • <strong>cpu_peak_cv</strong>: How consistent peak CPU spikes are across repetitions<br>
+            • <strong>load_avg_1m_cv</strong>: How consistent system load averages are across repetitions</p>
             
             <p><strong>Interpretation:</strong><br>
             • <strong>CV &lt; 5%</strong>: Very consistent (good)<br>
             • <strong>CV 5-10%</strong>: Moderately consistent<br>
             • <strong>CV &gt; 10%</strong>: High variability (investigate causes)</p>
+            
+            <p><strong>What Each Column Tells You:</strong><br>
+            • <strong>Low throughput_mean_cv</strong>: Reliable, repeatable performance results<br>
+            • <strong>Low latency_cv values</strong>: Predictable response times across runs<br>
+            • <strong>Low error_rate_cv</strong>: Stable error patterns (ideally 0% errors consistently)<br>
+            • <strong>Low cpu_avg_cv</strong>: Stable CPU usage patterns, no random spikes or bottlenecks<br>
+            • <strong>Low cpu_peak_cv</strong>: Predictable peak CPU loads, consistent workload handling<br>
+            • <strong>Low load_avg_1m_cv</strong>: Stable system load, no interference from other processes<br>
+            • <strong>High CV values (&gt;10%)</strong>: Inconsistent behavior - may indicate system interference, thermal throttling, or configuration issues</p>
             
             {rep_analysis['cv_analysis'].sort_index(ascending=False).to_html(classes='table')}
             
