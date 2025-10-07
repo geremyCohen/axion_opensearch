@@ -471,8 +471,16 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
         <div id="RepetitionAnalysis" class="tabcontent active">
             <h2>Repetition Analysis - Data Quality Validation</h2>
             
-            <h3>Individual Repetition Metrics</h3>
-            {rep_analysis['rep_metrics'].to_html(index=False, classes='table')}
+            <h3>Individual Repetition Metrics</h3>"""
+    
+    # Group repetition metrics by config
+    for config in rep_analysis['rep_metrics']['config'].unique():
+        config_data = rep_analysis['rep_metrics'][rep_analysis['rep_metrics']['config'] == config]
+        html_content += f"""
+            <h4>Configuration: {config}</h4>
+            {config_data.drop('config', axis=1).to_html(index=False, classes='table')}"""
+    
+    html_content += f"""
             
             <h3>Coefficient of Variation Analysis</h3>
             {rep_analysis['cv_analysis'].to_html(classes='table')}
@@ -602,7 +610,7 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
 def main():
     # Use relative paths from script directory
     script_dir = Path(__file__).parent
-    data_dir = script_dir / "results/optimization/20251006_193245/c4a-64/4k/nyc_taxis"
+    data_dir = script_dir / "results/optimization/20251007_144856/c4a-64/4k/nyc_taxis"
     output_dir = script_dir / "analysis_output"
     
     if not os.path.exists(data_dir):
