@@ -404,22 +404,42 @@ main() {
     local found_resume_point=false
     
     for clients in "${CLIENT_LOADS[@]}"; do
+        # Skip entire client loads that are already complete
+        if [[ $clients -lt $CURRENT_CLIENTS ]]; then
+            log "Skipping completed client load: $clients clients"
+            completed_runs=$((completed_runs + ${#NODE_SHARD_CONFIGS[@]} * REPETITIONS))
+            continue
+        fi
+        
         for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
             local nodes=$node_shard
             local shards=$node_shard
             
             # If we haven't found our resume point yet, check if this is it
             if [[ $found_resume_point == false ]]; then
-                if [[ $clients -gt $CURRENT_CLIENTS ]] || \
-                   [[ $clients -eq $CURRENT_CLIENTS && $nodes -gt $CURRENT_NODES ]]; then
+                # Check if we should resume from this configuration
+                if [[ $clients -gt $CURRENT_CLIENTS ]]; then
+                    # Next client load - this is our resume point
                     found_resume_point=true
-                    log "Found resume point: $clients clients, $nodes nodes"
+                    log "Found resume point: $clients clients, $nodes nodes (next client load)"
+                elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -gt $CURRENT_NODES ]]; then
+                    # Same client load, next node configuration
+                    found_resume_point=true
+                    log "Found resume point: $clients clients, $nodes nodes (next node config)"
                 elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES ]]; then
                     # Same config - check if we need to resume mid-repetitions
-                    found_resume_point=true
-                    log "Resuming within same config: $clients clients, $nodes nodes"
+                    if [[ $CURRENT_REP -lt $REPETITIONS ]]; then
+                        found_resume_point=true
+                        log "Resuming within same config: $clients clients, $nodes nodes (rep $((CURRENT_REP + 1)))"
+                    else
+                        # All repetitions complete for this config, skip it
+                        log "Skipping completed config: $clients clients, $nodes nodes (all $REPETITIONS reps done)"
+                        completed_runs=$((completed_runs + REPETITIONS))
+                        continue
+                    fi
                 else
-                    # Skip this entire configuration
+                    # Skip this entire configuration - it's already completed
+                    log "Skipping completed config: $clients clients, $nodes nodes"
                     completed_runs=$((completed_runs + REPETITIONS))
                     continue
                 fi
