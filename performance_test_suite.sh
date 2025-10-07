@@ -44,16 +44,7 @@ load_checkpoint() {
         source "$CHECKPOINT_FILE"
         log "Checkpoint found: resuming from clients=$CURRENT_CLIENTS, nodes=$CURRENT_NODES, shards=$CURRENT_SHARDS, rep=$CURRENT_REP"
         
-        # Validate that the checkpoint configuration is reasonable
-        if [[ $CURRENT_NODES -gt 16 ]]; then
-            log "WARNING: Checkpoint references $CURRENT_NODES nodes, but max supported is 16. Resetting checkpoint."
-            rm -f "$CHECKPOINT_FILE"
-            CURRENT_CLIENTS=0
-            CURRENT_NODES=0
-            CURRENT_SHARDS=0
-            CURRENT_REP=0
-            return
-        fi
+        # Checkpoint loaded successfully
         
         # Clean up incomplete run files from the next run that would have been attempted
         local next_rep=$((CURRENT_REP + 1))
@@ -404,6 +395,16 @@ main() {
             log "Skipping completed client load: $clients clients"
             completed_runs=$((completed_runs + ${#NODE_SHARD_CONFIGS[@]} * REPETITIONS))
             continue
+        elif [[ $clients -eq $CURRENT_CLIENTS ]]; then
+            # For current client load, check if we're completely done with all configs
+            # We're done if current_nodes is the last node config AND current_rep equals REPETITIONS
+            local last_node_config=${NODE_SHARD_CONFIGS[-1]}
+            log "DEBUG: clients=$clients, CURRENT_CLIENTS=$CURRENT_CLIENTS, CURRENT_NODES=$CURRENT_NODES, last_node_config=$last_node_config, CURRENT_REP=$CURRENT_REP, REPETITIONS=$REPETITIONS"
+            if [[ $CURRENT_NODES -eq $last_node_config && $CURRENT_REP -eq $REPETITIONS ]]; then
+                log "Skipping completed client load: $clients clients (all configs done)"
+                completed_runs=$((completed_runs + ${#NODE_SHARD_CONFIGS[@]} * REPETITIONS))
+                continue
+            fi
         fi
         
         for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
