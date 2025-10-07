@@ -25,11 +25,9 @@ CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
 LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(70)
-#CLIENT_LOADS=(60 70 80 90 100)
-NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
-#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
-REPETITIONS=2
+CLIENT_LOADS=(60 70 80 90 100)
+NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
+REPETITIONS=4
 #REPETITIONS=4
 
 # Initialize
@@ -273,7 +271,7 @@ main() {
             
             # Skip if we haven't reached the checkpoint yet
             if [[ $clients -lt $CURRENT_CLIENTS ]] || \
-               [[ $clients -eq $CURRENT_CLIENTS && $nodes -le $CURRENT_NODES ]]; then
+               [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]]; then
                 completed_runs=$((completed_runs + REPETITIONS))
                 continue
             fi
@@ -293,7 +291,9 @@ main() {
                 log "Checkpoint values: CURRENT_CLIENTS=$CURRENT_CLIENTS, CURRENT_NODES=$CURRENT_NODES, CURRENT_SHARDS=$CURRENT_SHARDS, CURRENT_REP=$CURRENT_REP"
                 
                 # Skip if we haven't reached the checkpoint repetition yet
-                if [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES && $shards -eq $CURRENT_SHARDS && $rep -le $CURRENT_REP ]]; then
+                if [[ $clients -lt $CURRENT_CLIENTS ]] || \
+                   [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]] || \
+                   [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES && $rep -le $CURRENT_REP ]]; then
                     log "Skipping due to checkpoint: $clients,$nodes,$shards,$rep <= $CURRENT_CLIENTS,$CURRENT_NODES,$CURRENT_SHARDS,$CURRENT_REP"
                     completed_runs=$((completed_runs + 1))
                     continue
