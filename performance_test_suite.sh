@@ -262,22 +262,29 @@ main() {
     load_checkpoint
     
     local completed_runs=0
-    local all_combinations_complete=true
+    local found_resume_point=false
     
     for clients in "${CLIENT_LOADS[@]}"; do
         for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
             local nodes=$node_shard
             local shards=$node_shard
             
-            # Skip if we haven't reached the checkpoint yet
-            if [[ $clients -lt $CURRENT_CLIENTS ]] || \
-               [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]]; then
-                completed_runs=$((completed_runs + REPETITIONS))
-                continue
+            # If we haven't found our resume point yet, check if this is it
+            if [[ $found_resume_point == false ]]; then
+                if [[ $clients -gt $CURRENT_CLIENTS ]] || \
+                   [[ $clients -eq $CURRENT_CLIENTS && $nodes -gt $CURRENT_NODES ]]; then
+                    found_resume_point=true
+                    log "Found resume point: $clients clients, $nodes nodes"
+                elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES ]]; then
+                    # Same config - check if we need to resume mid-repetitions
+                    found_resume_point=true
+                    log "Resuming within same config: $clients clients, $nodes nodes"
+                else
+                    # Skip this entire configuration
+                    completed_runs=$((completed_runs + REPETITIONS))
+                    continue
+                fi
             fi
-            
-            # If we reach here, we have work to do
-            all_combinations_complete=false
             
             # Configure cluster once per node/shard combination
             log "About to configure cluster: $nodes nodes, $shards shards"
@@ -288,18 +295,15 @@ main() {
             
             for rep in $(seq 1 $REPETITIONS); do
                 log "Processing repetition $rep for $clients clients, $nodes nodes, $shards shards"
-                log "Checkpoint values: CURRENT_CLIENTS=$CURRENT_CLIENTS, CURRENT_NODES=$CURRENT_NODES, CURRENT_SHARDS=$CURRENT_SHARDS, CURRENT_REP=$CURRENT_REP"
                 
-                # Skip if we haven't reached the checkpoint repetition yet
-                if [[ $clients -lt $CURRENT_CLIENTS ]] || \
-                   [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]] || \
-                   [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES && $rep -le $CURRENT_REP ]]; then
-                    log "Skipping due to checkpoint: $clients,$nodes,$shards,$rep <= $CURRENT_CLIENTS,$CURRENT_NODES,$CURRENT_SHARDS,$CURRENT_REP"
+                # Skip completed repetitions in current config
+                if [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES && $rep -le $CURRENT_REP ]]; then
+                    log "Skipping completed repetition: $clients,$nodes,$rep (completed up to $CURRENT_REP)"
                     completed_runs=$((completed_runs + 1))
                     continue
                 fi
                 
-                log "Checkpoint check passed, proceeding with benchmark"
+                log "Running new benchmark: $clients,$nodes,$rep"
                 
                 if run_benchmark "$clients" "$nodes" "$shards" "$rep"; then
                     log "run_benchmark completed successfully"
@@ -314,14 +318,6 @@ main() {
             done
         done
     done
-    
-    # Check if all combinations were already complete
-    if [[ $all_combinations_complete == true ]]; then
-        log "All defined combinations already completed. Nothing to do."
-        rm -f "$CHECKPOINT_FILE"
-        log "Performance test suite completed - all work done"
-        return 0
-    fi
     
     rm -f "$CHECKPOINT_FILE"
     log "Performance test suite completed successfully"
