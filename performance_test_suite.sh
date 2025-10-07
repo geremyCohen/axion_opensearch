@@ -78,6 +78,106 @@ load_checkpoint() {
     fi
 }
 
+safe_delete_indices() {
+    log "Performing safe index cleanup..."
+    
+    # Delete all indices (not just nyc_taxis*)
+    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
+    curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+    
+    # Wait for deletion to complete
+    local attempts=0
+    while [[ $attempts -lt 10 ]]; do
+        local indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | wc -l)
+        if [[ $indices -eq 0 ]]; then
+            log "Index cleanup completed"
+            return 0
+        fi
+        log "Waiting for index deletion... (attempt $((attempts+1))/10)"
+        sleep 3
+        ((attempts++))
+    done
+    
+    log "WARNING: Index cleanup may be incomplete"
+}
+
+detect_cluster_issues() {
+    local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
+    
+    if [[ -z "$health_response" ]]; then
+        log "ERROR: Cluster not responding"
+        return 1
+    fi
+    
+    local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null)
+    local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null)
+    
+    log "Cluster status: $status, unassigned shards: $unassigned"
+    
+    if [[ "$status" == "red" && $unassigned -gt 0 ]]; then
+        log "DETECTED: Red cluster with unassigned shards - attempting recovery"
+        return 1
+    fi
+    
+    return 0
+}
+
+recover_cluster() {
+    log "Attempting cluster recovery..."
+    
+    # Force delete all indices to clear unassigned shards
+    safe_delete_indices
+    
+    # Wait for cluster to stabilize
+    sleep 10
+    
+    # Check if recovery worked
+    if detect_cluster_issues; then
+        log "Cluster recovery successful"
+        return 0
+    else
+        log "Cluster recovery failed"
+        return 1
+    fi
+}
+
+wait_for_green_cluster() {
+    local max_attempts=15
+    local attempt=1
+    
+    log "Waiting for cluster to become green/yellow..."
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
+        
+        if [[ -n "$health_response" ]]; then
+            local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null)
+            local nodes=$(echo "$health_response" | jq -r '.number_of_nodes // 0' 2>/dev/null)
+            local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null)
+            
+            log "Cluster check: status=$status, nodes=$nodes, unassigned=$unassigned (attempt $attempt/$max_attempts)"
+            
+            if [[ "$status" == "green" || "$status" == "yellow" ]] && [[ $unassigned -eq 0 ]]; then
+                log "Cluster is healthy"
+                return 0
+            fi
+            
+            if [[ "$status" == "red" ]]; then
+                log "Red cluster detected - attempting recovery"
+                if recover_cluster; then
+                    continue  # Retry the health check
+                fi
+            fi
+        fi
+        
+        sleep 10
+        ((attempt++))
+    done
+    
+    log "WARNING: Cluster not fully healthy after $max_attempts attempts"
+    return 1
+}
+
 save_checkpoint() {
     cat > "$CHECKPOINT_FILE" << EOF
 CURRENT_CLIENTS=$1
@@ -99,16 +199,22 @@ configure_cluster() {
     
     log "Configuring cluster: $nodes nodes, $shards shards"
     
-    # Check for red cluster status and fix unassigned shards
-    local cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
-    if [[ "$cluster_status" == "red" ]]; then
-        log "Cluster is red - checking for unassigned shards"
-        local unassigned=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.unassigned_shards // 0' 2>/dev/null)
-        if [[ $unassigned -gt 0 ]]; then
-            log "Found $unassigned unassigned shards - cleaning up indices before cluster update"
-            curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
-            sleep 2
+    # Pre-scaling validation and cleanup
+    log "Pre-scaling validation..."
+    if ! detect_cluster_issues; then
+        log "Cluster issues detected - attempting recovery before scaling"
+        if ! recover_cluster; then
+            log "ERROR: Cannot recover cluster before scaling"
+            return 1
         fi
+    fi
+    
+    # Safe index cleanup before scaling
+    safe_delete_indices
+    
+    # Wait for cluster to be healthy before scaling
+    if ! wait_for_green_cluster; then
+        log "WARNING: Cluster not green before scaling, but continuing..."
     fi
     
     log "Attempting cluster configuration update..."
@@ -117,41 +223,36 @@ configure_cluster() {
          num_of_shards=$shards ./install/dual_installer.sh update "$TARGET_HOST" 2>&1 | tee -a "$LOG_FILE"; then
         log "Cluster configuration completed"
     else
-        log "WARNING: Cluster configuration may have failed, but continuing..."
+        log "WARNING: Cluster configuration may have failed"
+        return 1
     fi
     
-    sleep 30  # Allow cluster to stabilize
+    # Post-scaling validation
+    sleep 30
+    log "Post-scaling validation..."
+    
+    if ! wait_for_green_cluster; then
+        log "ERROR: Cluster unhealthy after scaling"
+        if ! recover_cluster; then
+            log "ERROR: Failed to recover cluster after scaling"
+            return 1
+        fi
+    fi
+    
+    log "Cluster scaling completed successfully"
 }
 
 verify_cluster_active() {
-    local max_attempts=20
-    local attempt=1
+    log "Verifying cluster is ready for benchmarking..."
     
-    log "Waiting for cluster to become active..."
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
-        
-        if [[ -n "$health_response" ]]; then
-            local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null)
-            local nodes=$(echo "$health_response" | jq -r '.number_of_nodes // 0' 2>/dev/null)
-            
-            log "Cluster status: $status, nodes: $nodes (attempt $attempt/$max_attempts)"
-            
-            if [[ "$status" == "green" || "$status" == "yellow" ]] && [[ "$nodes" -gt 0 ]]; then
-                log "Cluster is active with $nodes nodes"
-                return 0
-            fi
-        else
-            log "No response from cluster (attempt $attempt/$max_attempts)"
-        fi
-        
-        sleep 15
-        ((attempt++))
-    done
-    
-    log "WARNING: Cluster not fully active after $max_attempts attempts, but continuing..."
-    return 0  # Don't fail - let the benchmark attempt proceed
+    # Use the comprehensive health check
+    if wait_for_green_cluster; then
+        log "Cluster verification successful"
+        return 0
+    else
+        log "WARNING: Cluster verification failed, but continuing with benchmark attempt"
+        return 0  # Don't fail - let the benchmark attempt proceed
+    fi
 }
 
 collect_metrics() {
@@ -179,10 +280,19 @@ run_benchmark() {
     
     log "Starting benchmark: $test_name"
     
-    # Clear existing indices
-    log "Clearing indices..."
-    curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null || true
-    sleep 5
+    # Safe index cleanup before benchmark
+    log "Performing safe index cleanup before benchmark..."
+    safe_delete_indices
+    
+    # Verify cluster is healthy before benchmark
+    if ! detect_cluster_issues; then
+        log "Cluster issues detected before benchmark - attempting recovery"
+        if ! recover_cluster; then
+            log "ERROR: Cannot recover cluster before benchmark"
+            set -e
+            return 1
+        fi
+    fi
     
     # Run OSB
     log "Executing OSB for $test_name..."
