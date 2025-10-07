@@ -566,9 +566,9 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             • <strong>load_avg_1m_cv</strong>: How consistent system load averages are across repetitions</p>
             
             <p><strong>Interpretation:</strong><br>
-            • <strong>CV &lt; 5%</strong>: Very consistent (good)<br>
-            • <strong>CV 5-10%</strong>: Moderately consistent<br>
-            • <strong>CV &gt; 10%</strong>: High variability (investigate causes)</p>
+            • <strong>CV &lt; 5%</strong>: Very consistent (good) - <span style="background-color: #d4edda; color: #155724; padding: 2px 4px;">Green</span><br>
+            • <strong>CV 5-10%</strong>: Moderately consistent - <span style="background-color: #fff3cd; color: #856404; padding: 2px 4px;">Yellow</span><br>
+            • <strong>CV &gt; 10%</strong>: High variability (investigate causes) - <span style="background-color: #f8d7da; color: #721c24; padding: 2px 4px;">Red</span></p>
             
             <p><strong>What Each Column Tells You:</strong><br>
             • <strong>Low throughput_mean_cv</strong>: Reliable, repeatable performance results<br>
@@ -577,9 +577,39 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             • <strong>Low cpu_avg_cv</strong>: Stable CPU usage patterns, no random spikes or bottlenecks<br>
             • <strong>Low cpu_peak_cv</strong>: Predictable peak CPU loads, consistent workload handling<br>
             • <strong>Low load_avg_1m_cv</strong>: Stable system load, no interference from other processes<br>
-            • <strong>High CV values (&gt;10%)</strong>: Inconsistent behavior - may indicate system interference, thermal throttling, or configuration issues</p>
+            • <strong>High CV values (&gt;10%)</strong>: Inconsistent behavior - may indicate system interference, thermal throttling, or configuration issues</p>"""
+    
+    # Generate color-coded CV table
+    cv_df = rep_analysis['cv_analysis'].sort_index(ascending=False)
+    
+    def get_cv_color(val):
+        if pd.isna(val) or val == 0:
+            return ''
+        elif val < 5:
+            return 'background-color: #d4edda; color: #155724'  # Light green
+        elif val <= 10:
+            return 'background-color: #fff3cd; color: #856404'  # Light yellow
+        else:
+            return 'background-color: #f8d7da; color: #721c24'  # Light red
+    
+    # Build HTML table manually with color coding
+    cv_table_html = '<table class="table"><thead><tr><th>Config</th>'
+    for col in cv_df.columns:
+        cv_table_html += f'<th>{col}</th>'
+    cv_table_html += '</tr></thead><tbody>'
+    
+    for idx, row in cv_df.iterrows():
+        cv_table_html += f'<tr><td>{idx}</td>'
+        for col in cv_df.columns:
+            val = row[col]
+            style = get_cv_color(val)
+            cv_table_html += f'<td style="{style}">{val:.2f}</td>'
+        cv_table_html += '</tr>'
+    cv_table_html += '</tbody></table>'
+    
+    html_content += f"""
             
-            {rep_analysis['cv_analysis'].sort_index(ascending=False).to_html(classes='table')}
+            {cv_table_html}
             
             <h3>Outlier Detection (>2σ)</h3>
             <p>Identifies individual repetitions that deviate significantly from the mean within each configuration using statistical analysis (>2 standard deviations).</p>
