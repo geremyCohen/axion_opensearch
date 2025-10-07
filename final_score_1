@@ -1,0 +1,361 @@
+Things to monitor:
+
+Run time
+Instance type
+Memory
+CPU
+Benchmark Workers, Bulk Size
+Benchmark metrics (which ones?)
+
+NYC Taxis
+Maxxed out 16CPU dual-node with
+
+~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.50:9200,10.0.0.50:9201,10.0.0.50:9202,10.0.0.50:9203,10.0.0.50:9204,10.0.0.50:9205,10.0.0.50:9206,10.0.0.50:9207,10.0.0.50:9208,10.0.0.50:9209,10.0.0.50:9210,10.0.0.50:9211,10.0.0.50:9212,10.0.0.50:9213,10.0.0.50:9214,10.0.0.50:9215 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:90,bulk_size:10000"
+
+
+NEW! TODO! Test this with 16:
+
+opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200,10.0.0.203:9201,10.0.0.203:9202,10.0.0.203:9203,10.0.0.203:9204,10.0.0.203:9205,10.0.0.203:9206,10.0.0.203:9207,10.0.0.203:9208,10.0.0.203:9209,10.0.0.203:9210,10.0.0.203:9211,10.0.0.203:9212,10.0.0.203:9213,10.0.0.203:9214,10.0.0.203:9215 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:25,bulk_size:10000"
+
+
+
+Maxxed out 48CPU dual-node with
+
+# Override with this amount of system memory (default of 50%)
+system_memory_percent=80 ./install/dual_installer.sh update 10.0.0.50
+
+# this gets me ~80% with 24 nodes, when i set clients to 100 it putshed it over
+
+~/benchmark-env/bin/opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.50:9200,10.0.0.50:9201,10.0.0.50:9202,10.0.0.50:9203,10.0.0.50:9204,10.0.0.50:9205,10.0.0.50:9206,10.0.0.50:9207,10.0.0.50:9208,10.0.0.50:9209,10.0.0.50:9210,10.0.0.50:9211,10.0.0.50:9212,10.0.0.50:9213,10.0.0.50:9214,10.0.0.50:9215 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:90,bulk_size:10000"
+
+
+
+
+ ./install/dual_installer.sh remove 10.0.0.50 && ./install/dual_installer.sh install 24 10.0.0.50 && system_memory_percent=80 ./install/dual_installer.sh update 10.0.0.50
+
+# this gets me ~80% with 24 nodes
+ ./install/dual_installer.sh remove 10.0.0.50 && ./install/dual_installer.sh install 20 10.0.0.50 && system_memory_percent=90 ./install/dual_installer.sh update 10.0.0.50
+
+
+
+
+
+16 test with 8 nodes, 8 shards (A1)
+
+|                                                         Metric |   Task |    Value |   Unit |
+|---------------------------------------------------------------:|-------:|---------:|-------:|
+|                     Cumulative indexing time of primary shards |        |  945.007 |    min |
+|             Min cumulative indexing time across primary shards |        |        0 |    min |
+|          Median cumulative indexing time across primary shards |        |  117.209 |    min |
+|             Max cumulative indexing time across primary shards |        |  120.534 |    min |
+|            Cumulative indexing throttle time of primary shards |        |        0 |    min |
+|    Min cumulative indexing throttle time across primary shards |        |        0 |    min |
+| Median cumulative indexing throttle time across primary shards |        |        0 |    min |
+|    Max cumulative indexing throttle time across primary shards |        |        0 |    min |
+|                        Cumulative merge time of primary shards |        |  269.262 |    min |
+|                       Cumulative merge count of primary shards |        |      473 |        |
+|                Min cumulative merge time across primary shards |        |        0 |    min |
+|             Median cumulative merge time across primary shards |        |  32.2062 |    min |
+|                Max cumulative merge time across primary shards |        |  39.1618 |    min |
+|               Cumulative merge throttle time of primary shards |        |  3.04213 |    min |
+|       Min cumulative merge throttle time across primary shards |        |        0 |    min |
+|    Median cumulative merge throttle time across primary shards |        | 0.339867 |    min |
+|       Max cumulative merge throttle time across primary shards |        |   0.5462 |    min |
+|                      Cumulative refresh time of primary shards |        |  42.5335 |    min |
+|                     Cumulative refresh count of primary shards |        |      339 |        |
+|              Min cumulative refresh time across primary shards |        |        0 |    min |
+|           Median cumulative refresh time across primary shards |        |  5.22795 |    min |
+|              Max cumulative refresh time across primary shards |        |  5.81697 |    min |
+|                        Cumulative flush time of primary shards |        |  22.0736 |    min |
+|                       Cumulative flush count of primary shards |        |       84 |        |
+|                Min cumulative flush time across primary shards |        |        0 |    min |
+|             Median cumulative flush time across primary shards |        |  2.49716 |    min |
+|                Max cumulative flush time across primary shards |        |  3.26025 |    min |
+|                                        Total Young Gen GC time |        |  194.224 |      s |
+|                                       Total Young Gen GC count |        |     2223 |        |
+|                                          Total Old Gen GC time |        |        0 |      s |
+|                                         Total Old Gen GC count |        |        0 |        |
+|                                                     Store size |        |  72.3984 |     GB |
+|                                                  Translog size |        |  11.2964 |     GB |
+|                                         Heap used for segments |        |        0 |     MB |
+|                                       Heap used for doc values |        |        0 |     MB |
+|                                            Heap used for terms |        |        0 |     MB |
+|                                            Heap used for norms |        |        0 |     MB |
+|                                           Heap used for points |        |        0 |     MB |
+|                                    Heap used for stored fields |        |        0 |     MB |
+|                                                  Segment count |        |      515 |        |
+|                                                 Min Throughput |  index |   147201 | docs/s |
+|                                                Mean Throughput |  index |   150440 | docs/s |
+|                                              Median Throughput |  index |   150678 | docs/s |
+|                                                 Max Throughput |  index |   152492 | docs/s |
+|                                        50th percentile latency |  index |  5330.37 |     ms |
+|                                        90th percentile latency |  index |  8901.63 |     ms |
+|                                        99th percentile latency |  index |  15665.8 |     ms |
+|                                      99.9th percentile latency |  index |  22537.2 |     ms |
+|                                     99.99th percentile latency |  index |  26626.2 |     ms |
+|                                       100th percentile latency |  index |  31578.4 |     ms |
+|                                   50th percentile service time |  index |  5330.37 |     ms |
+|                                   90th percentile service time |  index |  8901.63 |     ms |
+|                                   99th percentile service time |  index |  15665.8 |     ms |
+|                                 99.9th percentile service time |  index |  22537.2 |     ms |
+|                                99.99th percentile service time |  index |  26626.2 |     ms |
+|                                  100th percentile service time |  index |  31578.4 |     ms |
+|                                                     error rate |  index |        0 |      % |
+
+16 test with 12 nodes, 18 shards (A2)
+
+export IP=10.0.0.203
+./install/dual_installer.sh remove
+./install/dual_installer.sh install 12 # node per core
+system_memory_percent=80 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=80% num_of_shards=12 ./install/dual_installer.sh update
+
+sudo pkill -9 -f python3.11;curl -XDELETE "http://10.0.0.203:9200/nyc*"; \ 
+opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200,10.0.0.203:9201,10.0.0.203:9202,10.0.0.203:9203,10.0.0.203:9204,10.0.0.203:9205,10.0.0.203:9206,10.0.0.203:9207,10.0.0.203:9208,10.0.0.203:9209,10.0.0.203:9210,10.0.0.203:9211 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:55,bulk_size:10000"
+
+Cumulative indexing time of primary shards |        |  1210.52 |    min |
+|             Min cumulative indexing time across primary shards |        |        0 |    min |
+|          Median cumulative indexing time across primary shards |        |  66.4588 |    min |
+|             Max cumulative indexing time across primary shards |        |  70.6566 |    min |
+|            Cumulative indexing throttle time of primary shards |        |        0 |    min |
+|    Min cumulative indexing throttle time across primary shards |        |        0 |    min |
+| Median cumulative indexing throttle time across primary shards |        |        0 |    min |
+|    Max cumulative indexing throttle time across primary shards |        |        0 |    min |
+|                        Cumulative merge time of primary shards |        |   438.92 |    min |
+|                       Cumulative merge count of primary shards |        |      595 |        |
+|                Min cumulative merge time across primary shards |        |        0 |    min |
+|             Median cumulative merge time across primary shards |        |  23.9214 |    min |
+|                Max cumulative merge time across primary shards |        |  27.3964 |    min |
+|               Cumulative merge throttle time of primary shards |        |  5.46905 |    min |
+|       Min cumulative merge throttle time across primary shards |        |        0 |    min |
+|    Median cumulative merge throttle time across primary shards |        | 0.250958 |    min |
+|       Max cumulative merge throttle time across primary shards |        |   0.4749 |    min |
+|                      Cumulative refresh time of primary shards |        |  93.5938 |    min |
+|                     Cumulative refresh count of primary shards |        |      689 |        |
+|              Min cumulative refresh time across primary shards |        |        0 |    min |
+|           Median cumulative refresh time across primary shards |        |  5.17547 |    min |
+|              Max cumulative refresh time across primary shards |        |  5.88583 |    min |
+|                        Cumulative flush time of primary shards |        |  20.3375 |    min |
+|                       Cumulative flush count of primary shards |        |       74 |        |
+|                Min cumulative flush time across primary shards |        |        0 |    min |
+|             Median cumulative flush time across primary shards |        |  1.14165 |    min |
+|                Max cumulative flush time across primary shards |        |  1.30615 |    min |
+|                                        Total Young Gen GC time |        |  252.832 |      s |
+|                                       Total Young Gen GC count |        |     3716 |        |
+|                                          Total Old Gen GC time |        |        0 |      s |
+|                                         Total Old Gen GC count |        |        0 |        |
+|                                                     Store size |        |  83.5116 |     GB |
+|                                                  Translog size |        |  20.8086 |     GB |
+|                                         Heap used for segments |        |        0 |     MB |
+|                                       Heap used for doc values |        |        0 |     MB |
+|                                            Heap used for terms |        |        0 |     MB |
+|                                            Heap used for norms |        |        0 |     MB |
+|                                           Heap used for points |        |        0 |     MB |
+|                                    Heap used for stored fields |        |        0 |     MB |
+|                                                  Segment count |        |      776 |        |
+|                                                 Min Throughput |  index |   116584 | docs/s |
+|                                                Mean Throughput |  index |   141050 | docs/s |
+|                                              Median Throughput |  index |   143770 | docs/s |
+|                                                 Max Throughput |  index |   148296 | docs/s |
+|                                        50th percentile latency |  index |  2998.94 |     ms |
+|                                        90th percentile latency |  index |  9523.65 |     ms |
+|                                        99th percentile latency |  index |    15845 |     ms |
+|                                      99.9th percentile latency |  index |    22628 |     ms |
+|                                     99.99th percentile latency |  index |    27756 |     ms |
+|                                       100th percentile latency |  index |  28283.6 |     ms |
+|                                   50th percentile service time |  index |  2998.94 |     ms |
+|                                   90th percentile service time |  index |  9523.65 |     ms |
+|                                   99th percentile service time |  index |    15845 |     ms |
+|                                 99.9th percentile service time |  index |    22628 |     ms |
+|                                99.99th percentile service time |  index |    27756 |     ms |
+|                                  100th percentile service time |  index |  28283.6 |     ms |
+|                                                     error rate |  index |        0 |      % |
+
+
+
+
+16 test with 12 nodes, 12 shards (90 clients) (A3)
+
+opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200,10.0.0.203:9201,10.0.0.203:9202,10.0.0.203:9203,10.0.0.203:9204,10.0.0.203:9205,10.0.0.203:9206,10.0.0.203:9207,10.0.0.203:9208,10.0.0.203:9209,10.0.0.203:9210,10.0.0.203:9211 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:90,bulk_size:10000"
+
+
+
+                     Cumulative indexing time of primary shards |        |  1379.18 |    min |
+|             Min cumulative indexing time across primary shards |        |        0 |    min |
+|          Median cumulative indexing time across primary shards |        |  113.695 |    min |
+|             Max cumulative indexing time across primary shards |        |  120.537 |    min |
+|            Cumulative indexing throttle time of primary shards |        |        0 |    min |
+|    Min cumulative indexing throttle time across primary shards |        |        0 |    min |
+| Median cumulative indexing throttle time across primary shards |        |        0 |    min |
+|    Max cumulative indexing throttle time across primary shards |        |        0 |    min |
+|                        Cumulative merge time of primary shards |        |  428.934 |    min |
+|                       Cumulative merge count of primary shards |        |      554 |        |
+|                Min cumulative merge time across primary shards |        |        0 |    min |
+|             Median cumulative merge time across primary shards |        |  34.4572 |    min |
+|                Max cumulative merge time across primary shards |        |  42.1091 |    min |
+|               Cumulative merge throttle time of primary shards |        |  3.31333 |    min |
+|       Min cumulative merge throttle time across primary shards |        |        0 |    min |
+|    Median cumulative merge throttle time across primary shards |        | 0.229058 |    min |
+|       Max cumulative merge throttle time across primary shards |        |   0.4008 |    min |
+|                      Cumulative refresh time of primary shards |        |  73.1326 |    min |
+|                     Cumulative refresh count of primary shards |        |      460 |        |
+|              Min cumulative refresh time across primary shards |        |        0 |    min |
+|           Median cumulative refresh time across primary shards |        |  5.88277 |    min |
+|              Max cumulative refresh time across primary shards |        |   7.1105 |    min |
+|                        Cumulative flush time of primary shards |        |  34.6227 |    min |
+|                       Cumulative flush count of primary shards |        |       89 |        |
+|                Min cumulative flush time across primary shards |        |        0 |    min |
+|             Median cumulative flush time across primary shards |        |  2.87166 |    min |
+|                Max cumulative flush time across primary shards |        |  3.21143 |    min |
+|                                        Total Young Gen GC time |        |  344.401 |      s |
+|                                       Total Young Gen GC count |        |     3736 |        |
+|                                          Total Old Gen GC time |        |        0 |      s |
+|                                         Total Old Gen GC count |        |        0 |        |
+|                                                     Store size |        |  76.5154 |     GB |
+|                                                  Translog size |        |  8.34347 |     GB |
+|                                         Heap used for segments |        |        0 |     MB |
+|                                       Heap used for doc values |        |        0 |     MB |
+|                                            Heap used for terms |        |        0 |     MB |
+|                                            Heap used for norms |        |        0 |     MB |
+|                                           Heap used for points |        |        0 |     MB |
+|                                    Heap used for stored fields |        |        0 |     MB |
+|                                                  Segment count |        |      822 |        |
+|                                                 Min Throughput |  index |   131744 | docs/s |
+|                                                Mean Throughput |  index |   140154 | docs/s |
+|                                              Median Throughput |  index |   140967 | docs/s |
+|                                                 Max Throughput |  index |   143566 | docs/s |
+|                                        50th percentile latency |  index |  5468.83 |     ms |
+|                                        90th percentile latency |  index |  11333.3 |     ms |
+|                                        99th percentile latency |  index |  18174.5 |     ms |
+|                                      99.9th percentile latency |  index |  23935.6 |     ms |
+|                                     99.99th percentile latency |  index |  28652.4 |     ms |
+|                                       100th percentile latency |  index |  31983.7 |     ms |
+|                                   50th percentile service time |  index |  5468.83 |     ms |
+|                                   90th percentile service time |  index |  11333.3 |     ms |
+|                                   99th percentile service time |  index |  18174.5 |     ms |
+|                                 99.9th percentile service time |  index |  23935.6 |     ms |
+|                                99.99th percentile service time |  index |  28652.4 |     ms |
+|                                  100th percentile service time |  index |  31983.7 |     ms |
+|                                                     error rate |  index |        0 |      % |
+
+
+
+
+48:
+Test with 24 nodes, 36 shards:
+
+sudo pkill -9 -f python3.11;curl -XDELETE "http://10.0.0.203:9200/nyc*"; opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.207:9200,10.0.0.207:9201,10.0.0.207:9202,10.0.0.207:9203,10.0.0.207:9204,10.0.0.207:9205,10.0.0.207:9206,10.0.0.207:9207,10.0.0.207:9208,10.0.0.207:9209,10.0.0.207:9210,10.0.0.207:9211,10.0.0.207:9212,10.0.0.207:9213,10.0.0.207:9214,10.0.0.207:9215,10.0.0.207:9216,10.0.0.207:9217,10.0.0.207:9218,10.0.0.207:9219,10.0.0.207:9220,10.0.0.207:9221,10.0.0.207:9222,10.0.0.207:9223 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:116,bulk_size:10000"
+
+
+|                        Cumulative merge time of primary shards |        |  495.081 |    min |
+|                       Cumulative merge count of primary shards |        |     1105 |        |
+|                Min cumulative merge time across primary shards |        |        0 |    min |
+|             Median cumulative merge time across primary shards |        |  12.4353 |    min |
+|                Max cumulative merge time across primary shards |        |  19.8043 |    min |
+|               Cumulative merge throttle time of primary shards |        |  5.32978 |    min |
+|       Min cumulative merge throttle time across primary shards |        |        0 |    min |
+|    Median cumulative merge throttle time across primary shards |        | 0.136725 |    min |
+|       Max cumulative merge throttle time across primary shards |        |  0.24855 |    min |
+|                      Cumulative refresh time of primary shards |        |  53.1162 |    min |
+|                     Cumulative refresh count of primary shards |        |      643 |        |
+|              Min cumulative refresh time across primary shards |        |        0 |    min |
+|           Median cumulative refresh time across primary shards |        |  1.44397 |    min |
+|              Max cumulative refresh time across primary shards |        |  2.00475 |    min |
+|                        Cumulative flush time of primary shards |        |  20.6166 |    min |
+|                       Cumulative flush count of primary shards |        |      110 |        |
+|                Min cumulative flush time across primary shards |        |        0 |    min |
+|             Median cumulative flush time across primary shards |        | 0.544833 |    min |
+|                Max cumulative flush time across primary shards |        |  0.78635 |    min |
+|                                        Total Young Gen GC time |        |  148.208 |      s |
+|                                       Total Young Gen GC count |        |     2310 |        |
+|                                          Total Old Gen GC time |        |        0 |      s |
+|                                         Total Old Gen GC count |        |        0 |        |
+|                                                     Store size |        |  159.888 |     GB |
+|                                                  Translog size |        |  27.5088 |     GB |
+|                                         Heap used for segments |        |        0 |     MB |
+|                                       Heap used for doc values |        |        0 |     MB |
+|                                            Heap used for terms |        |        0 |     MB |
+|                                            Heap used for norms |        |        0 |     MB |
+|                                           Heap used for points |        |        0 |     MB |
+|                                    Heap used for stored fields |        |        0 |     MB |
+|                                                  Segment count |        |     1883 |        |
+|                                                 Min Throughput |  index |   314880 | docs/s |
+|                                                Mean Throughput |  index |   326045 | docs/s |
+|                                              Median Throughput |  index |   326805 | docs/s |
+|                                                 Max Throughput |  index |   332081 | docs/s |
+|                                        50th percentile latency |  index |  2110.66 |     ms |
+|                                        90th percentile latency |  index |  7185.22 |     ms |
+|                                        99th percentile latency |  index |  10727.9 |     ms |
+|                                      99.9th percentile latency |  index |  14283.3 |     ms |
+|                                       100th percentile latency |  index |    17754 |     ms |
+|                                   50th percentile service time |  index |  2110.66 |     ms |
+|                                   90th percentile service time |  index |  7185.22 |     ms |
+|                                   99th percentile service time |  index |  10727.9 |     ms |
+|                                 99.9th percentile service time |  index |  14283.3 |     ms |
+|                                  100th percentile service time |  index |    17754 |     ms |
+|                                                     error rate |  index |        0 |      % |
+
+
+
+
+
+
+
+
+
+
+
+export IP=10.0.0.203
+./install/dual_installer.sh remove
+./install/dual_installer.sh install 12 # node per core
+system_memory_percent=80 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=80% num_of_shards=12./install/dual_installer.sh update
+
+sudo pkill -9 -f python3.11;curl -XDELETE "http://10.0.0.203:9200/nyc*"; \ 
+opensearch-benchmark execute-test --workload=nyc_taxis --target-hosts=10.0.0.203:9200,10.0.0.203:9201,10.0.0.203:9202,10.0.0.203:9203,10.0.0.203:9204,10.0.0.203:9205,10.0.0.203:9206,10.0.0.203:9207,10.0.0.203:9208,10.0.0.203:9209,10.0.0.203:9210,10.0.0.203:9211 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:55,bulk_size:10000"
+
+opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only --target-hosts=10.0.0.209:9200,10.0.0.209:9201,10.0.0.209:9202,10.0.0.209:9203,10.0.0.209:9204,10.0.0.209:9205,10.0.0.209:9206,10.0.0.209:9207 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:60,bulk_size:10000"
+
+
+
+
+
+
+
+
+# c4a-16 test
+
+## nyc_taxis
+
+### Setup the environment
+
+#### Source Env and Update Path
+
+export PATH=$PATH:~/benchmark-env/bin/ # setup path
+source ~/benchmark-env/bin/activate
+
+#### Install Opensearch Nodes
+
+
+export IP=10.0.0.209
+~/axion_opensearch/install/dual_installer.sh remove
+~/axion_opensearch/install/dual_installer.sh install 8 
+system_memory_percent=80 indices_breaker_total_limit=85% indices_breaker_request_limit=70% indices_breaker_fielddata_limit=80% num_of_shards=8 ~/axion_opensearch/install/dual_installer.sh update
+
+#### Run Opensearch Bench 5 times, and record STDERR and STDOUT to c4a-16/nyc_taxis/n, where n is run number. Check to make sure this folder exists before starting initial benchmark run.
+
+opensearch-benchmark run --workload=nyc_taxis --pipeline=benchmark-only --target-hosts=10.0.0.209:9200,10.0.0.209:9201,10.0.0.209:9202,10.0.0.209:9203,10.0.0.209:9204,10.0.0.209:9205,10.0.0.209:9206,10.0.0.209:9207 --client-options=use_ssl:false,verify_certs:false,timeout:60 --kill-running-processes --include-tasks="index" --workload-params="bulk_indexing_clients:60,bulk_size:10000"
+
+
+
+
+New Rules Discovered:
+
+throw out first run
+time to update disk IO !
+1 node per core, unless memory restrained, then do .5 nodes per core
+auto sharding at install time to 1:1 node:core ratio.  Additional sharding ratio increases coordination cost with no gain (for this test)
+need to have enough ram !
+time to update disk IO !
+distribute shards evenly for indexing
+More clients doesn't make it go faster if its ending up in the Q
+There may be a point where coordination cost creates diminishing return
+
