@@ -21,8 +21,48 @@ def parse_filename(filename):
         return int(match.group(1)), int(match.group(2)), int(match.group(3)), int(match.group(4))
     return None, None, None, None
 
+def parse_cpu_metrics(data_dir, clients, nodes, shards, rep):
+    """Parse CPU metrics from metrics files for a specific repetition"""
+    pattern = f"metrics_{clients}_{nodes}-{shards}_{rep}_*"
+    metrics_files = glob.glob(os.path.join(data_dir, pattern))
+    
+    cpu_data = []
+    for file_path in metrics_files:
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+                
+            for line in lines[1:]:  # Skip timestamp header
+                if line.strip() and line.startswith('{'):
+                    data = json.loads(line)
+                    if 'nodes' in data:
+                        for node_id, node_info in data['nodes'].items():
+                            if 'os' in node_info and 'cpu' in node_info['os']:
+                                cpu_data.append({
+                                    'cpu_percent': node_info['os']['cpu']['percent'],
+                                    'load_1m': node_info['os']['cpu']['load_average']['1m'],
+                                    'process_cpu': node_info['process']['cpu']['percent']
+                                })
+        except Exception as e:
+            continue
+    
+    if cpu_data:
+        cpu_df = pd.DataFrame(cpu_data)
+        return {
+            'cpu_avg': cpu_df['cpu_percent'].mean(),
+            'cpu_peak': cpu_df['cpu_percent'].max(),
+            'cpu_p95': cpu_df['cpu_percent'].quantile(0.95),
+            'load_avg_1m': cpu_df['load_1m'].mean(),
+            'process_cpu_avg': cpu_df['process_cpu'].mean()
+        }
+    
+    return {
+        'cpu_avg': 0, 'cpu_peak': 0, 'cpu_p95': 0, 
+        'load_avg_1m': 0, 'process_cpu_avg': 0
+    }
+
 def load_summary_data(data_dir):
-    """Load all summary JSON files"""
+    """Load all summary JSON files and parse CPU metrics"""
     summary_files = glob.glob(os.path.join(data_dir, "*_summary.json"))
     data = []
     
@@ -36,6 +76,9 @@ def load_summary_data(data_dir):
         try:
             with open(file_path, 'r') as f:
                 summary = json.load(f)
+            
+            # Parse CPU metrics for this repetition
+            cpu_metrics = parse_cpu_metrics(data_dir, clients, nodes, shards, rep)
                 
             record = {
                 'clients': clients,
@@ -50,7 +93,12 @@ def load_summary_data(data_dir):
                 'latency_p90': summary['latency']['90_0'],
                 'latency_p99': summary['latency']['99_0'],
                 'latency_mean': summary['latency']['mean'],
-                'error_rate': summary['error_rate']
+                'error_rate': summary['error_rate'],
+                'cpu_avg': cpu_metrics['cpu_avg'],
+                'cpu_peak': cpu_metrics['cpu_peak'],
+                'cpu_p95': cpu_metrics['cpu_p95'],
+                'load_avg_1m': cpu_metrics['load_avg_1m'],
+                'process_cpu_avg': cpu_metrics['process_cpu_avg']
             }
             data.append(record)
         except Exception as e:
@@ -201,28 +249,32 @@ def generate_recommendations(df, agg_stats):
 def create_repetition_analysis(df):
     """Tab 1: Repetition Analysis - Validate data quality and identify outliers"""
     
-    # Individual repetition metrics table
-    rep_metrics = df[['config', 'repetition', 'throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99', 'error_rate']].copy()
+    # Individual repetition metrics table with CPU data
+    rep_metrics = df[['config', 'repetition', 'throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99', 
+                     'error_rate', 'cpu_avg', 'cpu_peak', 'cpu_p95', 'load_avg_1m']].copy()
     rep_metrics['duration'] = 3600  # Placeholder - would need actual duration from logs
     
-    # Coefficient of variation analysis
+    # Coefficient of variation analysis including CPU metrics
     cv_analysis = df.groupby('config').agg({
         'throughput_mean': lambda x: x.std() / x.mean() * 100,
         'latency_p50': lambda x: x.std() / x.mean() * 100,
         'latency_p90': lambda x: x.std() / x.mean() * 100,
         'latency_p99': lambda x: x.std() / x.mean() * 100,
-        'error_rate': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0
+        'error_rate': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'cpu_avg': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'cpu_peak': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'load_avg_1m': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0
     }).round(2)
     cv_analysis.columns = [f'{col}_cv' for col in cv_analysis.columns]
     
-    # Outlier detection (>2σ from mean)
+    # Outlier detection (>2σ from mean) including CPU metrics
     outliers_df = []
     for config in df['config'].unique():
         config_data = df[df['config'] == config]
         if len(config_data) < 2:
             continue
             
-        for metric in ['throughput_mean', 'latency_p99']:
+        for metric in ['throughput_mean', 'latency_p99', 'cpu_avg', 'cpu_peak']:
             mean_val = config_data[metric].mean()
             std_val = config_data[metric].std()
             if std_val > 0:
@@ -240,13 +292,18 @@ def create_repetition_analysis(df):
     
     outliers_table = pd.DataFrame(outliers_df)
     
-    # Box plots for metric distributions
+    # Box plots for metric distributions including CPU
     box_plots = {}
-    for metric in ['throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99']:
+    for metric in ['throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99', 'cpu_avg', 'cpu_peak']:
         fig = px.box(df, x='config', y=metric, title=f'{metric.replace("_", " ").title()} Distribution')
         box_plots[metric] = fig
     
-    # Scatter plot: throughput vs P90 latency
+    # Scatter plot: throughput vs CPU
+    cpu_scatter_fig = px.scatter(df, x='cpu_avg', y='throughput_mean', color='config',
+                               title='Throughput vs Average CPU by Repetition',
+                               hover_data=['repetition', 'cpu_peak'])
+    
+    # Scatter plot: throughput vs P90 latency (existing)
     scatter_fig = px.scatter(df, x='latency_p90', y='throughput_mean', color='config',
                            title='Throughput vs P90 Latency by Repetition',
                            hover_data=['repetition'])
@@ -256,7 +313,8 @@ def create_repetition_analysis(df):
         'cv_analysis': cv_analysis,
         'outliers': outliers_table,
         'box_plots': box_plots,
-        'scatter_plot': scatter_fig
+        'scatter_plot': scatter_fig,
+        'cpu_scatter_plot': cpu_scatter_fig
     }
 
 def create_run_level_analysis(df):
@@ -526,6 +584,11 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
                 <div id="scatter_plot"></div>
             </div>
             <p><strong>Throughput vs Latency Correlation:</strong> Scatter plot showing the relationship between throughput and P90 latency for each individual repetition. Helps identify performance trade-offs and optimal operating points.</p>
+            
+            <div class="chart-container">
+                <div id="cpu_scatter_plot"></div>
+            </div>
+            <p><strong>Throughput vs CPU Correlation:</strong> Scatter plot showing the relationship between throughput and average CPU utilization for each repetition. Helps identify CPU bottlenecks and resource efficiency.</p>
         </div>
         
         <!-- Tab 2: Run Level Analysis -->
@@ -617,6 +680,9 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     
     scatter_json = rep_analysis['scatter_plot'].to_json()
     js_code += f"Plotly.newPlot('scatter_plot', {scatter_json});\n"
+    
+    cpu_scatter_json = rep_analysis['cpu_scatter_plot'].to_json()
+    js_code += f"Plotly.newPlot('cpu_scatter_plot', {cpu_scatter_json});\n"
     
     # Run level analysis charts
     heatmap_json = run_analysis['heatmap'].to_json()
