@@ -12,13 +12,8 @@ else
     EXISTING_RUN=""
 fi
 
-if [[ -n "$EXISTING_RUN" ]]; then
-    TIMESTAMP=$(basename $(dirname "$EXISTING_RUN"))
-    echo "Found existing run: $TIMESTAMP"
-else
-    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-    echo "Starting new run: $TIMESTAMP"
-fi
+TIMESTAMP="20251007_144856"
+echo "Using existing run: $TIMESTAMP"
 
 RESULTS_DIR="./results/optimization/$TIMESTAMP/c4a-64/4k/nyc_taxis"
 CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
@@ -437,6 +432,11 @@ main() {
                         completed_runs=$((completed_runs + REPETITIONS))
                         continue
                     fi
+                elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]]; then
+                    # Earlier node config in same client load - skip it
+                    log "Skipping earlier node config: $clients clients, $nodes nodes"
+                    completed_runs=$((completed_runs + REPETITIONS))
+                    continue
                 else
                     # Skip this entire configuration - it's already completed
                     log "Skipping completed config: $clients clients, $nodes nodes"
