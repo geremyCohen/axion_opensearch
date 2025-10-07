@@ -476,6 +476,7 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
     # Group repetition metrics by config
     for config in rep_analysis['rep_metrics']['config'].unique():
         config_data = rep_analysis['rep_metrics'][rep_analysis['rep_metrics']['config'] == config]
+        config_data = config_data.sort_values('repetition', ascending=False)
         html_content += f"""
             <h4>Configuration: {config}</h4>
             {config_data.drop('config', axis=1).to_html(index=False, classes='table')}"""
