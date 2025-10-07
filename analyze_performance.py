@@ -474,7 +474,8 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             <h3>Individual Repetition Metrics</h3>"""
     
     # Group repetition metrics by config
-    for config in rep_analysis['rep_metrics']['config'].unique():
+    configs_sorted = sorted(rep_analysis['rep_metrics']['config'].unique(), reverse=True)
+    for config in configs_sorted:
         config_data = rep_analysis['rep_metrics'][rep_analysis['rep_metrics']['config'] == config]
         config_data = config_data.sort_values('repetition', ascending=False)
         html_content += f"""
@@ -484,7 +485,7 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
     html_content += f"""
             
             <h3>Coefficient of Variation Analysis</h3>
-            {rep_analysis['cv_analysis'].to_html(classes='table')}
+            {rep_analysis['cv_analysis'].sort_index(ascending=False).to_html(classes='table')}
             
             <h3>Outlier Detection (>2σ)</h3>
             {rep_analysis['outliers'].to_html(index=False, classes='table') if not rep_analysis['outliers'].empty else '<p>No outliers detected</p>'}
