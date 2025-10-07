@@ -471,7 +471,21 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
         <div id="RepetitionAnalysis" class="tabcontent active">
             <h2>Repetition Analysis - Data Quality Validation</h2>
             
-            <h3>Individual Repetition Metrics</h3>"""
+            <h3>Individual Repetition Metrics</h3>
+            <p>Shows <strong>raw performance data for each individual benchmark run</strong> within each configuration.</p>
+            
+            <p><strong>What it contains:</strong><br>
+            • <strong>repetition</strong>: Run number (4, 3, 2, 1 in descending order)<br>
+            • <strong>throughput_mean</strong>: Average documents indexed per second during that run<br>
+            • <strong>latency_p50/p90/p99</strong>: 50th, 90th, and 99th percentile response times in milliseconds<br>
+            • <strong>error_rate</strong>: Fraction of failed requests (0.000 = no errors)<br>
+            • <strong>duration</strong>: How long the benchmark run took</p>
+            
+            <p><strong>Purpose:</strong><br>
+            • <strong>Spot individual run anomalies</strong> before they get averaged out<br>
+            • <strong>See run-to-run variation</strong> within the same configuration<br>
+            • <strong>Identify trends</strong> across repetitions (getting better/worse over time)<br>
+            • <strong>Validate data quality</strong> by checking if all runs are reasonably similar</p>"""
     
     # Group repetition metrics by config
     configs_sorted = sorted(rep_analysis['rep_metrics']['config'].unique(), reverse=True)
