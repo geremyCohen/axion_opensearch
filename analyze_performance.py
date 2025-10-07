@@ -382,11 +382,23 @@ def create_run_level_analysis(df):
                          size='nodes_first', color='config',
                          title='Throughput vs CPU Utilization')
     
+    # Latency vs CPU Utilization
+    latency_cpu_fig = px.scatter(agg_metrics, x='peak_cpu', y='latency_p99_mean',
+                                size='nodes_first', color='config',
+                                title='Latency vs CPU Utilization')
+    
+    # Throughput vs Latency
+    throughput_latency_fig = px.scatter(agg_metrics, x='latency_p90_mean', y='throughput_mean_mean',
+                                       size='nodes_first', color='config',
+                                       title='Throughput vs Latency')
+    
     return {
         'agg_metrics': agg_metrics,
         'radar_charts': radar_charts,
         'heatmap': heatmap_fig,
-        'correlation': corr_fig
+        'correlation': corr_fig,
+        'latency_cpu': latency_cpu_fig,
+        'throughput_latency': throughput_latency_fig
     }
 
 def create_config_comparison(df):
@@ -641,6 +653,11 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
                 <div id="resource_heatmap"></div>
                 <div id="throughput_correlation"></div>
             </div>
+            
+            <div class="metrics-grid">
+                <div id="latency_cpu_chart"></div>
+                <div id="throughput_latency_chart"></div>
+            </div>
         </div>
         
         <!-- Tab 3: Config Comparison -->
@@ -729,6 +746,12 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     
     corr_json = run_analysis['correlation'].to_json()
     js_code += f"Plotly.newPlot('throughput_correlation', {corr_json});\n"
+    
+    latency_cpu_json = run_analysis['latency_cpu'].to_json()
+    js_code += f"Plotly.newPlot('latency_cpu_chart', {latency_cpu_json});\n"
+    
+    throughput_latency_json = run_analysis['throughput_latency'].to_json()
+    js_code += f"Plotly.newPlot('throughput_latency_chart', {throughput_latency_json});\n"
     
     # Config comparison charts
     scaling_3d_json = config_analysis['scaling_3d'].to_json()
