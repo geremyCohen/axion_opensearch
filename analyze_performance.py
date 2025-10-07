@@ -485,6 +485,16 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
     html_content += f"""
             
             <h3>Coefficient of Variation Analysis</h3>
+            <p><strong>In the dashboard:</strong><br>
+            • <strong>throughput_mean_cv</strong>: How consistent throughput is across repetitions<br>
+            • <strong>latency_p50_cv, latency_p90_cv, latency_p99_cv</strong>: How consistent latency percentiles are<br>
+            • <strong>error_rate_cv</strong>: How consistent error rates are</p>
+            
+            <p><strong>Interpretation:</strong><br>
+            • <strong>CV &lt; 5%</strong>: Very consistent (good)<br>
+            • <strong>CV 5-10%</strong>: Moderately consistent<br>
+            • <strong>CV &gt; 10%</strong>: High variability (investigate causes)</p>
+            
             {rep_analysis['cv_analysis'].sort_index(ascending=False).to_html(classes='table')}
             
             <h3>Outlier Detection (>2σ)</h3>
