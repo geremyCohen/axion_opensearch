@@ -600,8 +600,10 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     return js_code
 
 def main():
-    data_dir = "/home/geremy_cohen_arm_com/axion_opensearch/results/optimization/20251006_193245/c4a-64/4k/nyc_taxis"
-    output_dir = "/home/geremy_cohen_arm_com/axion_opensearch/analysis_output"
+    # Use relative paths from script directory
+    script_dir = Path(__file__).parent
+    data_dir = script_dir / "results/optimization/20251006_193245/c4a-64/4k/nyc_taxis"
+    output_dir = script_dir / "analysis_output"
     
     if not os.path.exists(data_dir):
         print(f"Data directory not found: {data_dir}")
