@@ -766,9 +766,20 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     return js_code
 
 def main():
-    # Use relative paths from script directory
+    # Use relative paths from script directory with dynamic page size detection
     script_dir = Path(__file__).parent
-    data_dir = script_dir / "results/optimization/20251007_144856/c4a-64/4k/nyc_taxis"
+    
+    # Detect page size to determine correct results directory
+    import subprocess
+    try:
+        # Try to detect page size from system (assuming local analysis matches remote system)
+        page_size = subprocess.check_output(['getconf', 'PAGESIZE'], text=True).strip()
+        page_size_dir = "64k" if page_size == "65536" else "4k"
+    except:
+        # Default to 4k if detection fails
+        page_size_dir = "4k"
+    
+    data_dir = script_dir / f"results/optimization/20251007_144856/c4a-64/{page_size_dir}/nyc_taxis"
     output_dir = script_dir / "analysis_output"
     
     if not os.path.exists(data_dir):

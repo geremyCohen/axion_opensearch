@@ -5,6 +5,18 @@ set -euo pipefail
 # Configuration
 TARGET_HOST="$IP"
 
+# Detect page size on remote host
+PAGE_SIZE=$(ssh "$TARGET_HOST" "getconf PAGESIZE" 2>/dev/null || echo "4096")
+if [[ "$PAGE_SIZE" == "65536" ]]; then
+    PAGE_SIZE_DIR="64k"
+else
+    PAGE_SIZE_DIR="4k"
+fi
+
+log() {
+    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
+}
+
 # Find existing run or create new timestamp
 if [[ -d "./results/optimization" ]]; then
     EXISTING_RUN=$(find ./results/optimization -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
@@ -14,8 +26,9 @@ fi
 
 TIMESTAMP="20251007_144856"
 echo "Using existing run: $TIMESTAMP"
+echo "Detected page size: $PAGE_SIZE bytes -> using $PAGE_SIZE_DIR directory"
 
-RESULTS_DIR="./results/optimization/$TIMESTAMP/c4a-64/4k/nyc_taxis"
+RESULTS_DIR="./results/optimization/$TIMESTAMP/c4a-64/$PAGE_SIZE_DIR/nyc_taxis"
 CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
 LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
 
@@ -29,10 +42,6 @@ REPETITIONS=4
 mkdir -p "$RESULTS_DIR"
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
-
-log() {
-    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
-}
 
 error_exit() {
     log "ERROR: $*"
