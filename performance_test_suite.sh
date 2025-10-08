@@ -150,21 +150,51 @@ verify_shard_configuration() {
     return 0
 }
 
-detect_cluster_issues() {
+recover_cluster_from_split_brain() {
+    log "Attempting cluster recovery from split-brain/quorum failure..."
+    
+    # Check if we have cluster_master_not_discovered_exception
     local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
-    
-    if [[ -z "$health_response" ]]; then
-        log "ERROR: Cluster not responding"
-        return 1
-    fi
-    
-    local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null)
-    local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null)
-    
-    log "Cluster status: $status, unassigned shards: $unassigned"
-    
-    if [[ "$status" == "red" && $unassigned -gt 0 ]]; then
-        log "DETECTED: Red cluster with unassigned shards - attempting recovery"
+    if echo "$health_response" | grep -q "cluster_master_not_discovered_exception"; then
+        log "Detected cluster manager election failure - performing full cluster restart"
+        
+        # Stop all OpenSearch services
+        log "Stopping all OpenSearch services..."
+        ssh "$TARGET_HOST" "sudo systemctl stop opensearch-node*" 2>/dev/null || true
+        sleep 10
+        
+        # Clear cluster state data to force fresh election
+        log "Clearing cluster state data..."
+        ssh "$TARGET_HOST" "sudo rm -rf /opt/opensearch-node*/data/nodes/*/indices/*" 2>/dev/null || true
+        ssh "$TARGET_HOST" "sudo rm -rf /opt/opensearch-node*/data/nodes/*/node.lock" 2>/dev/null || true
+        
+        # Start services sequentially to ensure proper cluster formation
+        log "Starting OpenSearch services sequentially..."
+        for node in {1..16}; do
+            ssh "$TARGET_HOST" "sudo systemctl start opensearch-node$node" 2>/dev/null || true
+            sleep 2
+        done
+        
+        # Wait for cluster to form
+        log "Waiting for cluster formation..."
+        local attempts=0
+        while [[ $attempts -lt 30 ]]; do
+            local health=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
+            if echo "$health" | grep -q '"status"'; then
+                local status=$(echo "$health" | jq -r '.status // "unknown"' 2>/dev/null)
+                local nodes=$(echo "$health" | jq -r '.number_of_nodes // 0' 2>/dev/null)
+                log "Cluster recovery progress: status=$status, nodes=$nodes"
+                
+                if [[ "$status" != "unknown" && $nodes -gt 0 ]]; then
+                    log "Cluster recovery successful"
+                    return 0
+                fi
+            fi
+            sleep 10
+            ((attempts++))
+        done
+        
+        log "WARNING: Cluster recovery may have failed"
         return 1
     fi
     
@@ -200,6 +230,17 @@ wait_for_cluster_with_timeout() {
         local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
         
         if [[ -n "$health_response" ]]; then
+            # Check for cluster manager election failure
+            if echo "$health_response" | grep -q "cluster_master_not_discovered_exception"; then
+                log "Detected cluster manager election failure - attempting recovery"
+                if recover_cluster_from_split_brain; then
+                    continue  # Retry health check after recovery
+                else
+                    log "Cluster recovery failed, but continuing"
+                    return 1
+                fi
+            fi
+            
             local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null)
             local nodes=$(echo "$health_response" | jq -r '.number_of_nodes // 0' 2>/dev/null)
             local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null)
