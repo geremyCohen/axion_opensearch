@@ -127,6 +127,65 @@ def parse_queue_metrics(data_dir, clients, nodes, shards, rep):
         'max_queue': 0, 'max_rejected': 0, 'write_queue': 0, 'search_queue': 0
     }
 
+def discover_clusters_and_workloads(root_dir):
+    """Discover all unique clusters and workloads under root directory"""
+    clusters = {}
+    
+    # Find all summary.json files recursively
+    for summary_file in glob.glob(os.path.join(root_dir, "**/*_summary.json"), recursive=True):
+        # Extract path components
+        rel_path = os.path.relpath(summary_file, root_dir)
+        path_parts = rel_path.split(os.sep)
+        
+        if len(path_parts) >= 4:  # instance_type/page_size/workload/file
+            instance_type = path_parts[0]
+            page_size = path_parts[1] 
+            workload = path_parts[2]
+            
+            cluster_key = f"{instance_type}_{page_size}_{workload}"
+            cluster_name = f"{instance_type} {page_size} - {workload}"
+            
+            if cluster_key not in clusters:
+                clusters[cluster_key] = {
+                    'name': cluster_name,
+                    'instance_type': instance_type,
+                    'page_size': page_size,
+                    'workload': workload,
+                    'path': os.path.join(root_dir, instance_type, page_size, workload),
+                    'files': []
+                }
+            
+            clusters[cluster_key]['files'].append(summary_file)
+    
+    return clusters
+
+def load_all_cluster_data(root_dir):
+    """Load data from all discovered clusters"""
+    clusters = discover_clusters_and_workloads(root_dir)
+    all_dataframes = []
+    
+    for cluster_key, cluster_info in clusters.items():
+        print(f"Loading data from: {cluster_info['name']} ({len(cluster_info['files'])} files)")
+        
+        # Load data from this cluster's directory
+        cluster_df = load_summary_data(cluster_info['path'])
+        
+        if not cluster_df.empty:
+            # Add cluster information to the dataframe
+            cluster_df['cluster_key'] = cluster_key
+            cluster_df['cluster_name'] = cluster_info['name']
+            cluster_df['instance_type'] = cluster_info['instance_type']
+            cluster_df['page_size'] = cluster_info['page_size']
+            cluster_df['workload'] = cluster_info['workload']
+            
+            all_dataframes.append(cluster_df)
+    
+    if all_dataframes:
+        combined_df = pd.concat(all_dataframes, ignore_index=True)
+        return combined_df, clusters
+    else:
+        return pd.DataFrame(), clusters
+
 def load_summary_data(data_dir):
     """Load all summary JSON files and parse CPU metrics"""
     summary_files = glob.glob(os.path.join(data_dir, "*_summary.json"))
@@ -200,19 +259,35 @@ def extract_cluster_info(data_dir):
     
     return instance_type, page_size, workload
 
-def analyze_repetitions(df, data_dir):
+def analyze_repetitions(df, clusters_info=None):
     """Analyze individual repetitions grouped by OS cluster and client count"""
     print("=== REPETITION-LEVEL ANALYSIS ===\n")
     
-    # Extract cluster information
-    instance_type, page_size, workload = extract_cluster_info(data_dir)
-    cluster_name = f"{instance_type} {page_size} - {workload}" if all([instance_type, page_size, workload]) else "Unknown Cluster"
+    # Group by cluster first if we have multiple clusters
+    if 'cluster_name' in df.columns:
+        cluster_groups = df.groupby('cluster_name')
+        
+        for cluster_name, cluster_df in cluster_groups:
+            print(f"OS Cluster Definition - Workload Name: {cluster_name}")
+            print("=" * 60)
+            
+            _analyze_cluster_repetitions(cluster_df)
+            print("\n" + "="*80 + "\n")
+    else:
+        # Single cluster mode (backward compatibility)
+        cluster_name = "Unknown Cluster"
+        if clusters_info:
+            cluster_name = list(clusters_info.values())[0]['name']
+        
+        print(f"OS Cluster Definition - Workload Name: {cluster_name}\n")
+        _analyze_cluster_repetitions(df)
     
-    print(f"OS Cluster Definition - Workload Name: {cluster_name}\n")
-    
+    return []  # No outliers for now
+
+def _analyze_cluster_repetitions(df):
+    """Analyze repetitions for a single cluster"""
     # Group by client count first, then by node-shard configuration
     client_groups = df.groupby('clients')
-    outliers = []
     
     for clients, client_df in client_groups:
         print(f"Client Count: {clients}")
@@ -239,27 +314,11 @@ def analyze_repetitions(df, data_dir):
             
             # Show individual repetitions
             for _, row in group.iterrows():
-                throughput_z = abs(row['throughput_mean'] - throughput_mean) / throughput_std if throughput_std > 0 else 0
-                latency_z = abs(row['latency_p99'] - latency_p99_mean) / latency_p99_std if latency_p99_std > 0 else 0
-                
-                status = ""
-                if throughput_z > 2 or latency_z > 2:
-                    outliers.append({
-                        'config': f"{clients}_{nodes}-{shards}",
-                        'repetition': row['repetition'],
-                        'throughput_z': throughput_z,
-                        'latency_z': latency_z,
-                        'reason': 'throughput' if throughput_z > 2 else 'latency'
-                    })
-                    status = " [OUTLIER]"
-                
-                print(f"    Rep {row['repetition']}: {row['throughput_mean']:.0f} docs/s, {row['latency_p99']:.1f}ms P99{status}")
+                print(f"    Rep {row['repetition']}: {row['throughput_mean']:.0f} docs/s, {row['latency_p99']:.1f}ms P99")
             
             print()
         
         print()
-    
-    return outliers
 
 def analyze_aggregates(df):
     """Analyze aggregate performance across configurations"""
@@ -980,7 +1039,7 @@ def main():
     if not data_dir:
         print("Error: OS_DATA environment variable not set")
         print("Usage: OS_DATA=/path/to/opensearch/results python analyze_performance.py")
-        print("Example: OS_DATA=/Users/user/opensearch/results/optimization/20251007_144856/c4a-64/4k/nyc_taxis python analyze_performance.py")
+        print("Example: OS_DATA=/Users/user/kustomer/axion_os_data python analyze_performance.py")
         exit(1)
     
     data_dir = Path(data_dir)
@@ -993,29 +1052,41 @@ def main():
     
     print(f"Analyzing performance data from: {data_dir}\n")
     
-    # Load data
-    df = load_summary_data(data_dir)
+    # Discover and load data from all clusters
+    df, clusters_info = load_all_cluster_data(data_dir)
     
     if df.empty:
         print("No summary data found!")
-        return
+        exit(1)
     
-    print(f"Loaded {len(df)} benchmark results")
-    config_counts = df.groupby(['clients', 'nodes', 'shards']).size()
-    print("Configurations found:")
-    for (clients, nodes, shards), count in config_counts.items():
-        print(f"  {clients} clients, {nodes} nodes, {shards} shards: {count} repetitions")
-    print()
+    print(f"\nDiscovered {len(clusters_info)} unique cluster(s):")
+    for cluster_key, cluster_info in clusters_info.items():
+        print(f"  - {cluster_info['name']}: {len(cluster_info['files'])} benchmark files")
     
-    # Generate three-level analysis
-    print("Generating repetition analysis...")
-    rep_analysis = create_repetition_analysis(df)
+    print(f"\nLoaded {len(df)} total benchmark results")
     
-    print("Generating run level analysis...")
-    run_analysis = create_run_level_analysis(df)
+    # Show configuration summary
+    if 'cluster_name' in df.columns:
+        for cluster_name, cluster_df in df.groupby('cluster_name'):
+            print(f"\n{cluster_name} configurations:")
+            configs = cluster_df.groupby(['clients', 'nodes', 'shards']).size().reset_index(name='repetitions')
+            for _, config in configs.iterrows():
+                print(f"  {config['clients']} clients, {config['nodes']} nodes, {config['shards']} shards: {config['repetitions']} repetitions")
+    else:
+        # Single cluster backward compatibility
+        configs = df.groupby(['clients', 'nodes', 'shards']).size().reset_index(name='repetitions')
+        print("Configurations found:")
+        for _, config in configs.iterrows():
+            print(f"  {config['clients']} clients, {config['nodes']} nodes, {config['shards']} shards: {config['repetitions']} repetitions")
+    
+    # For now, just run the repetition analysis
+    # TODO: Dashboard generation will be updated later for multi-cluster support
+    print("\n" + "="*80)
+    rep_analysis = analyze_repetitions(df, clusters_info)
     
     print("Generating config comparison analysis...")
     config_analysis = create_config_comparison(df)
+    run_analysis = {}  # Placeholder for run analysis
     
     # Generate HTML dashboard
     print("Creating comprehensive HTML dashboard...")
