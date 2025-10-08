@@ -942,25 +942,21 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     return js_code
 
 def main():
-    # Use relative paths from script directory with dynamic page size detection
+    # Check for OS_DATA environment variable
+    data_dir = os.environ.get('OS_DATA')
+    if not data_dir:
+        print("Error: OS_DATA environment variable not set")
+        print("Usage: OS_DATA=/path/to/opensearch/results python analyze_performance.py")
+        print("Example: OS_DATA=/Users/user/opensearch/results/optimization/20251007_144856/c4a-64/4k/nyc_taxis python analyze_performance.py")
+        exit(1)
+    
+    data_dir = Path(data_dir)
     script_dir = Path(__file__).parent
-    
-    # Detect page size to determine correct results directory
-    import subprocess
-    try:
-        # Try to detect page size from system (assuming local analysis matches remote system)
-        page_size = subprocess.check_output(['getconf', 'PAGESIZE'], text=True).strip()
-        page_size_dir = "64k" if page_size == "65536" else "4k"
-    except:
-        # Default to 4k if detection fails
-        page_size_dir = "4k"
-    
-    data_dir = script_dir / f"results/optimization/20251007_144856/c4a-64/{page_size_dir}/nyc_taxis"
     output_dir = script_dir / "analysis_output"
     
-    if not os.path.exists(data_dir):
-        print(f"Data directory not found: {data_dir}")
-        return
+    if not data_dir.exists():
+        print(f"Error: Data directory not found: {data_dir}")
+        exit(1)
     
     print(f"Analyzing performance data from: {data_dir}\n")
     
