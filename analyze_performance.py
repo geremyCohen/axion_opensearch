@@ -282,7 +282,7 @@ def analyze_repetitions(df, clusters_info=None):
         print(f"OS Cluster Definition - Workload Name: {cluster_name}\n")
         _analyze_cluster_repetitions(df)
     
-    return []  # No outliers for now
+    return {'rep_metrics': df, 'outliers': []}  # Return data for dashboard
 
 def _analyze_cluster_repetitions(df):
     """Analyze repetitions for a single cluster"""
@@ -1086,11 +1086,12 @@ def main():
     
     print("Generating config comparison analysis...")
     config_analysis = create_config_comparison(df)
-    run_analysis = {}  # Placeholder for run analysis
+    run_analysis = {'agg_metrics': df}  # Placeholder for run analysis
     
     # Generate HTML dashboard
     print("Creating comprehensive HTML dashboard...")
-    dashboard_path = generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_dir)
+    # dashboard_path = generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_dir)
+    print("Dashboard generation temporarily disabled for multi-cluster mode")
     
     # Legacy analysis for backward compatibility
     outliers = analyze_repetitions(df, data_dir)
@@ -1105,7 +1106,7 @@ def main():
     config_analysis['config_ranking'].to_csv(os.path.join(output_dir, 'config_rankings.csv'), index=False)
     
     print(f"\n=== ENHANCED DASHBOARD GENERATED ===")
-    print(f"Dashboard: {dashboard_path}")
+    # print(f"Dashboard: {dashboard_path}")
     print(f"Data files saved to: {output_dir}/")
     print("Files: raw_results.csv, repetition_metrics.csv, run_level_metrics.csv, config_rankings.csv")
     
@@ -1116,12 +1117,12 @@ def main():
     print(f"Outliers detected: {len(rep_analysis['outliers'])}")
     print(f"Error rate range: {df['error_rate'].min():.3f} - {df['error_rate'].max():.3f}")
     
-    if not rep_analysis['outliers'].empty:
+    if len(rep_analysis['outliers']) > 0:
         print("\nOutlier details:")
         for _, outlier in rep_analysis['outliers'].iterrows():
             print(f"  {outlier['config']} rep {outlier['repetition']}: {outlier['metric']} outlier (z-score: {outlier['z_score']:.2f})")
     
-    print(f"\nOpen {dashboard_path} in your browser to view the comprehensive analysis dashboard.")
+    # print(f"\nOpen {dashboard_path} in your browser to view the comprehensive analysis dashboard.")
 
 if __name__ == "__main__":
     main()
