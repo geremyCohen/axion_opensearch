@@ -1,0 +1,152 @@
+{
+ "benchmark-version": "2.0.0",
+ "benchmark-revision": null,
+ "environment": "local",
+ "test-run-id": "3b8fac28-bd0b-4fd2-9ee5-29d32c0a91dd",
+ "test-run-timestamp": "20251008T142356Z",
+ "pipeline": "benchmark-only",
+ "user-tags": {},
+ "workload": "nyc_taxis",
+ "cluster-config-instance": [
+  "external"
+ ],
+ "cluster": {
+  "revision": "8ff7c6ee924a49f0f59f80a6e1c73073c8904214",
+  "distribution-version": "3.1.0",
+  "distribution-flavor": "oss",
+  "cluster-config-revision": null
+ },
+ "results": {
+  "op_metrics": [
+   {
+    "task": "index",
+    "operation": "index",
+    "throughput": {
+     "min": 353110.454676671,
+     "mean": 365699.0453842154,
+     "median": 364304.3854201593,
+     "max": 379900.1260575036,
+     "unit": "docs/s"
+    },
+    "latency": {
+     "50_0": 2507.6844089999213,
+     "90_0": 3887.576673797594,
+     "99_0": 5872.074898417911,
+     "99_9": 6803.197006753593,
+     "100_0": 7137.919344997499,
+     "mean": 2563.4132918331034,
+     "unit": "ms"
+    },
+    "service_time": {
+     "50_0": 2507.6844089999213,
+     "90_0": 3887.576673797594,
+     "99_0": 5872.074898417911,
+     "99_9": 6803.197006753593,
+     "100_0": 7137.919344997499,
+     "mean": 2563.4132918331034,
+     "unit": "ms"
+    },
+    "client_processing_time": {
+     "50_0": 1.2898324966954533,
+     "90_0": 1.4559840004949365,
+     "99_0": 11.976408142653543,
+     "99_9": 88.06040776843297,
+     "100_0": 134.01843499741517,
+     "mean": 1.6533382557878182,
+     "unit": "ms"
+    },
+    "processing_time": {
+     "50_0": 2519.390432498767,
+     "90_0": 3910.4549121024324,
+     "99_0": 5921.849016732012,
+     "99_9": 6810.680279911291,
+     "100_0": 7140.793744001712,
+     "mean": 2578.59316762419,
+     "unit": "ms"
+    },
+    "error_rate": 0.0,
+    "duration": 465529.34123700106
+   }
+  ],
+  "correctness_metrics": [
+   {
+    "task": "index",
+    "operation": "index",
+    "recall@k": {},
+    "recall@1": {},
+    "error_rate": 0.0,
+    "duration": 465529.34123700106
+   }
+  ],
+  "profile_metrics": [],
+  "total_time": 30122170,
+  "total_time_per_shard": {
+   "min": 9,
+   "median": 14681149,
+   "max": 15441012,
+   "unit": "ms"
+  },
+  "indexing_throttle_time": 111545,
+  "indexing_throttle_time_per_shard": {
+   "min": 0,
+   "median": 52221,
+   "max": 59324,
+   "unit": "ms"
+  },
+  "merge_time": 4493888,
+  "merge_time_per_shard": {
+   "min": 0,
+   "median": 2117149,
+   "max": 2376739,
+   "unit": "ms"
+  },
+  "merge_count": 1064,
+  "refresh_time": 96410,
+  "refresh_time_per_shard": {
+   "min": 78,
+   "median": 44571,
+   "max": 51761,
+   "unit": "ms"
+  },
+  "refresh_count": 141,
+  "flush_time": 280667,
+  "flush_time_per_shard": {
+   "min": 23,
+   "median": 137905,
+   "max": 142739,
+   "unit": "ms"
+  },
+  "flush_count": 92,
+  "merge_throttle_time": 32172,
+  "merge_throttle_time_per_shard": {
+   "min": 0,
+   "median": 13441,
+   "max": 18731,
+   "unit": "ms"
+  },
+  "ml_processing_time": [],
+  "young_gc_time": 25142,
+  "young_gc_count": 1066,
+  "old_gc_time": 0,
+  "old_gc_count": 0,
+  "memory_segments": 0,
+  "memory_doc_values": 0,
+  "memory_terms": 0,
+  "memory_norms": 0,
+  "memory_points": 0,
+  "memory_stored_fields": 0,
+  "store_size": 73151931133,
+  "translog_size": 1698765741,
+  "segment_count": 276,
+  "total_transform_search_times": [],
+  "total_transform_index_times": [],
+  "total_transform_processing_times": [],
+  "total_transform_throughput": []
+ },
+ "workload-revision": "32d8806",
+ "test_procedure": "append-no-conflicts",
+ "workload-params": {
+  "bulk_indexing_clients": 90,
+  "bulk_size": 10000
+ }
+}
