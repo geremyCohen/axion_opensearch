@@ -182,47 +182,80 @@ def load_summary_data(data_dir):
     
     return pd.DataFrame(data)
 
-def analyze_repetitions(df):
-    """Analyze individual repetitions for outliers"""
+def extract_cluster_info(data_dir):
+    """Extract OS cluster information from data directory path"""
+    path_parts = str(data_dir).split('/')
+    instance_type = None
+    page_size = None
+    workload = None
+    
+    for i, part in enumerate(path_parts):
+        if part in ['c4a-64', 'c4-96', 'c4a-32', 'c4-48']:  # Add more instance types as needed
+            instance_type = part
+            if i + 1 < len(path_parts) and path_parts[i + 1] in ['4k', '64k']:
+                page_size = path_parts[i + 1]
+            if i + 2 < len(path_parts):
+                workload = path_parts[i + 2]
+            break
+    
+    return instance_type, page_size, workload
+
+def analyze_repetitions(df, data_dir):
+    """Analyze individual repetitions grouped by OS cluster and client count"""
     print("=== REPETITION-LEVEL ANALYSIS ===\n")
     
-    configs = df.groupby(['clients', 'nodes', 'shards'])
+    # Extract cluster information
+    instance_type, page_size, workload = extract_cluster_info(data_dir)
+    cluster_name = f"{instance_type} {page_size} - {workload}" if all([instance_type, page_size, workload]) else "Unknown Cluster"
+    
+    print(f"OS Cluster Definition - Workload Name: {cluster_name}\n")
+    
+    # Group by client count first, then by node-shard configuration
+    client_groups = df.groupby('clients')
     outliers = []
     
-    for (clients, nodes, shards), group in configs:
-        if len(group) < 2:
-            print(f"Configuration {clients}_{nodes}-{shards}: Only 1 repetition - cannot detect outliers")
-            continue
-            
-        print(f"Configuration: {clients} clients, {nodes} nodes, {shards} shards")
-        print(f"Repetitions: {len(group)}")
+    for clients, client_df in client_groups:
+        print(f"Client Count: {clients}")
+        print("=" * 40)
         
-        # Calculate statistics
-        throughput_mean = group['throughput_mean'].mean()
-        throughput_std = group['throughput_mean'].std()
-        latency_p99_mean = group['latency_p99'].mean()
-        latency_p99_std = group['latency_p99'].std()
+        configs = client_df.groupby(['nodes', 'shards'])
         
-        print(f"Throughput: {throughput_mean:.0f} ± {throughput_std:.0f} docs/s (CV: {throughput_std/throughput_mean*100:.1f}%)")
-        print(f"P99 Latency: {latency_p99_mean:.1f} ± {latency_p99_std:.1f} ms (CV: {latency_p99_std/latency_p99_mean*100:.1f}%)")
-        
-        # Show individual repetitions
-        for _, row in group.iterrows():
-            throughput_z = abs(row['throughput_mean'] - throughput_mean) / throughput_std if throughput_std > 0 else 0
-            latency_z = abs(row['latency_p99'] - latency_p99_mean) / latency_p99_std if latency_p99_std > 0 else 0
+        for (nodes, shards), group in configs:
+            if len(group) < 2:
+                print(f"  Configuration {nodes}-{shards}: Only 1 repetition - cannot detect outliers")
+                continue
+                
+            print(f"  Configuration: {nodes} nodes, {shards} shards")
+            print(f"  Repetitions: {len(group)}")
             
-            status = ""
-            if throughput_z > 2 or latency_z > 2:
-                outliers.append({
-                    'config': f"{clients}_{nodes}-{shards}",
-                    'repetition': row['repetition'],
-                    'throughput_z': throughput_z,
-                    'latency_z': latency_z,
-                    'reason': 'throughput' if throughput_z > 2 else 'latency'
-                })
-                status = " [OUTLIER]"
+            # Calculate statistics
+            throughput_mean = group['throughput_mean'].mean()
+            throughput_std = group['throughput_mean'].std()
+            latency_p99_mean = group['latency_p99'].mean()
+            latency_p99_std = group['latency_p99'].std()
             
-            print(f"  Rep {row['repetition']}: {row['throughput_mean']:.0f} docs/s, {row['latency_p99']:.1f}ms P99{status}")
+            print(f"  Throughput: {throughput_mean:.0f} ± {throughput_std:.0f} docs/s (CV: {throughput_std/throughput_mean*100:.1f}%)")
+            print(f"  P99 Latency: {latency_p99_mean:.1f} ± {latency_p99_std:.1f} ms (CV: {latency_p99_std/latency_p99_mean*100:.1f}%)")
+            
+            # Show individual repetitions
+            for _, row in group.iterrows():
+                throughput_z = abs(row['throughput_mean'] - throughput_mean) / throughput_std if throughput_std > 0 else 0
+                latency_z = abs(row['latency_p99'] - latency_p99_mean) / latency_p99_std if latency_p99_std > 0 else 0
+                
+                status = ""
+                if throughput_z > 2 or latency_z > 2:
+                    outliers.append({
+                        'config': f"{clients}_{nodes}-{shards}",
+                        'repetition': row['repetition'],
+                        'throughput_z': throughput_z,
+                        'latency_z': latency_z,
+                        'reason': 'throughput' if throughput_z > 2 else 'latency'
+                    })
+                    status = " [OUTLIER]"
+                
+                print(f"    Rep {row['repetition']}: {row['throughput_mean']:.0f} docs/s, {row['latency_p99']:.1f}ms P99{status}")
+            
+            print()
         
         print()
     
@@ -989,7 +1022,7 @@ def main():
     dashboard_path = generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_dir)
     
     # Legacy analysis for backward compatibility
-    outliers = analyze_repetitions(df)
+    outliers = analyze_repetitions(df, data_dir)
     agg_stats = analyze_aggregates(df)
     generate_recommendations(df, agg_stats)
     
