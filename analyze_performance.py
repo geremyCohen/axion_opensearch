@@ -322,6 +322,65 @@ def generate_recommendations(df, agg_stats):
     else:
         print("   Only one configuration available - cannot analyze scaling patterns")
 
+def generate_grouped_table_html(df):
+    """Generate HTML table with grouped column headers"""
+    # Define column groups
+    column_groups = {
+        'Basic': ['repetition', 'duration'],
+        'Performance': ['throughput_mean'],
+        'Latency': ['latency_p50', 'latency_p90', 'latency_p99'],
+        'Errors': ['error_rate'],
+        'CPU': ['cpu_avg', 'cpu_peak', 'cpu_p95', 'load_avg_1m'],
+        'Queue': ['total_queue', 'total_rejected', 'max_queue', 'write_queue', 'search_queue']
+    }
+    
+    # Build header HTML
+    html = '<table class="table">\n<thead>\n'
+    
+    # First header row (group names)
+    html += '<tr>\n'
+    for group_name, columns in column_groups.items():
+        available_cols = [col for col in columns if col in df.columns]
+        if available_cols:
+            html += f'<th colspan="{len(available_cols)}" style="text-align: center; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">{group_name}</th>\n'
+    html += '</tr>\n'
+    
+    # Second header row (column names)
+    html += '<tr>\n'
+    for group_name, columns in column_groups.items():
+        for col in columns:
+            if col in df.columns:
+                display_name = col.replace('_', ' ').title()
+                html += f'<th style="background-color: #e9ecef;">{display_name}</th>\n'
+    html += '</tr>\n</thead>\n<tbody>\n'
+    
+    # Data rows
+    for _, row in df.iterrows():
+        html += '<tr>\n'
+        for group_name, columns in column_groups.items():
+            for col in columns:
+                if col in df.columns:
+                    value = row[col]
+                    if pd.isna(value):
+                        html += '<td>-</td>\n'
+                    elif isinstance(value, (int, float)):
+                        if col in ['throughput_mean']:
+                            html += f'<td>{value:,.0f}</td>\n'
+                        elif col in ['latency_p50', 'latency_p90', 'latency_p99']:
+                            html += f'<td>{value:.0f}</td>\n'
+                        elif col in ['cpu_avg', 'cpu_peak', 'cpu_p95', 'load_avg_1m']:
+                            html += f'<td>{value:.1f}</td>\n'
+                        elif col == 'error_rate':
+                            html += f'<td>{value:.3f}</td>\n'
+                        else:
+                            html += f'<td>{value}</td>\n'
+                    else:
+                        html += f'<td>{value}</td>\n'
+        html += '</tr>\n'
+    
+    html += '</tbody>\n</table>'
+    return html
+
 def create_repetition_analysis(df):
     """Tab 1: Repetition Analysis - Validate data quality and identify outliers"""
     
@@ -661,9 +720,10 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
     for config in configs_sorted:
         config_data = rep_analysis['rep_metrics'][rep_analysis['rep_metrics']['config'] == config]
         config_data = config_data.sort_values('repetition', ascending=False)
+        config_table_html = generate_grouped_table_html(config_data.drop('config', axis=1))
         html_content += f"""
             <h4>Configuration: {config}</h4>
-            {config_data.drop('config', axis=1).to_html(index=False, classes='table')}"""
+            {config_table_html}"""
     
     html_content += f"""
             
