@@ -2,8 +2,48 @@
 
 set -euo pipefail
 
+# Command line parameter validation
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <workload>"
+    echo ""
+    echo "Required parameter:"
+    echo "  workload    Must be one of: nyc_taxis, big5, vectorsearch"
+    echo ""
+    echo "Example: $0 nyc_taxis"
+    exit 1
+fi
+
+WORKLOAD_PARAM="$1"
+ALLOWED_WORKLOADS=("nyc_taxis" "big5" "vectorsearch")
+
+# Validate workload parameter
+if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
+    echo "ERROR: Invalid workload '$WORKLOAD_PARAM'"
+    echo ""
+    echo "Usage: $0 <workload>"
+    echo ""
+    echo "Allowed workloads:"
+    for workload in "${ALLOWED_WORKLOADS[@]}"; do
+        echo "  - $workload"
+    done
+    echo ""
+    echo "Example: $0 nyc_taxis"
+    exit 1
+fi
+
+echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
+
 # Configuration
 TARGET_HOST="$IP"
+
+# Path configuration - consolidate all path components
+WORKLOAD_NAME="$WORKLOAD_PARAM"
+BASE_RESULTS_DIR="./results/optimization"
+
+# Detect instance type on remote host
+INSTANCE_TYPE_RAW=$(ssh "$TARGET_HOST" "curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/machine-type 2>/dev/null | awk -F'/' '{print \$NF}'" 2>/dev/null || echo "c4a-standard-64")
+# Remove "standard" from the instance type (e.g., c4a-standard-16 -> c4a-16)
+INSTANCE_TYPE=$(echo "$INSTANCE_TYPE_RAW" | sed 's/-standard-/-/')
 
 # Detect page size on remote host
 PAGE_SIZE=$(ssh "$TARGET_HOST" "getconf PAGESIZE" 2>/dev/null || echo "4096")
@@ -13,24 +53,24 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-log() {
-    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
-}
-
 # Find existing run or create new timestamp
-if [[ -d "./results/optimization" ]]; then
-    EXISTING_RUN=$(find ./results/optimization -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
+if [[ -d "$BASE_RESULTS_DIR" ]]; then
+    EXISTING_RUN=$(find "$BASE_RESULTS_DIR" -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
 else
     EXISTING_RUN=""
 fi
 
 TIMESTAMP="20251008"
 echo "Using existing run: $TIMESTAMP"
+echo "Detected instance type: $INSTANCE_TYPE_RAW -> $INSTANCE_TYPE"
 echo "Detected page size: $PAGE_SIZE bytes -> using $PAGE_SIZE_DIR directory"
 
-RESULTS_DIR="./results/optimization/$TIMESTAMP/c4a-64/$PAGE_SIZE_DIR/nyc_taxis"
-CHECKPOINT_FILE="./results/optimization/$TIMESTAMP/test_progress.checkpoint"
-LOG_FILE="./results/optimization/$TIMESTAMP/performance_test.log"
+# Consolidated path construction
+RUN_BASE_DIR="$BASE_RESULTS_DIR/$TIMESTAMP"
+INSTANCE_BASE_DIR="$RUN_BASE_DIR/$INSTANCE_TYPE/$PAGE_SIZE_DIR"
+RESULTS_DIR="$INSTANCE_BASE_DIR/$WORKLOAD_NAME"
+CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
+LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
 CLIENT_LOADS=(60 70 80 90 100)
@@ -81,12 +121,12 @@ aggressive_index_reset() {
     for attempt in {1..3}; do
         log "Index deletion attempt $attempt/3"
         curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-        curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+        curl -s -X DELETE "http://$TARGET_HOST:9200/${WORKLOAD_NAME}*" > /dev/null 2>&1 || true
         curl -s -X DELETE "http://$TARGET_HOST:9200/_all" > /dev/null 2>&1 || true
         sleep 3
         
-        # Check if nyc_taxis index still exists
-        local indices_exist=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | wc -l)
+        # Check if workload index still exists
+        local indices_exist=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null | wc -l)
         if [[ $indices_exist -eq 0 ]]; then
             log "Index deletion successful on attempt $attempt"
             break
@@ -97,15 +137,15 @@ aggressive_index_reset() {
     # Wait for deletion to propagate
     sleep 10
     
-    # Verify no nyc_taxis indices remain
-    local remaining_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | wc -l)
+    # Verify no workload indices remain
+    local remaining_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null | wc -l)
     if [[ $remaining_indices -gt 0 ]]; then
-        log "WARNING: $remaining_indices nyc_taxis indices still exist after aggressive cleanup"
-        curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | while read line; do
+        log "WARNING: $remaining_indices $WORKLOAD_NAME indices still exist after aggressive cleanup"
+        curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null | while read line; do
             log "Remaining index: $line"
         done
     else
-        log "All nyc_taxis indices successfully deleted"
+        log "All $WORKLOAD_NAME indices successfully deleted"
     fi
 }
 
@@ -118,28 +158,28 @@ verify_shard_configuration() {
     local attempt=1
     
     while [[ $attempt -le $max_attempts ]]; do
-        local nyc_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null)
-        
-        if [[ -n "$nyc_indices" ]]; then
-            log "Found nyc_taxis indices:"
-            echo "$nyc_indices" | while read line; do
+        local workload_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null)
+
+        if [[ -n "$workload_indices" ]]; then
+            log "Found $WORKLOAD_NAME indices:"
+            echo "$workload_indices" | while read line; do
                 log "  $line"
             done
             
             # Check primary shard count
-            local actual_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards/nyc_taxis*?h=shard,prirep" 2>/dev/null | grep "p" | wc -l)
+            local actual_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards/${WORKLOAD_NAME}*?h=shard,prirep" 2>/dev/null | grep "p" | wc -l)
             log "Actual primary shards: $actual_shards, Expected: $expected_shards"
             
             if [[ $actual_shards -ne $expected_shards ]]; then
                 log "ERROR: Shard count mismatch! Deleting incorrect index..."
-                curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+                curl -s -X DELETE "http://$TARGET_HOST:9200/${WORKLOAD_NAME}*" > /dev/null 2>&1 || true
                 sleep 5
             else
                 log "Shard configuration verified successfully"
                 return 0
             fi
         else
-            log "No nyc_taxis indices found (attempt $attempt/$max_attempts)"
+            log "No $WORKLOAD_NAME indices found (attempt $attempt/$max_attempts)"
         fi
         
         sleep 5
@@ -202,7 +242,7 @@ recover_cluster_from_split_brain() {
 }
 
 safe_delete_indices() {
-    curl -s -X DELETE "${TARGET_HOST}:9200/nyc_taxis*" >/dev/null 2>&1 || true
+    curl -s -X DELETE "http://${TARGET_HOST}:9200/${WORKLOAD_NAME}*" >/dev/null 2>&1 || true
 }
 
 detect_cluster_issues() {
@@ -263,7 +303,7 @@ wait_for_cluster_with_timeout() {
             
             if [[ "$status" == "red" && $unassigned -gt 0 ]]; then
                 log "Red cluster with unassigned shards - attempting recovery"
-                curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+                curl -s -X DELETE "http://$TARGET_HOST:9200/${WORKLOAD_NAME}*" > /dev/null 2>&1 || true
                 sleep 5
             fi
         else
@@ -401,7 +441,7 @@ run_benchmark() {
     # Run OSB
     log "Executing OSB for $test_name..."
     
-    local osb_cmd="opensearch-benchmark run --workload=nyc_taxis \
+    local osb_cmd="opensearch-benchmark run --workload=$WORKLOAD_NAME \
         --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
         --client-options=use_ssl:false,verify_certs:false,timeout:60 \
         --kill-running-processes --include-tasks=index \
