@@ -61,6 +61,72 @@ def parse_cpu_metrics(data_dir, clients, nodes, shards, rep):
         'load_avg_1m': 0, 'process_cpu_avg': 0
     }
 
+def parse_queue_metrics(data_dir, clients, nodes, shards, rep):
+    """Parse thread pool queue metrics from metrics files for a specific repetition"""
+    pattern = f"metrics_{clients}_{nodes}-{shards}_{rep}_*"
+    metrics_files = glob.glob(os.path.join(data_dir, pattern))
+    
+    queue_data = []
+    for file_path in metrics_files:
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+                
+            for line in lines[1:]:  # Skip timestamp header
+                if line.strip() and line.startswith('{'):
+                    data = json.loads(line)
+                    if 'nodes' in data:
+                        for node_id, node_info in data['nodes'].items():
+                            if 'thread_pool' in node_info:
+                                # Extract key thread pool metrics
+                                thread_pools = node_info['thread_pool']
+                                
+                                # Focus on important thread pools for indexing/search
+                                important_pools = ['write', 'search', 'generic', 'refresh', 'flush']
+                                
+                                for pool_name in important_pools:
+                                    if pool_name in thread_pools:
+                                        pool = thread_pools[pool_name]
+                                        queue_data.append({
+                                            'pool': pool_name,
+                                            'queue': pool.get('queue', 0),
+                                            'active': pool.get('active', 0),
+                                            'rejected': pool.get('rejected', 0),
+                                            'threads': pool.get('threads', 0),
+                                            'largest': pool.get('largest', 0)
+                                        })
+        except Exception as e:
+            continue
+    
+    if queue_data:
+        queue_df = pd.DataFrame(queue_data)
+        
+        # Calculate aggregate metrics across all pools and nodes
+        total_queue = queue_df['queue'].sum()
+        total_active = queue_df['active'].sum()
+        total_rejected = queue_df['rejected'].sum()
+        max_queue = queue_df['queue'].max()
+        max_rejected = queue_df['rejected'].max()
+        
+        # Pool-specific metrics
+        write_queue = queue_df[queue_df['pool'] == 'write']['queue'].sum()
+        search_queue = queue_df[queue_df['pool'] == 'search']['queue'].sum()
+        
+        return {
+            'total_queue': total_queue,
+            'total_active': total_active,
+            'total_rejected': total_rejected,
+            'max_queue': max_queue,
+            'max_rejected': max_rejected,
+            'write_queue': write_queue,
+            'search_queue': search_queue
+        }
+    
+    return {
+        'total_queue': 0, 'total_active': 0, 'total_rejected': 0,
+        'max_queue': 0, 'max_rejected': 0, 'write_queue': 0, 'search_queue': 0
+    }
+
 def load_summary_data(data_dir):
     """Load all summary JSON files and parse CPU metrics"""
     summary_files = glob.glob(os.path.join(data_dir, "*_summary.json"))
@@ -79,6 +145,9 @@ def load_summary_data(data_dir):
             
             # Parse CPU metrics for this repetition
             cpu_metrics = parse_cpu_metrics(data_dir, clients, nodes, shards, rep)
+            
+            # Parse queue metrics for this repetition
+            queue_metrics = parse_queue_metrics(data_dir, clients, nodes, shards, rep)
                 
             record = {
                 'clients': clients,
@@ -98,7 +167,14 @@ def load_summary_data(data_dir):
                 'cpu_peak': cpu_metrics['cpu_peak'],
                 'cpu_p95': cpu_metrics['cpu_p95'],
                 'load_avg_1m': cpu_metrics['load_avg_1m'],
-                'process_cpu_avg': cpu_metrics['process_cpu_avg']
+                'process_cpu_avg': cpu_metrics['process_cpu_avg'],
+                'total_queue': queue_metrics['total_queue'],
+                'total_active': queue_metrics['total_active'],
+                'total_rejected': queue_metrics['total_rejected'],
+                'max_queue': queue_metrics['max_queue'],
+                'max_rejected': queue_metrics['max_rejected'],
+                'write_queue': queue_metrics['write_queue'],
+                'search_queue': queue_metrics['search_queue']
             }
             data.append(record)
         except Exception as e:
@@ -249,12 +325,13 @@ def generate_recommendations(df, agg_stats):
 def create_repetition_analysis(df):
     """Tab 1: Repetition Analysis - Validate data quality and identify outliers"""
     
-    # Individual repetition metrics table with CPU data
+    # Individual repetition metrics table with CPU and queue data
     rep_metrics = df[['config', 'repetition', 'throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99', 
-                     'error_rate', 'cpu_avg', 'cpu_peak', 'cpu_p95', 'load_avg_1m']].copy()
+                     'error_rate', 'cpu_avg', 'cpu_peak', 'cpu_p95', 'load_avg_1m', 
+                     'total_queue', 'total_rejected', 'max_queue', 'write_queue', 'search_queue']].copy()
     rep_metrics['duration'] = 3600  # Placeholder - would need actual duration from logs
     
-    # Coefficient of variation analysis including CPU metrics
+    # Coefficient of variation analysis including CPU and queue metrics
     cv_analysis = df.groupby('config').agg({
         'throughput_mean': lambda x: x.std() / x.mean() * 100,
         'latency_p50': lambda x: x.std() / x.mean() * 100,
@@ -262,18 +339,21 @@ def create_repetition_analysis(df):
         'latency_p99': lambda x: x.std() / x.mean() * 100,
         'cpu_avg': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
         'cpu_peak': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
-        'load_avg_1m': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0
+        'load_avg_1m': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'total_queue': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'total_rejected': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'max_queue': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0
     }).round(2)
     cv_analysis.columns = [f'{col}_cv' for col in cv_analysis.columns]
     
-    # Outlier detection (>2σ from mean) including CPU metrics
+    # Outlier detection (>2σ from mean) including CPU and queue metrics
     outliers_df = []
     for config in df['config'].unique():
         config_data = df[df['config'] == config]
         if len(config_data) < 2:
             continue
             
-        for metric in ['throughput_mean', 'latency_p99', 'cpu_avg', 'cpu_peak']:
+        for metric in ['throughput_mean', 'latency_p99', 'cpu_avg', 'cpu_peak', 'total_queue', 'total_rejected', 'max_queue']:
             mean_val = config_data[metric].mean()
             std_val = config_data[metric].std()
             if std_val > 0:
@@ -291,9 +371,9 @@ def create_repetition_analysis(df):
     
     outliers_table = pd.DataFrame(outliers_df)
     
-    # Box plots for metric distributions including CPU
+    # Box plots for metric distributions including CPU and queue metrics
     box_plots = {}
-    for metric in ['throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99', 'cpu_avg', 'cpu_peak']:
+    for metric in ['throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99', 'cpu_avg', 'cpu_peak', 'total_queue', 'max_queue', 'total_rejected']:
         fig = px.box(df, x='config', y=metric, title=f'{metric.replace("_", " ").title()} Distribution')
         box_plots[metric] = fig
     
@@ -301,6 +381,11 @@ def create_repetition_analysis(df):
     cpu_scatter_fig = px.scatter(df, x='cpu_avg', y='throughput_mean', color='config',
                                title='Throughput vs Average CPU by Repetition',
                                hover_data=['repetition', 'cpu_peak'])
+    
+    # Scatter plot: throughput vs queue depth
+    queue_scatter_fig = px.scatter(df, x='total_queue', y='throughput_mean', color='config',
+                                 title='Throughput vs Total Queue Depth by Repetition',
+                                 hover_data=['repetition', 'max_queue', 'total_rejected'])
     
     # Scatter plot: throughput vs P90 latency (existing)
     scatter_fig = px.scatter(df, x='latency_p90', y='throughput_mean', color='config',
@@ -313,7 +398,8 @@ def create_repetition_analysis(df):
         'outliers': outliers_table,
         'box_plots': box_plots,
         'scatter_plot': scatter_fig,
-        'cpu_scatter_plot': cpu_scatter_fig
+        'cpu_scatter_plot': cpu_scatter_fig,
+        'queue_scatter_plot': queue_scatter_fig
     }
 
 def create_run_level_analysis(df):
@@ -326,6 +412,14 @@ def create_run_level_analysis(df):
         'latency_p90': ['mean', 'std'],
         'latency_p99': ['mean', 'std'],
         'error_rate': ['mean', 'max'],
+        'cpu_avg': ['mean', 'max'],
+        'cpu_peak': ['mean', 'max'],
+        'load_avg_1m': ['mean', 'max'],
+        'total_queue': ['mean', 'max'],
+        'total_rejected': ['sum', 'max'],
+        'max_queue': ['mean', 'max'],
+        'write_queue': ['mean', 'max'],
+        'search_queue': ['mean', 'max'],
         'nodes': 'first',
         'clients': 'first'
     }).round(2)
@@ -338,10 +432,9 @@ def create_run_level_analysis(df):
     agg_metrics['docs_per_node'] = agg_metrics['throughput_mean_mean'] / agg_metrics['nodes_first']
     agg_metrics['latency_per_gb'] = agg_metrics['latency_p99_mean'] / 10  # Assuming ~10GB indexed
     
-    # Resource utilization (placeholder - would need actual monitoring data)
-    agg_metrics['peak_cpu'] = np.random.uniform(70, 95, len(agg_metrics))
-    agg_metrics['peak_memory'] = np.random.uniform(60, 85, len(agg_metrics))
-    agg_metrics['peak_io'] = np.random.uniform(40, 80, len(agg_metrics))
+    # Queue health indicators
+    agg_metrics['queue_pressure'] = agg_metrics['total_queue_mean'] + agg_metrics['total_rejected_sum']
+    agg_metrics['write_efficiency'] = agg_metrics['throughput_mean_mean'] / (agg_metrics['write_queue_mean'] + 1)  # +1 to avoid division by zero
     
     # Performance profile radar charts
     radar_charts = {}
@@ -352,10 +445,11 @@ def create_run_level_analysis(df):
         throughput_norm = min(100, config_data['throughput_mean_mean'] / 50000 * 100)
         latency_norm = max(0, 100 - config_data['latency_p99_mean'] / 1000 * 100)
         efficiency_norm = min(100, config_data['docs_per_node'] / 10000 * 100)
-        cpu_norm = 100 - config_data['peak_cpu']
+        cpu_norm = max(0, 100 - config_data['cpu_avg_mean'])  # Lower CPU usage = better
+        queue_norm = max(0, 100 - config_data['queue_pressure'])  # Lower queue pressure = better
         
-        categories = ['Throughput', 'Low Latency', 'Efficiency', 'CPU Available']
-        values = [throughput_norm, latency_norm, efficiency_norm, cpu_norm]
+        categories = ['Throughput', 'Low Latency', 'Efficiency', 'CPU Available', 'Queue Health']
+        values = [throughput_norm, latency_norm, efficiency_norm, cpu_norm, queue_norm]
         
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
@@ -370,22 +464,27 @@ def create_run_level_analysis(df):
         )
         radar_charts[config] = fig
     
-    # Resource utilization heatmap
-    heatmap_data = agg_metrics[['config', 'peak_cpu', 'peak_memory', 'peak_io']].set_index('config')
+    # Resource utilization heatmap using actual metrics
+    heatmap_data = agg_metrics[['config', 'cpu_avg_mean', 'cpu_peak_mean', 'load_avg_1m_mean', 'total_queue_mean']].set_index('config')
     heatmap_fig = px.imshow(heatmap_data.T, 
                            title='Resource Utilization Heatmap',
                            color_continuous_scale='RdYlBu_r',
                            aspect='auto')
     
     # Throughput vs resource correlation
-    corr_fig = px.scatter(agg_metrics, x='peak_cpu', y='throughput_mean_mean', 
+    corr_fig = px.scatter(agg_metrics, x='cpu_avg_mean', y='throughput_mean_mean', 
                          size='nodes_first', color='config',
                          title='Throughput vs CPU Utilization')
     
     # Latency vs CPU Utilization
-    latency_cpu_fig = px.scatter(agg_metrics, x='peak_cpu', y='latency_p99_mean',
+    latency_cpu_fig = px.scatter(agg_metrics, x='cpu_avg_mean', y='latency_p99_mean',
                                 size='nodes_first', color='config',
                                 title='Latency vs CPU Utilization')
+    
+    # Throughput vs Queue Pressure
+    throughput_queue_fig = px.scatter(agg_metrics, x='queue_pressure', y='throughput_mean_mean',
+                                     size='nodes_first', color='config',
+                                     title='Throughput vs Queue Pressure')
     
     # Throughput vs Latency
     throughput_latency_fig = px.scatter(agg_metrics, x='latency_p90_mean', y='throughput_mean_mean',
@@ -398,6 +497,7 @@ def create_run_level_analysis(df):
         'heatmap': heatmap_fig,
         'correlation': corr_fig,
         'latency_cpu': latency_cpu_fig,
+        'throughput_queue': throughput_queue_fig,
         'throughput_latency': throughput_latency_fig
     }
 
@@ -573,7 +673,10 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             • <strong>latency_p50_cv, latency_p90_cv, latency_p99_cv</strong>: How consistent latency percentiles are<br>
             • <strong>cpu_avg_cv</strong>: How consistent average CPU utilization is across repetitions<br>
             • <strong>cpu_peak_cv</strong>: How consistent peak CPU spikes are across repetitions<br>
-            • <strong>load_avg_1m_cv</strong>: How consistent system load averages are across repetitions</p>
+            • <strong>load_avg_1m_cv</strong>: How consistent system load averages are across repetitions<br>
+            • <strong>total_queue_cv</strong>: How consistent thread pool queue depths are across repetitions<br>
+            • <strong>total_rejected_cv</strong>: How consistent thread pool rejections are across repetitions<br>
+            • <strong>max_queue_cv</strong>: How consistent peak queue depths are across repetitions</p>
             
             <p><strong>Interpretation:</strong><br>
             • <strong>CV &lt; 5%</strong>: Very consistent (good) - <span style="background-color: #d4edda; color: #155724; padding: 2px 4px;">Green</span><br>
@@ -586,7 +689,8 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             • <strong>Low cpu_avg_cv</strong>: Stable CPU usage patterns, no random spikes or bottlenecks<br>
             • <strong>Low cpu_peak_cv</strong>: Predictable peak CPU loads, consistent workload handling<br>
             • <strong>Low load_avg_1m_cv</strong>: Stable system load, no interference from other processes<br>
-            • <strong>High CV values (&gt;10%)</strong>: Inconsistent behavior - may indicate system interference, thermal throttling, or configuration issues</p>"""
+            • <strong>Low queue_cv values</strong>: Consistent thread pool behavior, no unexpected queueing or rejections<br>
+            • <strong>High CV values (&gt;10%)</strong>: Inconsistent behavior - may indicate system interference, thermal throttling, resource contention, or configuration issues</p>"""
     
     # Generate color-coded CV table
     cv_df = rep_analysis['cv_analysis'].sort_index(ascending=False)
@@ -640,6 +744,11 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
                 <div id="cpu_scatter_plot"></div>
             </div>
             <p><strong>Throughput vs CPU Correlation:</strong> Scatter plot showing the relationship between throughput and average CPU utilization for each repetition. Helps identify CPU bottlenecks and resource efficiency.</p>
+            
+            <div class="chart-container">
+                <div id="queue_scatter_plot"></div>
+            </div>
+            <p><strong>Throughput vs Queue Depth Correlation:</strong> Scatter plot showing the relationship between throughput and thread pool queue depth for each repetition. Helps identify queueing bottlenecks and thread pool saturation.</p>
         </div>
         
         <!-- Tab 2: Run Level Analysis -->
@@ -656,6 +765,7 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             
             <div class="metrics-grid">
                 <div id="latency_cpu_chart"></div>
+                <div id="throughput_queue_chart"></div>
                 <div id="throughput_latency_chart"></div>
             </div>
         </div>
@@ -740,6 +850,9 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     cpu_scatter_json = rep_analysis['cpu_scatter_plot'].to_json()
     js_code += f"Plotly.newPlot('cpu_scatter_plot', {cpu_scatter_json});\n"
     
+    queue_scatter_json = rep_analysis['queue_scatter_plot'].to_json()
+    js_code += f"Plotly.newPlot('queue_scatter_plot', {queue_scatter_json});\n"
+    
     # Run level analysis charts
     heatmap_json = run_analysis['heatmap'].to_json()
     js_code += f"Plotly.newPlot('resource_heatmap', {heatmap_json});\n"
@@ -749,6 +862,9 @@ def generate_plotly_js(rep_analysis, run_analysis, config_analysis):
     
     latency_cpu_json = run_analysis['latency_cpu'].to_json()
     js_code += f"Plotly.newPlot('latency_cpu_chart', {latency_cpu_json});\n"
+    
+    throughput_queue_json = run_analysis['throughput_queue'].to_json()
+    js_code += f"Plotly.newPlot('throughput_queue_chart', {throughput_queue_json});\n"
     
     throughput_latency_json = run_analysis['throughput_latency'].to_json()
     js_code += f"Plotly.newPlot('throughput_latency_chart', {throughput_latency_json});\n"
