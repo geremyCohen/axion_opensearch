@@ -541,88 +541,91 @@ main() {
     log "Total configurations: $total_configs, Total runs: $total_runs"
     log "CLIENT_LOADS: ${CLIENT_LOADS[*]}"
     log "NODE_SHARD_CONFIGS: ${NODE_SHARD_CONFIGS[*]}"
-    
+    log "Optimized execution order: cluster will be reconfigured only ${#NODE_SHARD_CONFIGS[@]} times instead of $total_configs times"
+
     load_checkpoint
     
     local completed_runs=0
     local found_resume_point=false
     
-    for clients in "${CLIENT_LOADS[@]}"; do
-        # Skip entire client loads that are already complete
-        if [[ $clients -lt $CURRENT_CLIENTS ]]; then
-            log "Skipping completed client load: $clients clients"
-            completed_runs=$((completed_runs + ${#NODE_SHARD_CONFIGS[@]} * REPETITIONS))
+    # OPTIMIZED LOOP ORDER: node/shard configs outer, client loads inner
+    # This reduces cluster reconfigurations from 25 to 5
+    for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
+        local nodes=$node_shard
+        local shards=$node_shard
+
+        # Skip entire node configurations that are already complete
+        if [[ $nodes -lt $CURRENT_NODES ]]; then
+            log "Skipping completed node config: $nodes nodes"
+            completed_runs=$((completed_runs + ${#CLIENT_LOADS[@]} * REPETITIONS))
             continue
-        elif [[ $clients -eq $CURRENT_CLIENTS ]]; then
-            # For current client load, check if we're completely done with all configs
-            # We're done if current_nodes is the last node config AND current_rep equals REPETITIONS
-            local last_node_config=${NODE_SHARD_CONFIGS[-1]}
-            log "DEBUG: clients=$clients, CURRENT_CLIENTS=$CURRENT_CLIENTS, CURRENT_NODES=$CURRENT_NODES, last_node_config=$last_node_config, CURRENT_REP=$CURRENT_REP, REPETITIONS=$REPETITIONS"
-            if [[ $CURRENT_NODES -eq $last_node_config && $CURRENT_REP -eq $REPETITIONS ]]; then
-                log "Skipping completed client load: $clients clients (all configs done)"
-                completed_runs=$((completed_runs + ${#NODE_SHARD_CONFIGS[@]} * REPETITIONS))
+        elif [[ $nodes -eq $CURRENT_NODES ]]; then
+            # For current node config, check if we're completely done with all client loads
+            # We're done if current_clients is the last client load AND current_rep equals REPETITIONS
+            local last_client_load=${CLIENT_LOADS[-1]}
+            log "DEBUG: nodes=$nodes, CURRENT_NODES=$CURRENT_NODES, CURRENT_CLIENTS=$CURRENT_CLIENTS, last_client_load=$last_client_load, CURRENT_REP=$CURRENT_REP, REPETITIONS=$REPETITIONS"
+            if [[ $CURRENT_CLIENTS -eq $last_client_load && $CURRENT_REP -eq $REPETITIONS ]]; then
+                log "Skipping completed node config: $nodes nodes (all client loads done)"
+                completed_runs=$((completed_runs + ${#CLIENT_LOADS[@]} * REPETITIONS))
                 continue
             fi
         fi
-        
-        for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
-            local nodes=$node_shard
-            local shards=$node_shard
-            
+
+        # Configure cluster once per node/shard combination
+        log "About to configure cluster: $nodes nodes, $shards shards"
+        configure_cluster "$nodes" "$shards"
+        log "Cluster configured, verifying..."
+        verify_cluster_active
+        log "Cluster verified, starting benchmark runs for all client loads..."
+
+        for clients in "${CLIENT_LOADS[@]}"; do
             # If we haven't found our resume point yet, check if this is it
             if [[ $found_resume_point == false ]]; then
                 # Check if we should resume from this configuration
-                if [[ $clients -gt $CURRENT_CLIENTS ]]; then
-                    # Next client load - this is our resume point
+                if [[ $nodes -gt $CURRENT_NODES ]]; then
+                    # Next node config - this is our resume point
                     found_resume_point=true
-                    log "Found resume point: $clients clients, $nodes nodes (next client load)"
-                elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -gt $CURRENT_NODES ]]; then
-                    # Same client load, next node configuration
+                    log "Found resume point: $nodes nodes, $clients clients (next node config)"
+                elif [[ $nodes -eq $CURRENT_NODES && $clients -gt $CURRENT_CLIENTS ]]; then
+                    # Same node config, next client load
                     found_resume_point=true
-                    log "Found resume point: $clients clients, $nodes nodes (next node config)"
-                elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES ]]; then
+                    log "Found resume point: $nodes nodes, $clients clients (next client load)"
+                elif [[ $nodes -eq $CURRENT_NODES && $clients -eq $CURRENT_CLIENTS ]]; then
                     # Same config - check if we need to resume mid-repetitions
                     if [[ $CURRENT_REP -lt $REPETITIONS ]]; then
                         found_resume_point=true
-                        log "Resuming within same config: $clients clients, $nodes nodes (rep $((CURRENT_REP + 1)))"
+                        log "Resuming within same config: $nodes nodes, $clients clients (rep $((CURRENT_REP + 1)))"
                     else
                         # All repetitions complete for this config, skip it
-                        log "Skipping completed config: $clients clients, $nodes nodes (all $REPETITIONS reps done)"
+                        log "Skipping completed config: $nodes nodes, $clients clients (all $REPETITIONS reps done)"
                         completed_runs=$((completed_runs + REPETITIONS))
                         continue
                     fi
-                elif [[ $clients -eq $CURRENT_CLIENTS && $nodes -lt $CURRENT_NODES ]]; then
-                    # Earlier node config in same client load - skip it
-                    log "Skipping earlier node config: $clients clients, $nodes nodes"
+                elif [[ $nodes -eq $CURRENT_NODES && $clients -lt $CURRENT_CLIENTS ]]; then
+                    # Earlier client load in same node config - skip it
+                    log "Skipping earlier client load: $nodes nodes, $clients clients"
                     completed_runs=$((completed_runs + REPETITIONS))
                     continue
                 else
                     # Skip this entire configuration - it's already completed
-                    log "Skipping completed config: $clients clients, $nodes nodes"
+                    log "Skipping completed config: $nodes nodes, $clients clients"
                     completed_runs=$((completed_runs + REPETITIONS))
                     continue
                 fi
             fi
             
-            # Configure cluster once per node/shard combination
-            log "About to configure cluster: $nodes nodes, $shards shards"
-            configure_cluster "$nodes" "$shards"
-            log "Cluster configured, verifying..."
-            verify_cluster_active
-            log "Cluster verified, starting benchmark runs..."
-            
             for rep in $(seq 1 $REPETITIONS); do
-                log "Processing repetition $rep for $clients clients, $nodes nodes, $shards shards"
-                
+                log "Processing repetition $rep for $nodes nodes, $shards shards, $clients clients"
+
                 # Skip completed repetitions in current config
-                if [[ $clients -eq $CURRENT_CLIENTS && $nodes -eq $CURRENT_NODES && $rep -le $CURRENT_REP ]]; then
-                    log "Skipping completed repetition: $clients,$nodes,$rep (completed up to $CURRENT_REP)"
+                if [[ $nodes -eq $CURRENT_NODES && $clients -eq $CURRENT_CLIENTS && $rep -le $CURRENT_REP ]]; then
+                    log "Skipping completed repetition: $nodes,$clients,$rep (completed up to $CURRENT_REP)"
                     completed_runs=$((completed_runs + 1))
                     continue
                 fi
                 
-                log "Running new benchmark: $clients,$nodes,$rep"
-                
+                log "Running new benchmark: $nodes,$clients,$rep"
+
                 if run_benchmark "$clients" "$nodes" "$shards" "$rep"; then
                     log "run_benchmark completed successfully"
                     save_checkpoint "$clients" "$nodes" "$shards" "$rep"
@@ -641,4 +644,3 @@ main() {
     log "Performance test suite completed successfully"
 }
 
-main "$@"
