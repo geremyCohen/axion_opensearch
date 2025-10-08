@@ -201,6 +201,15 @@ recover_cluster_from_split_brain() {
     return 0
 }
 
+safe_delete_indices() {
+    curl -s -X DELETE "${TARGET_HOST}:9200/nyc_taxis*" >/dev/null 2>&1 || true
+}
+
+detect_cluster_issues() {
+    local health=$(curl -s "${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    [[ "$health" == "green" ]]
+}
+
 recover_cluster() {
     log "Attempting cluster recovery..."
     
