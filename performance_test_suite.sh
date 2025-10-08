@@ -73,27 +73,81 @@ load_checkpoint() {
     fi
 }
 
-safe_delete_indices() {
-    log "Performing safe index cleanup..."
+aggressive_index_reset() {
+    local expected_shards=$1
+    log "Performing aggressive index reset for $expected_shards shards..."
     
-    # Delete all indices (not just nyc_taxis*)
-    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-    curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
-    
-    # Wait for deletion to complete
-    local attempts=0
-    while [[ $attempts -lt 10 ]]; do
-        local indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | wc -l)
-        if [[ $indices -eq 0 ]]; then
-            log "Index cleanup completed"
-            return 0
-        fi
-        log "Waiting for index deletion... (attempt $((attempts+1))/10)"
+    # Delete all indices multiple times to ensure cleanup
+    for attempt in {1..3}; do
+        log "Index deletion attempt $attempt/3"
+        curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
+        curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+        curl -s -X DELETE "http://$TARGET_HOST:9200/_all" > /dev/null 2>&1 || true
         sleep 3
-        ((attempts++))
+        
+        # Check if nyc_taxis index still exists
+        local indices_exist=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | wc -l)
+        if [[ $indices_exist -eq 0 ]]; then
+            log "Index deletion successful on attempt $attempt"
+            break
+        fi
+        log "Indices still exist, retrying deletion..."
     done
     
-    log "WARNING: Index cleanup may be incomplete"
+    # Wait for deletion to propagate
+    sleep 10
+    
+    # Verify no nyc_taxis indices remain
+    local remaining_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | wc -l)
+    if [[ $remaining_indices -gt 0 ]]; then
+        log "WARNING: $remaining_indices nyc_taxis indices still exist after aggressive cleanup"
+        curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null | while read line; do
+            log "Remaining index: $line"
+        done
+    else
+        log "All nyc_taxis indices successfully deleted"
+    fi
+}
+
+verify_shard_configuration() {
+    local expected_shards=$1
+    log "Verifying shard configuration expects $expected_shards shards..."
+    
+    # Wait for any indices to be created and check shard count
+    local max_attempts=10
+    local attempt=1
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        local nyc_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/nyc_taxis*" 2>/dev/null)
+        
+        if [[ -n "$nyc_indices" ]]; then
+            log "Found nyc_taxis indices:"
+            echo "$nyc_indices" | while read line; do
+                log "  $line"
+            done
+            
+            # Check primary shard count
+            local actual_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards/nyc_taxis*?h=shard,prirep" 2>/dev/null | grep "p" | wc -l)
+            log "Actual primary shards: $actual_shards, Expected: $expected_shards"
+            
+            if [[ $actual_shards -ne $expected_shards ]]; then
+                log "ERROR: Shard count mismatch! Deleting incorrect index..."
+                curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+                sleep 5
+            else
+                log "Shard configuration verified successfully"
+                return 0
+            fi
+        else
+            log "No nyc_taxis indices found (attempt $attempt/$max_attempts)"
+        fi
+        
+        sleep 5
+        ((attempt++))
+    done
+    
+    log "Shard verification completed"
+    return 0
 }
 
 detect_cluster_issues() {
@@ -198,11 +252,9 @@ configure_cluster() {
     # Pre-scaling validation and cleanup
     log "Pre-scaling validation..."
     
-    # Always delete indices before cluster operations to prevent shard allocation issues
-    log "Performing preemptive index cleanup..."
-    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-    curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
-    sleep 5
+    # Always perform aggressive index reset before cluster operations
+    log "Performing aggressive index reset..."
+    aggressive_index_reset "$shards"
     
     # Check for red status and attempt recovery
     local cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
@@ -237,6 +289,9 @@ configure_cluster() {
     if ! wait_for_cluster_with_timeout; then
         log "WARNING: Cluster not fully healthy after scaling, but continuing"
     fi
+    
+    # Verify shard configuration is correct
+    verify_shard_configuration "$shards"
     
     log "Cluster scaling completed"
 }
@@ -279,9 +334,9 @@ run_benchmark() {
     
     log "Starting benchmark: $test_name"
     
-    # Safe index cleanup before benchmark
-    log "Performing safe index cleanup before benchmark..."
-    safe_delete_indices
+    # Aggressive index cleanup before benchmark
+    log "Performing aggressive index cleanup before benchmark..."
+    aggressive_index_reset "$shards"
     
     # Verify cluster is healthy before benchmark
     if ! detect_cluster_issues; then
