@@ -447,7 +447,7 @@ run_benchmark() {
         --kill-running-processes --include-tasks=index \
         --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
-    log "About to execute OSB command..."
+    log "Executing OSB run, please wait for completion."
     
     # Start metrics collection in background
     (
