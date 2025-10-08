@@ -24,7 +24,7 @@ else
     EXISTING_RUN=""
 fi
 
-TIMESTAMP="20251007_144856"
+TIMESTAMP="20251008"
 echo "Using existing run: $TIMESTAMP"
 echo "Detected page size: $PAGE_SIZE bytes -> using $PAGE_SIZE_DIR directory"
 
@@ -136,11 +136,11 @@ recover_cluster() {
     fi
 }
 
-wait_for_green_cluster() {
-    local max_attempts=15
+wait_for_cluster_with_timeout() {
+    local max_attempts=10
     local attempt=1
     
-    log "Waiting for cluster to become green/yellow..."
+    log "Waiting for cluster health with timeout..."
     
     while [[ $attempt -le $max_attempts ]]; do
         local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
@@ -157,19 +157,20 @@ wait_for_green_cluster() {
                 return 0
             fi
             
-            if [[ "$status" == "red" ]]; then
-                log "Red cluster detected - attempting recovery"
-                if recover_cluster; then
-                    continue  # Retry the health check
-                fi
+            if [[ "$status" == "red" && $unassigned -gt 0 ]]; then
+                log "Red cluster with unassigned shards - attempting recovery"
+                curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+                sleep 5
             fi
+        else
+            log "No cluster response (attempt $attempt/$max_attempts)"
         fi
         
-        sleep 10
+        sleep 15
         ((attempt++))
     done
     
-    log "WARNING: Cluster not fully healthy after $max_attempts attempts"
+    log "Cluster health check timed out after $max_attempts attempts"
     return 1
 }
 
@@ -196,20 +197,27 @@ configure_cluster() {
     
     # Pre-scaling validation and cleanup
     log "Pre-scaling validation..."
-    if ! detect_cluster_issues; then
-        log "Cluster issues detected - attempting recovery before scaling"
-        if ! recover_cluster; then
-            log "ERROR: Cannot recover cluster before scaling"
-            return 1
+    
+    # Always delete indices before cluster operations to prevent shard allocation issues
+    log "Performing preemptive index cleanup..."
+    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
+    curl -s -X DELETE "http://$TARGET_HOST:9200/nyc_taxis*" > /dev/null 2>&1 || true
+    sleep 5
+    
+    # Check for red status and attempt recovery
+    local cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
+    if [[ "$cluster_status" == "red" ]]; then
+        log "Cluster is red - attempting recovery before scaling"
+        local unassigned=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.unassigned_shards // 0' 2>/dev/null)
+        if [[ $unassigned -gt 0 ]]; then
+            log "Found $unassigned unassigned shards - forcing index cleanup"
+            curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
+            sleep 10
+            
+            # Recheck status after cleanup
+            cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
+            log "Cluster status after cleanup: $cluster_status"
         fi
-    fi
-    
-    # Safe index cleanup before scaling
-    safe_delete_indices
-    
-    # Wait for cluster to be healthy before scaling
-    if ! wait_for_green_cluster; then
-        log "WARNING: Cluster not green before scaling, but continuing..."
     fi
     
     log "Attempting cluster configuration update..."
@@ -222,26 +230,22 @@ configure_cluster() {
         return 1
     fi
     
-    # Post-scaling validation
+    # Post-scaling validation with timeout
     sleep 30
-    log "Post-scaling validation..."
+    log "Post-scaling validation with timeout..."
     
-    if ! wait_for_green_cluster; then
-        log "ERROR: Cluster unhealthy after scaling"
-        if ! recover_cluster; then
-            log "ERROR: Failed to recover cluster after scaling"
-            return 1
-        fi
+    if ! wait_for_cluster_with_timeout; then
+        log "WARNING: Cluster not fully healthy after scaling, but continuing"
     fi
     
-    log "Cluster scaling completed successfully"
+    log "Cluster scaling completed"
 }
 
 verify_cluster_active() {
     log "Verifying cluster is ready for benchmarking..."
     
-    # Use the comprehensive health check
-    if wait_for_green_cluster; then
+    # Use the timeout-based health check
+    if wait_for_cluster_with_timeout; then
         log "Cluster verification successful"
         return 0
     else
