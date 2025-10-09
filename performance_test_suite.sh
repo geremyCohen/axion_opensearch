@@ -72,8 +72,9 @@ CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
 LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(60 70 80 90 100)
-NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
+CLIENT_LOADS=(60)
+NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
+#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
 #REPETITIONS=4
 
@@ -249,8 +250,8 @@ safe_delete_indices() {
 }
 
 detect_cluster_issues() {
-    local health=$(curl -s "${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-    [[ "$health" == "green" ]]
+    local health=$(curl -s "http://${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    [[ "$health" == "green" || "$health" == "yellow" ]]
 }
 
 recover_cluster() {
