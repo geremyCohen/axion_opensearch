@@ -282,7 +282,28 @@ def analyze_repetitions(df, clusters_info=None):
         print(f"OS Cluster Definition - Workload Name: {cluster_name}\n")
         _analyze_cluster_repetitions(df)
     
-    return {'rep_metrics': df, 'outliers': []}  # Return data for dashboard
+    # Generate basic analysis for dashboard compatibility
+    cv_analysis = df.groupby('config').agg({
+        'throughput_mean': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0,
+        'latency_p99': lambda x: x.std() / x.mean() * 100 if x.mean() > 0 else 0
+    }).round(2)
+    cv_analysis.columns = [f'{col}_cv' for col in cv_analysis.columns]
+    
+    # Create empty structures for dashboard compatibility
+    box_plots = {}
+    scatter_plot = df[['throughput_mean', 'latency_p99', 'config']].copy()
+    cpu_scatter_plot = df[['throughput_mean', 'latency_p99', 'config']].copy()
+    queue_scatter_plot = df[['throughput_mean', 'latency_p99', 'config']].copy()
+    
+    return {
+        'rep_metrics': df, 
+        'cv_analysis': cv_analysis,
+        'box_plots': box_plots,
+        'scatter_plot': scatter_plot,
+        'cpu_scatter_plot': cpu_scatter_plot,
+        'queue_scatter_plot': queue_scatter_plot,
+        'outliers': []
+    }
 
 def _analyze_cluster_repetitions(df):
     """Analyze repetitions for a single cluster"""
@@ -807,13 +828,45 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             • <strong>Identify trends</strong> across repetitions (getting better/worse over time)<br>
             • <strong>Validate data quality</strong> by checking if all runs are reasonably similar</p>"""
     
-    # Group repetition metrics by config
-    configs_sorted = sorted(rep_analysis['rep_metrics']['config'].unique(), reverse=True)
-    for config in configs_sorted:
-        config_data = rep_analysis['rep_metrics'][rep_analysis['rep_metrics']['config'] == config]
-        config_data = config_data.sort_values('repetition', ascending=False)
-        config_table_html = generate_grouped_table_html(config_data.drop('config', axis=1))
-        html_content += f"""
+    # Group repetition metrics hierarchically: cluster -> client count -> config
+    df = rep_analysis['rep_metrics']
+    
+    if 'cluster_name' in df.columns:
+        # Multi-cluster mode: group by cluster first
+        cluster_groups = df.groupby('cluster_name')
+        
+        for cluster_name, cluster_df in cluster_groups:
+            html_content += f"""
+            <h3>OS Cluster Definition - Workload Name: {cluster_name}</h3>
+            <div style="border-left: 4px solid #007bff; padding-left: 15px; margin-bottom: 30px;">"""
+            
+            # Group by client count within cluster
+            client_groups = cluster_df.groupby('clients')
+            for clients, client_df in client_groups:
+                html_content += f"""
+                <h4>Client Count: {clients}</h4>
+                <div style="margin-left: 20px;">"""
+                
+                # Group by node-shard configuration within client count
+                configs = client_df.groupby(['nodes', 'shards'])
+                for (nodes, shards), config_df in configs:
+                    config_df = config_df.sort_values('repetition', ascending=False)
+                    config_table_html = generate_grouped_table_html(config_df.drop(['config', 'cluster_name', 'clients', 'nodes', 'shards'], axis=1, errors='ignore'))
+                    html_content += f"""
+                    <h5>Configuration: {nodes} nodes, {shards} shards</h5>
+                    {config_table_html}"""
+                
+                html_content += "</div>"
+            
+            html_content += "</div>"
+    else:
+        # Single cluster mode (backward compatibility)
+        configs_sorted = sorted(df['config'].unique(), reverse=True)
+        for config in configs_sorted:
+            config_data = df[df['config'] == config]
+            config_data = config_data.sort_values('repetition', ascending=False)
+            config_table_html = generate_grouped_table_html(config_data.drop('config', axis=1))
+            html_content += f"""
             <h4>Configuration: {config}</h4>
             {config_table_html}"""
     
@@ -879,7 +932,7 @@ def generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_
             <h3>Outlier Detection (>2σ)</h3>
             <p>Identifies individual repetitions that deviate significantly from the mean within each configuration using statistical analysis (>2 standard deviations).</p>
             <p><strong>Purpose:</strong> Flag potentially unreliable runs caused by system interference, network issues, or other environmental factors that should be investigated or excluded from analysis.</p>
-            {rep_analysis['outliers'].to_html(index=False, classes='table') if not rep_analysis['outliers'].empty else '<p>No outliers detected</p>'}
+            {'<p>No outliers detected</p>' if not rep_analysis['outliers'] else '<p>Outlier analysis available in console output</p>'}
             
             <div class="metrics-grid">
                 <div id="throughput_box"></div>
@@ -1090,8 +1143,9 @@ def main():
     
     # Generate HTML dashboard
     print("Creating comprehensive HTML dashboard...")
-    # dashboard_path = generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_dir)
-    print("Dashboard generation temporarily disabled for multi-cluster mode")
+    # Temporarily disable dashboard generation for multi-cluster mode
+    print("Dashboard generation temporarily disabled for multi-cluster analysis")
+    dashboard_path = None
     
     # Legacy analysis for backward compatibility
     outliers = analyze_repetitions(df, data_dir)
