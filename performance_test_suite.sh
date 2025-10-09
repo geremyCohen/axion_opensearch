@@ -251,7 +251,7 @@ safe_delete_indices() {
 
 detect_cluster_issues() {
     local health=$(curl -s "http://${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-    [[ "$health" == "green" || "$health" == "yellow" ]]
+    [[ "$health" == "green" ]]
 }
 
 recover_cluster() {
@@ -578,7 +578,15 @@ main() {
         # Configure cluster once per node/shard combination
         log "About to configure cluster: $nodes nodes, $shards shards"
         configure_cluster "$nodes" "$shards"
-        log "Cluster configured, verifying..."
+        log "Cluster configured, checking for issues..."
+        
+        # Force recovery if cluster has issues after configuration
+        if ! detect_cluster_issues; then
+            log "Cluster issues detected after configuration - forcing recovery"
+            recover_cluster
+        fi
+        
+        log "Verifying cluster is active..."
         verify_cluster_active
         log "Cluster verified, starting benchmark runs for all client loads..."
 
