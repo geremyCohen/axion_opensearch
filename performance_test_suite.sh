@@ -483,6 +483,18 @@ run_benchmark() {
     
     # Stop metrics collection
     kill $metrics_pid 2>/dev/null
+    sleep 2  # Allow process cleanup
+    
+    # Clean up edge metrics samples to avoid race conditions
+    log "Cleaning up edge metrics samples..."
+    rm -f "${metrics_file}_1" 2>/dev/null  # Remove first sample
+    
+    # Find and remove last sample (highest numbered file)
+    local last_sample=$(ls "${metrics_file}_"* 2>/dev/null | sed 's/.*_//' | sort -n | tail -1)
+    if [[ -n "$last_sample" ]]; then
+        rm -f "${metrics_file}_${last_sample}" 2>/dev/null
+        log "Removed first and last metrics samples (1 and $last_sample)"
+    fi
     
     log "OSB execution completed for $test_name"
     
