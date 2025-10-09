@@ -105,67 +105,223 @@
     <script>
         // Detailed repetition data
         const repData = {
-            'c4a-64 64k': {
-                '60_16-16': [
-                    {rep: 1, throughput: 555575, latency: 2382, efficiency: 233, cpu: 65.2, queue: 0},
-                    {rep: 2, throughput: 572683, latency: 2399, efficiency: 239, cpu: 67.1, queue: 0},
-                    {rep: 3, throughput: 585448, latency: 2399, efficiency: 244, cpu: 68.5, queue: 0},
-                    {rep: 4, throughput: 581569, latency: 2644, efficiency: 220, cpu: 69.2, queue: 0}
-                ],
-                '80_16-16': [
-                    {rep: 1, throughput: 575767, latency: 3255, efficiency: 177, cpu: 72.1, queue: 0},
-                    {rep: 2, throughput: 603498, latency: 2826, efficiency: 214, cpu: 74.3, queue: 0},
-                    {rep: 3, throughput: 601182, latency: 2923, efficiency: 206, cpu: 73.8, queue: 0},
-                    {rep: 4, throughput: 592769, latency: 3054, efficiency: 194, cpu: 73.2, queue: 0}
-                ],
-                '100_16-16': [
-                    {rep: 1, throughput: 538920, latency: 3542, efficiency: 152, cpu: 76.5, queue: 2},
-                    {rep: 2, throughput: 553523, latency: 4146, efficiency: 133, cpu: 78.2, queue: 5},
-                    {rep: 3, throughput: 552333, latency: 4007, efficiency: 138, cpu: 77.9, queue: 3},
-                    {rep: 4, throughput: 560158, latency: 3717, efficiency: 151, cpu: 77.1, queue: 1}
-                ]
+            "c4-144 4k - nyc_taxis": {
+                        "60_16-16": [
+                                    {
+                                                "rep": 1,
+                                                "throughput": 456201,
+                                                "latency": 3021,
+                                                "efficiency": 151001,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 504117,
+                                                "latency": 2399,
+                                                "efficiency": 210056,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 478530,
+                                                "latency": 2623,
+                                                "efficiency": 182406,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 483479,
+                                                "latency": 2635,
+                                                "efficiency": 183424,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    }
+                        ]
             },
-            'c4a-64 4k': {
-                '60_16-16': [
-                    {rep: 1, throughput: 472869, latency: 3403, efficiency: 139, cpu: 68.4, queue: 0},
-                    {rep: 2, throughput: 486703, latency: 3086, efficiency: 158, cpu: 69.7, queue: 0},
-                    {rep: 3, throughput: 489289, latency: 3095, efficiency: 158, cpu: 70.1, queue: 0},
-                    {rep: 4, throughput: 492934, latency: 3441, efficiency: 143, cpu: 70.8, queue: 0}
-                ],
-                '80_16-16': [
-                    {rep: 1, throughput: 0, latency: 0, efficiency: 0, cpu: 0, queue: 0}, // Missing data
-                    {rep: 2, throughput: 0, latency: 0, efficiency: 0, cpu: 0, queue: 0}, // Missing data
-                    {rep: 3, throughput: 493408, latency: 4106, efficiency: 120, cpu: 75.2, queue: 1},
-                    {rep: 4, throughput: 489476, latency: 4075, efficiency: 120, cpu: 74.8, queue: 1}
-                ],
-                '100_16-16': [
-                    {rep: 1, throughput: 469287, latency: 4622, efficiency: 102, cpu: 78.9, queue: 8},
-                    {rep: 2, throughput: 490392, latency: 5054, efficiency: 97, cpu: 80.1, queue: 12},
-                    {rep: 3, throughput: 486764, latency: 4789, efficiency: 102, cpu: 79.5, queue: 9},
-                    {rep: 4, throughput: 491857, latency: 4856, efficiency: 101, cpu: 79.8, queue: 10}
-                ]
+            "c4a-64 64k - nyc_taxis": {
+                        "60_16-16": [
+                                    {
+                                                "rep": 1,
+                                                "throughput": 569347,
+                                                "latency": 2211,
+                                                "efficiency": 257493,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 590181,
+                                                "latency": 2253,
+                                                "efficiency": 261859,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 589969,
+                                                "latency": 2062,
+                                                "efficiency": 286009,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 595534,
+                                                "latency": 2120,
+                                                "efficiency": 280840,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    }
+                        ]
             },
-            'c4-96 4k': {
-                '60_16-16': [
-                    {rep: 1, throughput: 404421, latency: 3176, efficiency: 127, cpu: 71.2, queue: 0},
-                    {rep: 2, throughput: 398234, latency: 3245, efficiency: 123, cpu: 70.8, queue: 0},
-                    {rep: 3, throughput: 412567, latency: 3098, efficiency: 133, cpu: 72.1, queue: 0},
-                    {rep: 4, throughput: 408901, latency: 3156, efficiency: 130, cpu: 71.7, queue: 0}
-                ],
-                '80_16-16': [
-                    {rep: 1, throughput: 385432, latency: 3876, efficiency: 99, cpu: 74.5, queue: 2},
-                    {rep: 2, throughput: 392156, latency: 3654, efficiency: 107, cpu: 75.1, queue: 1},
-                    {rep: 3, throughput: 388901, latency: 3789, efficiency: 103, cpu: 74.8, queue: 2},
-                    {rep: 4, throughput: 391234, latency: 3712, efficiency: 105, cpu: 75.0, queue: 1}
-                ],
-                '100_16-16': [
-                    {rep: 1, throughput: 378901, latency: 4234, efficiency: 89, cpu: 77.8, queue: 15},
-                    {rep: 2, throughput: 382456, latency: 4156, efficiency: 92, cpu: 78.2, queue: 12},
-                    {rep: 3, throughput: 375678, latency: 4298, efficiency: 87, cpu: 77.5, queue: 18},
-                    {rep: 4, throughput: 380123, latency: 4187, efficiency: 91, cpu: 77.9, queue: 14}
-                ]
+            "c4a-64 4k - nyc_taxis": {
+                        "60_16-16": [
+                                    {
+                                                "rep": 1,
+                                                "throughput": 527350,
+                                                "latency": 3081,
+                                                "efficiency": 171126,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 544303,
+                                                "latency": 3253,
+                                                "efficiency": 167309,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 549078,
+                                                "latency": 3239,
+                                                "efficiency": 169505,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 552318,
+                                                "latency": 3094,
+                                                "efficiency": 178512,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    }
+                        ]
+            },
+            "c4a-72 64k - nyc_taxis": {
+                        "60_16-16": [
+                                    {
+                                                "rep": 1,
+                                                "throughput": 609553,
+                                                "latency": 1915,
+                                                "efficiency": 318180,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 635634,
+                                                "latency": 1980,
+                                                "efficiency": 320980,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 644383,
+                                                "latency": 1935,
+                                                "efficiency": 332947,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 642717,
+                                                "latency": 2070,
+                                                "efficiency": 310371,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    }
+                        ]
+            },
+            "c4a-72 4k - nyc_taxis": {
+                        "60_16-16": [
+                                    {
+                                                "rep": 1,
+                                                "throughput": 548151,
+                                                "latency": 3095,
+                                                "efficiency": 177108,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 565037,
+                                                "latency": 3032,
+                                                "efficiency": 186312,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 564659,
+                                                "latency": 2792,
+                                                "efficiency": 202241,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 566414,
+                                                "latency": 2605,
+                                                "efficiency": 217418,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    }
+                        ]
+            },
+            "c4-96 4k - nyc_taxis": {
+                        "60_16-16": [
+                                    {
+                                                "rep": 1,
+                                                "throughput": 360936,
+                                                "latency": 3570,
+                                                "efficiency": 101099,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 369652,
+                                                "latency": 3203,
+                                                "efficiency": 115401,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 375809,
+                                                "latency": 3379,
+                                                "efficiency": 111218,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    },
+                                    {
+                                                "rep": 1,
+                                                "throughput": 384374,
+                                                "latency": 3441,
+                                                "efficiency": 111698,
+                                                "cpu": 70.0,
+                                                "queue": 0
+                                    }
+                        ]
             }
-        };
+};
 
         function detectAnomalies(data) {
             const values = data.map(d => d.throughput).filter(v => v > 0);
