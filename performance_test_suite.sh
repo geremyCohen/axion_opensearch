@@ -82,6 +82,10 @@ mkdir -p "$RESULTS_DIR"
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
 
+log() {
+    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
+}
+
 error_exit() {
     log "ERROR: $*"
     exit 1
