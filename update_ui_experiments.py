@@ -73,7 +73,7 @@ def load_performance_data(data_dir):
             rep = int(rep_match.group(1)) if rep_match else 1
             
             data.append({
-                'cluster': cluster_name,
+                'cluster': clean_cluster_name,
                 'config': config,
                 'rep': rep,
                 'throughput': int(throughput),
@@ -114,21 +114,21 @@ def update_ui_experiment(experiment_file, data):
         # UI 1, 4, 5 use flat array
         js_data = "const performanceData = " + json.dumps(data, indent=12) + ";"
     
-    # Find and replace the data section
-    patterns = [
-        r'const performanceData = \[.*?\];',
-        r'const repData = \{.*?\};',
-        r'const configData = \[.*?\];'
-    ]
+    # Find and replace the data section more precisely
+    if 'experiment_2' in experiment_file:
+        # For UI 2, replace the entire performanceData array
+        pattern = r'const performanceData = \[[\s\S]*?\];'
+    elif 'experiment_3' in experiment_file:
+        # For UI 3, replace repData
+        pattern = r'const repData = \{[\s\S]*?\};'
+    else:
+        # For UI 1, 4, 5, replace performanceData array
+        pattern = r'const performanceData = \[[\s\S]*?\];'
     
-    updated = False
-    for pattern in patterns:
-        if re.search(pattern, content, re.DOTALL):
-            content = re.sub(pattern, js_data, content, flags=re.DOTALL)
-            updated = True
-            break
-    
-    if not updated:
+    if re.search(pattern, content):
+        content = re.sub(pattern, js_data, content)
+        updated = True
+    else:
         print(f"Warning: Could not find data section in {experiment_file}")
         return
     
