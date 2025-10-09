@@ -254,6 +254,35 @@ detect_cluster_issues() {
     [[ "$health" == "green" ]]
 }
 
+ensure_cluster_idle() {
+    log "Ensuring cluster is completely idle before next run..."
+    
+    # Delete all indices to stop any ongoing operations
+    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
+    sleep 5
+    
+    # Wait for all tasks to complete
+    local max_attempts=12
+    local attempt=1
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        local pending_tasks=$(curl -s "http://$TARGET_HOST:9200/_cat/tasks?h=action" 2>/dev/null | grep -v "cluster:monitor" | wc -l)
+        local active_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards?h=state" 2>/dev/null | grep -v "STARTED" | wc -l)
+        
+        if [[ $pending_tasks -eq 0 && $active_shards -eq 0 ]]; then
+            log "Cluster is idle (no pending tasks or relocating shards)"
+            return 0
+        fi
+        
+        log "Waiting for cluster idle: $pending_tasks tasks, $active_shards non-started shards (attempt $attempt/$max_attempts)"
+        sleep 5
+        ((attempt++))
+    done
+    
+    log "WARNING: Cluster may not be fully idle, but continuing"
+    return 0
+}
+
 recover_cluster() {
     log "Attempting cluster recovery..."
     
@@ -615,6 +644,9 @@ main() {
                 if run_benchmark "$clients" "$nodes" "$shards" "$rep"; then
                     log "run_benchmark completed successfully"
                     save_checkpoint "$clients" "$nodes" "$shards" "$rep"
+                    
+                    # Ensure cluster is idle before next run
+                    ensure_cluster_idle
                 else
                     log "run_benchmark failed, but continuing..."
                 fi
