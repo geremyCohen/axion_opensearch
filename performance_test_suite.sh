@@ -643,3 +643,6 @@ main() {
     log "Performance test suite completed successfully"
 }
 
+# Execute main function
+main
+
