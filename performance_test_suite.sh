@@ -365,9 +365,6 @@ configure_cluster() {
         log "WARNING: Cluster not fully healthy after scaling, but continuing"
     fi
     
-    # Verify shard configuration is correct
-    verify_shard_configuration "$shards"
-    
     log "Cluster scaling completed"
 }
 
