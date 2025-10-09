@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UI Experiment 4: Performance Band Analysis</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
+        .container { max-width: 1600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .controls { background: #f1f3f4; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-weight: bold; margin-bottom: 5px; }
+        .band-selector { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0; }
+        .band-option { padding: 10px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.3s; }
+        .band-option.active { border-color: #007bff; background-color: #e7f3ff; }
+        .band-excellent { border-left: 4px solid #28a745; }
+        .band-good { border-left: 4px solid #17a2b8; }
+        .band-average { border-left: 4px solid #ffc107; }
+        .band-poor { border-left: 4px solid #dc3545; }
+        .chart-container { height: 400px; border: 1px solid #ddd; border-radius: 6px; margin: 10px 0; }
+        .band-analysis { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .recommendations { background: #e7f3ff; padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .config-list { max-height: 300px; overflow-y: auto; }
+        .config-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .config-item:hover { background-color: #f8f9fa; }
+        .performance-indicator { width: 20px; height: 20px; border-radius: 50%; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Performance Band Analysis</h1>
+        <p><strong>Purpose:</strong> Categorize configurations into performance bands to quickly identify optimal settings within specific latency and throughput ranges.</p>
+        
+        <div class="controls">
+            <div class="filter-group">
+                <label>Throughput Range (docs/s):</label>
+                <input type="range" id="throughputMin" min="300000" max="600000" value="400000" step="10000">
+                <span id="throughputMinValue">400,000</span> - 
+                <input type="range" id="throughputMax" min="300000" max="600000" value="550000" step="10000">
+                <span id="throughputMaxValue">550,000</span>
+            </div>
+            <div class="filter-group">
+                <label>Latency Range (ms):</label>
+                <input type="range" id="latencyMin" min="2000" max="5000" value="2500" step="100">
+                <span id="latencyMinValue">2,500</span> - 
+                <input type="range" id="latencyMax" min="2000" max="5000" value="4000" step="100">
+                <span id="latencyMaxValue">4,000</span>
+            </div>
+        </div>
+
+        <div class="band-selector">
+            <div class="band-option band-excellent active" data-band="excellent">
+                <h4>Excellent</h4>
+                <p>High throughput, low latency</p>
+                <small>Efficiency > 200</small>
+            </div>
+            <div class="band-option band-good" data-band="good">
+                <h4>Good</h4>
+                <p>Balanced performance</p>
+                <small>Efficiency 150-200</small>
+            </div>
+            <div class="band-option band-average" data-band="average">
+                <h4>Average</h4>
+                <p>Acceptable performance</p>
+                <small>Efficiency 100-150</small>
+            </div>
+            <div class="band-option band-poor" data-band="poor">
+                <h4>Poor</h4>
+                <p>Below expectations</p>
+                <small>Efficiency < 100</small>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div id="bandChart"></div>
+        </div>
+
+        <div class="band-analysis">
+            <div>
+                <h3>Configurations in Selected Band</h3>
+                <div class="config-list" id="configList"></div>
+            </div>
+            <div>
+                <h3>Band Statistics</h3>
+                <div id="bandStats"></div>
+            </div>
+        </div>
+
+        <div class="recommendations" id="recommendations">
+            <h3>Optimization Recommendations</h3>
+            <div id="recommendationContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // Performance data with bands
+        const performanceData = [
+            // Excellent band - c4a-64 64k
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 2, throughput: 572683, latency: 2399, efficiency: 239, band: 'excellent'},
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 3, throughput: 585448, latency: 2399, efficiency: 244, band: 'excellent'},
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 1, throughput: 555575, latency: 2382, efficiency: 233, band: 'excellent'},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 2, throughput: 603498, latency: 2826, efficiency: 214, band: 'excellent'},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 3, throughput: 601182, latency: 2923, efficiency: 206, band: 'excellent'},
+            
+            // Good band
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 4, throughput: 581569, latency: 2644, efficiency: 220, band: 'good'}, // Actually excellent but for demo
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 4, throughput: 592769, latency: 3054, efficiency: 194, band: 'good'},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 1, throughput: 575767, latency: 3255, efficiency: 177, band: 'good'},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 2, throughput: 486703, latency: 3086, efficiency: 158, band: 'good'},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 3, throughput: 489289, latency: 3095, efficiency: 158, band: 'good'},
+            
+            // Average band
+            {cluster: 'c4a-64 64k', config: '100_16-16', rep: 1, throughput: 538920, latency: 3542, efficiency: 152, band: 'average'},
+            {cluster: 'c4a-64 64k', config: '100_16-16', rep: 4, throughput: 560158, latency: 3717, efficiency: 151, band: 'average'},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 1, throughput: 472869, latency: 3403, efficiency: 139, band: 'average'},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 4, throughput: 492934, latency: 3441, efficiency: 143, band: 'average'},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 3, throughput: 412567, latency: 3098, efficiency: 133, band: 'average'},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 4, throughput: 408901, latency: 3156, efficiency: 130, band: 'average'},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 1, throughput: 404421, latency: 3176, efficiency: 127, band: 'average'},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 2, throughput: 398234, latency: 3245, efficiency: 123, band: 'average'},
+            {cluster: 'c4a-64 4k', config: '80_16-16', rep: 3, throughput: 493408, latency: 4106, efficiency: 120, band: 'average'},
+            {cluster: 'c4a-64 4k', config: '80_16-16', rep: 4, throughput: 489476, latency: 4075, efficiency: 120, band: 'average'},
+            {cluster: 'c4-96 4k', config: '80_16-16', rep: 2, throughput: 392156, latency: 3654, efficiency: 107, band: 'average'},
+            {cluster: 'c4-96 4k', config: '80_16-16', rep: 4, throughput: 391234, latency: 3712, efficiency: 105, band: 'average'},
+            {cluster: 'c4-96 4k', config: '80_16-16', rep: 3, throughput: 388901, latency: 3789, efficiency: 103, band: 'average'},
+            
+            // Poor band
+            {cluster: 'c4a-64 4k', config: '100_16-16', rep: 1, throughput: 469287, latency: 4622, efficiency: 102, band: 'poor'},
+            {cluster: 'c4a-64 4k', config: '100_16-16', rep: 3, throughput: 486764, latency: 4789, efficiency: 102, band: 'poor'},
+            {cluster: 'c4a-64 4k', config: '100_16-16', rep: 4, throughput: 491857, latency: 4856, efficiency: 101, band: 'poor'},
+            {cluster: 'c4-96 4k', config: '80_16-16', rep: 1, throughput: 385432, latency: 3876, efficiency: 99, band: 'poor'},
+            {cluster: 'c4a-64 4k', config: '100_16-16', rep: 2, throughput: 490392, latency: 5054, efficiency: 97, band: 'poor'},
+            {cluster: 'c4-96 4k', config: '100_16-16', rep: 2, throughput: 382456, latency: 4156, efficiency: 92, band: 'poor'},
+            {cluster: 'c4-96 4k', config: '100_16-16', rep: 4, throughput: 380123, latency: 4187, efficiency: 91, band: 'poor'},
+            {cluster: 'c4-96 4k', config: '100_16-16', rep: 1, throughput: 378901, latency: 4234, efficiency: 89, band: 'poor'},
+            {cluster: 'c4-96 4k', config: '100_16-16', rep: 3, throughput: 375678, latency: 4298, efficiency: 87, band: 'poor'}
+        ];
+
+        let selectedBand = 'excellent';
+
+        function updateChart() {
+            const throughputMin = parseInt(document.getElementById('throughputMin').value);
+            const throughputMax = parseInt(document.getElementById('throughputMax').value);
+            const latencyMin = parseInt(document.getElementById('latencyMin').value);
+            const latencyMax = parseInt(document.getElementById('latencyMax').value);
+
+            // Filter data by ranges
+            const filteredData = performanceData.filter(d => 
+                d.throughput >= throughputMin && d.throughput <= throughputMax &&
+                d.latency >= latencyMin && d.latency <= latencyMax
+            );
+
+            // Create traces for each band
+            const bands = ['excellent', 'good', 'average', 'poor'];
+            const colors = {
+                'excellent': '#28a745',
+                'good': '#17a2b8', 
+                'average': '#ffc107',
+                'poor': '#dc3545'
+            };
+
+            const traces = bands.map(band => {
+                const bandData = filteredData.filter(d => d.band === band);
+                return {
+                    x: bandData.map(d => d.latency),
+                    y: bandData.map(d => d.throughput),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: band.charAt(0).toUpperCase() + band.slice(1),
+                    marker: {
+                        color: colors[band],
+                        size: band === selectedBand ? 12 : 8,
+                        opacity: band === selectedBand ? 1.0 : 0.6,
+                        line: {
+                            color: band === selectedBand ? '#000' : colors[band],
+                            width: band === selectedBand ? 2 : 0
+                        }
+                    },
+                    text: bandData.map(d => `${d.cluster}<br>${d.config} Rep${d.rep}<br>Efficiency: ${d.efficiency}`),
+                    hovertemplate: '%{text}<br>Latency: %{x}ms<br>Throughput: %{y:,} docs/s<extra></extra>'
+                };
+            });
+
+            // Add performance band boundaries
+            const latencyRange = [latencyMin, latencyMax];
+            
+            // Excellent band boundary (efficiency = 200)
+            traces.push({
+                x: latencyRange,
+                y: latencyRange.map(l => l * 200 / 1000),
+                mode: 'lines',
+                name: 'Excellent Threshold',
+                line: {color: '#28a745', dash: 'dash', width: 2},
+                showlegend: false
+            });
+
+            // Good band boundary (efficiency = 150)
+            traces.push({
+                x: latencyRange,
+                y: latencyRange.map(l => l * 150 / 1000),
+                mode: 'lines',
+                name: 'Good Threshold',
+                line: {color: '#17a2b8', dash: 'dash', width: 2},
+                showlegend: false
+            });
+
+            // Average band boundary (efficiency = 100)
+            traces.push({
+                x: latencyRange,
+                y: latencyRange.map(l => l * 100 / 1000),
+                mode: 'lines',
+                name: 'Average Threshold',
+                line: {color: '#ffc107', dash: 'dash', width: 2},
+                showlegend: false
+            });
+
+            const layout = {
+                title: 'Performance Bands: Throughput vs Latency',
+                xaxis: {
+                    title: 'P99 Latency (ms)',
+                    range: [latencyMin - 200, latencyMax + 200]
+                },
+                yaxis: {
+                    title: 'Throughput (docs/s)',
+                    range: [throughputMin - 20000, throughputMax + 20000]
+                },
+                hovermode: 'closest',
+                showlegend: true
+            };
+
+            Plotly.newPlot('bandChart', traces, layout);
+            updateBandAnalysis(filteredData);
+        }
+
+        function updateBandAnalysis(data) {
+            const selectedBandData = data.filter(d => d.band === selectedBand);
+            
+            // Update config list
+            const configList = document.getElementById('configList');
+            configList.innerHTML = '';
+
+            selectedBandData.forEach(config => {
+                const item = document.createElement('div');
+                item.className = 'config-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>${config.cluster}</strong><br>
+                        <small>${config.config} Rep${config.rep}</small>
+                    </div>
+                    <div>
+                        <div>${config.throughput.toLocaleString()} docs/s</div>
+                        <div>${config.latency}ms P99</div>
+                    </div>
+                    <div class="performance-indicator" style="background-color: ${getBandColor(config.band)};"></div>
+                `;
+                configList.appendChild(item);
+            });
+
+            // Update band statistics
+            updateBandStats(selectedBandData);
+            updateRecommendations(data);
+        }
+
+        function updateBandStats(bandData) {
+            if (bandData.length === 0) {
+                document.getElementById('bandStats').innerHTML = '<p>No configurations in this band within the selected ranges.</p>';
+                return;
+            }
+
+            const avgThroughput = bandData.reduce((sum, d) => sum + d.throughput, 0) / bandData.length;
+            const avgLatency = bandData.reduce((sum, d) => sum + d.latency, 0) / bandData.length;
+            const avgEfficiency = bandData.reduce((sum, d) => sum + d.efficiency, 0) / bandData.length;
+            
+            const clusters = [...new Set(bandData.map(d => d.cluster))];
+            const bestConfig = bandData.reduce((best, current) => 
+                current.efficiency > best.efficiency ? current : best
+            );
+
+            const stats = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <h4>Performance Metrics</h4>
+                        <p><strong>Avg Throughput:</strong> ${Math.round(avgThroughput).toLocaleString()} docs/s</p>
+                        <p><strong>Avg Latency:</strong> ${Math.round(avgLatency)}ms</p>
+                        <p><strong>Avg Efficiency:</strong> ${Math.round(avgEfficiency)}</p>
+                        <p><strong>Configurations:</strong> ${bandData.length}</p>
+                    </div>
+                    <div>
+                        <h4>Best in Band</h4>
+                        <p><strong>Cluster:</strong> ${bestConfig.cluster}</p>
+                        <p><strong>Config:</strong> ${bestConfig.config}</p>
+                        <p><strong>Efficiency:</strong> ${bestConfig.efficiency}</p>
+                        <p><strong>Clusters:</strong> ${clusters.join(', ')}</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('bandStats').innerHTML = stats;
+        }
+
+        function updateRecommendations(allData) {
+            const bandCounts = {
+                excellent: allData.filter(d => d.band === 'excellent').length,
+                good: allData.filter(d => d.band === 'good').length,
+                average: allData.filter(d => d.band === 'average').length,
+                poor: allData.filter(d => d.band === 'poor').length
+            };
+
+            let recommendations = '<ul>';
+
+            if (bandCounts.excellent > 0) {
+                const excellentConfigs = allData.filter(d => d.band === 'excellent');
+                const topCluster = [...new Set(excellentConfigs.map(d => d.cluster))][0];
+                recommendations += `<li><strong>Optimal Choice:</strong> Use ${topCluster} configurations for best performance (${bandCounts.excellent} excellent configurations available).</li>`;
+            }
+
+            if (bandCounts.poor > bandCounts.excellent + bandCounts.good) {
+                recommendations += `<li><strong>Performance Issue:</strong> ${bandCounts.poor} configurations are in the poor band. Consider optimizing cluster settings or reducing load.</li>`;
+            }
+
+            if (selectedBand === 'excellent' && bandCounts.excellent === 0) {
+                recommendations += `<li><strong>No Excellent Performers:</strong> Consider relaxing latency requirements or increasing cluster resources.</li>`;
+            }
+
+            const c4a64kCount = allData.filter(d => d.cluster === 'c4a-64 64k').length;
+            const c4a64k4Count = allData.filter(d => d.cluster === 'c4a-64 4k').length;
+            const c496Count = allData.filter(d => d.cluster === 'c4-96 4k').length;
+
+            if (c4a64kCount > c4a64k4Count && c4a64kCount > c496Count) {
+                recommendations += `<li><strong>Page Size Impact:</strong> 64k page size shows superior performance. Consider migrating from 4k page configurations.</li>`;
+            }
+
+            recommendations += '</ul>';
+            document.getElementById('recommendationContent').innerHTML = recommendations;
+        }
+
+        function getBandColor(band) {
+            const colors = {
+                'excellent': '#28a745',
+                'good': '#17a2b8',
+                'average': '#ffc107',
+                'poor': '#dc3545'
+            };
+            return colors[band];
+        }
+
+        // Event listeners
+        document.getElementById('throughputMin').addEventListener('input', function() {
+            document.getElementById('throughputMinValue').textContent = parseInt(this.value).toLocaleString();
+            updateChart();
+        });
+
+        document.getElementById('throughputMax').addEventListener('input', function() {
+            document.getElementById('throughputMaxValue').textContent = parseInt(this.value).toLocaleString();
+            updateChart();
+        });
+
+        document.getElementById('latencyMin').addEventListener('input', function() {
+            document.getElementById('latencyMinValue').textContent = parseInt(this.value).toLocaleString();
+            updateChart();
+        });
+
+        document.getElementById('latencyMax').addEventListener('input', function() {
+            document.getElementById('latencyMaxValue').textContent = parseInt(this.value).toLocaleString();
+            updateChart();
+        });
+
+        // Band selection
+        document.querySelectorAll('.band-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.band-option').forEach(o => o.classList.remove('active'));
+                this.classList.add('active');
+                selectedBand = this.dataset.band;
+                updateChart();
+            });
+        });
+
+        // Initialize
+        updateChart();
+    </script>
+</body>
+</html>

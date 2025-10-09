@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UI Experiment 1: Performance Efficiency Curve Analysis</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .controls { background: #f1f3f4; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .filter-group { display: inline-block; margin-right: 20px; }
+        .filter-group label { font-weight: bold; margin-right: 8px; }
+        .filter-group select, .filter-group input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .chart-container { height: 500px; margin: 20px 0; border: 1px solid #ddd; border-radius: 6px; }
+        .efficiency-table { margin-top: 20px; }
+        .efficiency-table table { width: 100%; border-collapse: collapse; }
+        .efficiency-table th, .efficiency-table td { padding: 8px 12px; border: 1px solid #ddd; text-align: center; }
+        .efficiency-table th { background-color: #e9ecef; font-weight: bold; }
+        .efficiency-score { font-weight: bold; padding: 4px 8px; border-radius: 4px; }
+        .score-excellent { background-color: #d4edda; color: #155724; }
+        .score-good { background-color: #d1ecf1; color: #0c5460; }
+        .score-average { background-color: #fff3cd; color: #856404; }
+        .score-poor { background-color: #f8d7da; color: #721c24; }
+        .legend { display: flex; gap: 15px; margin: 10px 0; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 20px; height: 20px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Performance Efficiency Curve Analysis</h1>
+        <p><strong>Purpose:</strong> Identify optimal performance configurations by analyzing the efficiency curve (throughput vs latency) across all clusters and repetitions.</p>
+        
+        <div class="controls">
+            <div class="filter-group">
+                <label>Cluster:</label>
+                <select id="clusterFilter">
+                    <option value="all">All Clusters</option>
+                    <option value="c4-96 4k">c4-96 4k</option>
+                    <option value="c4a-64 4k">c4a-64 4k</option>
+                    <option value="c4a-64 64k">c4a-64 64k</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Client Range:</label>
+                <select id="clientFilter">
+                    <option value="all">All Clients</option>
+                    <option value="60-70">60-70</option>
+                    <option value="80-90">80-90</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Latency Threshold (ms):</label>
+                <input type="range" id="latencyThreshold" min="2000" max="6000" value="4000" step="100">
+                <span id="latencyValue">4000</span>
+            </div>
+            <div class="filter-group">
+                <label>Show Efficiency Bands:</label>
+                <input type="checkbox" id="showBands" checked>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #2E8B57;"></div>
+                <span>c4a-64 64k (Optimal)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #FF6347;"></div>
+                <span>c4a-64 4k</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4169E1;"></div>
+                <span>c4-96 4k</span>
+            </div>
+        </div>
+
+        <div id="efficiencyChart" class="chart-container"></div>
+        
+        <div class="efficiency-table">
+            <h3>Efficiency Rankings by Performance Band</h3>
+            <table id="efficiencyTable">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Cluster</th>
+                        <th>Configuration</th>
+                        <th>Rep</th>
+                        <th>Throughput</th>
+                        <th>P99 Latency</th>
+                        <th>Efficiency Score</th>
+                        <th>Performance Band</th>
+                    </tr>
+                </thead>
+                <tbody id="efficiencyTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Sample data - in real implementation, this would come from the analysis
+        const performanceData = [
+            // c4a-64 64k data
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 1, throughput: 555575, latency: 2382, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 2, throughput: 572683, latency: 2399, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 3, throughput: 585448, latency: 2399, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '60_16-16', rep: 4, throughput: 581569, latency: 2644, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 1, throughput: 575767, latency: 3255, clients: 80, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 2, throughput: 603498, latency: 2826, clients: 80, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 3, throughput: 601182, latency: 2923, clients: 80, nodes: 16},
+            {cluster: 'c4a-64 64k', config: '80_16-16', rep: 4, throughput: 592769, latency: 3054, clients: 80, nodes: 16},
+            // c4a-64 4k data
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 1, throughput: 472869, latency: 3403, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 2, throughput: 486703, latency: 3086, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 3, throughput: 489289, latency: 3095, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 4k', config: '60_16-16', rep: 4, throughput: 492934, latency: 3441, clients: 60, nodes: 16},
+            {cluster: 'c4a-64 4k', config: '80_16-16', rep: 3, throughput: 493408, latency: 4106, clients: 80, nodes: 16},
+            {cluster: 'c4a-64 4k', config: '80_16-16', rep: 4, throughput: 489476, latency: 4075, clients: 80, nodes: 16},
+            // c4-96 4k data
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 1, throughput: 404421, latency: 3176, clients: 60, nodes: 16},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 2, throughput: 398234, latency: 3245, clients: 60, nodes: 16},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 3, throughput: 412567, latency: 3098, clients: 60, nodes: 16},
+            {cluster: 'c4-96 4k', config: '60_16-16', rep: 4, throughput: 408901, latency: 3156, clients: 60, nodes: 16}
+        ];
+
+        function calculateEfficiencyScore(throughput, latency) {
+            // Efficiency = throughput / (latency/1000) - higher is better
+            return Math.round(throughput / (latency / 1000));
+        }
+
+        function getPerformanceBand(score) {
+            if (score >= 200) return 'Excellent';
+            if (score >= 150) return 'Good';
+            if (score >= 100) return 'Average';
+            return 'Poor';
+        }
+
+        function getScoreClass(band) {
+            const classes = {
+                'Excellent': 'score-excellent',
+                'Good': 'score-good',
+                'Average': 'score-average',
+                'Poor': 'score-poor'
+            };
+            return classes[band] || 'score-average';
+        }
+
+        function updateChart() {
+            const clusterFilter = document.getElementById('clusterFilter').value;
+            const clientFilter = document.getElementById('clientFilter').value;
+            const latencyThreshold = parseInt(document.getElementById('latencyThreshold').value);
+            const showBands = document.getElementById('showBands').checked;
+
+            let filteredData = performanceData;
+
+            // Apply filters
+            if (clusterFilter !== 'all') {
+                filteredData = filteredData.filter(d => d.cluster === clusterFilter);
+            }
+
+            if (clientFilter !== 'all') {
+                if (clientFilter === '60-70') {
+                    filteredData = filteredData.filter(d => d.clients >= 60 && d.clients <= 70);
+                } else if (clientFilter === '80-90') {
+                    filteredData = filteredData.filter(d => d.clients >= 80 && d.clients <= 90);
+                } else if (clientFilter === '100') {
+                    filteredData = filteredData.filter(d => d.clients === 100);
+                }
+            }
+
+            // Create traces for each cluster
+            const clusters = [...new Set(filteredData.map(d => d.cluster))];
+            const colors = {'c4a-64 64k': '#2E8B57', 'c4a-64 4k': '#FF6347', 'c4-96 4k': '#4169E1'};
+            
+            const traces = clusters.map(cluster => {
+                const clusterData = filteredData.filter(d => d.cluster === cluster);
+                return {
+                    x: clusterData.map(d => d.latency),
+                    y: clusterData.map(d => d.throughput),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: cluster,
+                    marker: {
+                        color: colors[cluster],
+                        size: 10,
+                        opacity: 0.7
+                    },
+                    text: clusterData.map(d => `${d.config} Rep${d.rep}<br>Efficiency: ${calculateEfficiencyScore(d.throughput, d.latency)}`),
+                    hovertemplate: '%{text}<br>Latency: %{x}ms<br>Throughput: %{y:,} docs/s<extra></extra>'
+                };
+            });
+
+            // Add efficiency bands if enabled
+            if (showBands) {
+                const latencyRange = [2000, 6000];
+                const excellentLine = latencyRange.map(l => l * 200 / 1000);
+                const goodLine = latencyRange.map(l => l * 150 / 1000);
+                const averageLine = latencyRange.map(l => l * 100 / 1000);
+
+                traces.push({
+                    x: latencyRange,
+                    y: excellentLine,
+                    mode: 'lines',
+                    name: 'Excellent (200+ efficiency)',
+                    line: {color: 'green', dash: 'dash', width: 2},
+                    showlegend: false
+                });
+
+                traces.push({
+                    x: latencyRange,
+                    y: goodLine,
+                    mode: 'lines',
+                    name: 'Good (150+ efficiency)',
+                    line: {color: 'orange', dash: 'dash', width: 2},
+                    showlegend: false
+                });
+
+                traces.push({
+                    x: latencyRange,
+                    y: averageLine,
+                    mode: 'lines',
+                    name: 'Average (100+ efficiency)',
+                    line: {color: 'red', dash: 'dash', width: 2},
+                    showlegend: false
+                });
+            }
+
+            // Add latency threshold line
+            traces.push({
+                x: [latencyThreshold, latencyThreshold],
+                y: [0, 700000],
+                mode: 'lines',
+                name: 'Latency Threshold',
+                line: {color: 'red', width: 3},
+                showlegend: false
+            });
+
+            const layout = {
+                title: 'Performance Efficiency Curve: Throughput vs Latency',
+                xaxis: {
+                    title: 'P99 Latency (ms)',
+                    range: [2000, 6000]
+                },
+                yaxis: {
+                    title: 'Throughput (docs/s)',
+                    range: [300000, 650000]
+                },
+                hovermode: 'closest',
+                showlegend: true,
+                annotations: showBands ? [
+                    {x: 5500, y: 600000, text: 'Excellent', showarrow: false, font: {color: 'green'}},
+                    {x: 5500, y: 500000, text: 'Good', showarrow: false, font: {color: 'orange'}},
+                    {x: 5500, y: 400000, text: 'Average', showarrow: false, font: {color: 'red'}}
+                ] : []
+            };
+
+            Plotly.newPlot('efficiencyChart', traces, layout);
+            updateTable(filteredData, latencyThreshold);
+        }
+
+        function updateTable(data, latencyThreshold) {
+            // Calculate efficiency scores and filter by threshold
+            const tableData = data
+                .filter(d => d.latency <= latencyThreshold)
+                .map(d => ({
+                    ...d,
+                    efficiency: calculateEfficiencyScore(d.throughput, d.latency),
+                    band: getPerformanceBand(calculateEfficiencyScore(d.throughput, d.latency))
+                }))
+                .sort((a, b) => b.efficiency - a.efficiency);
+
+            const tbody = document.getElementById('efficiencyTableBody');
+            tbody.innerHTML = '';
+
+            tableData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${row.cluster}</td>
+                    <td>${row.config}</td>
+                    <td>${row.rep}</td>
+                    <td>${row.throughput.toLocaleString()}</td>
+                    <td>${row.latency}</td>
+                    <td><span class="efficiency-score ${getScoreClass(row.band)}">${row.efficiency}</span></td>
+                    <td>${row.band}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Event listeners
+        document.getElementById('clusterFilter').addEventListener('change', updateChart);
+        document.getElementById('clientFilter').addEventListener('change', updateChart);
+        document.getElementById('latencyThreshold').addEventListener('input', function() {
+            document.getElementById('latencyValue').textContent = this.value;
+            updateChart();
+        });
+        document.getElementById('showBands').addEventListener('change', updateChart);
+
+        // Initialize
+        updateChart();
+    </script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UI Experiment 2: Multi-Cluster Performance Comparison</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
+        .container { max-width: 1600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .controls { background: #f1f3f4; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-weight: bold; margin-bottom: 5px; }
+        .filter-group select, .filter-group input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .chart-container { height: 400px; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+        .comparison-table { margin-top: 20px; }
+        .comparison-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .comparison-table th, .comparison-table td { padding: 6px 8px; border: 1px solid #ddd; text-align: center; }
+        .comparison-table th { background-color: #e9ecef; font-weight: bold; }
+        .winner { background-color: #d4edda; font-weight: bold; }
+        .second { background-color: #d1ecf1; }
+        .third { background-color: #fff3cd; }
+        .stats-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .stat-card { background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center; border-left: 4px solid #007bff; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #007bff; }
+        .stat-label { font-size: 14px; color: #6c757d; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-Cluster Performance Comparison</h1>
+        <p><strong>Purpose:</strong> Compare performance characteristics across different cluster configurations to identify the best performing setup for specific workload requirements.</p>
+        
+        <div class="controls">
+            <div class="filter-group">
+                <label>Metric Focus:</label>
+                <select id="metricFocus">
+                    <option value="throughput">Max Throughput</option>
+                    <option value="latency">Min Latency</option>
+                    <option value="efficiency">Best Efficiency</option>
+                    <option value="consistency">Most Consistent</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Client Load:</label>
+                <select id="clientLoad">
+                    <option value="all">All Loads</option>
+                    <option value="60">60 Clients</option>
+                    <option value="80">80 Clients</option>
+                    <option value="100">100 Clients</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Configuration:</label>
+                <select id="configFilter">
+                    <option value="all">All Configs</option>
+                    <option value="16-16">16 nodes, 16 shards</option>
+                    <option value="20-20">20 nodes, 20 shards</option>
+                    <option value="32-32">32 nodes, 32 shards</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Show Outliers:</label>
+                <input type="checkbox" id="showOutliers" checked>
+            </div>
+        </div>
+
+        <div class="stats-summary">
+            <div class="stat-card">
+                <div class="stat-value" id="bestThroughput">-</div>
+                <div class="stat-label">Best Throughput<br><span id="bestThroughputCluster">-</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="bestLatency">-</div>
+                <div class="stat-label">Best P99 Latency<br><span id="bestLatencyCluster">-</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="bestEfficiency">-</div>
+                <div class="stat-label">Best Efficiency<br><span id="bestEfficiencyCluster">-</span></div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-container">
+                <div id="throughputComparison"></div>
+            </div>
+            <div class="chart-container">
+                <div id="latencyComparison"></div>
+            </div>
+            <div class="chart-container">
+                <div id="variabilityComparison"></div>
+            </div>
+            <div class="chart-container">
+                <div id="efficiencyComparison"></div>
+            </div>
+        </div>
+        
+        <div class="comparison-table">
+            <h3>Detailed Performance Comparison by Configuration</h3>
+            <table id="comparisonTable">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Cluster</th>
+                        <th rowspan="2">Config</th>
+                        <th rowspan="2">Clients</th>
+                        <th colspan="4">Throughput (docs/s)</th>
+                        <th colspan="4">P99 Latency (ms)</th>
+                        <th rowspan="2">Efficiency</th>
+                        <th rowspan="2">CV %</th>
+                        <th rowspan="2">Rank</th>
+                    </tr>
+                    <tr>
+                        <th>Rep1</th>
+                        <th>Rep2</th>
+                        <th>Rep3</th>
+                        <th>Rep4</th>
+                        <th>Rep1</th>
+                        <th>Rep2</th>
+                        <th>Rep3</th>
+                        <th>Rep4</th>
+                    </tr>
+                </thead>
+                <tbody id="comparisonTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Extended sample data with more configurations
+        const performanceData = [
+            // c4a-64 64k - best performer
+            {cluster: 'c4a-64 64k', config: '60_16-16', clients: 60, nodes: 16, shards: 16,
+             throughput: [555575, 572683, 585448, 581569], latency: [2382, 2399, 2399, 2644]},
+            {cluster: 'c4a-64 64k', config: '80_16-16', clients: 80, nodes: 16, shards: 16,
+             throughput: [575767, 603498, 601182, 592769], latency: [3255, 2826, 2923, 3054]},
+            {cluster: 'c4a-64 64k', config: '100_16-16', clients: 100, nodes: 16, shards: 16,
+             throughput: [538920, 553523, 552333, 560158], latency: [3542, 4146, 4007, 3717]},
+            
+            // c4a-64 4k - middle performer
+            {cluster: 'c4a-64 4k', config: '60_16-16', clients: 60, nodes: 16, shards: 16,
+             throughput: [472869, 486703, 489289, 492934], latency: [3403, 3086, 3095, 3441]},
+            {cluster: 'c4a-64 4k', config: '80_16-16', clients: 80, nodes: 16, shards: 16,
+             throughput: [493408, 489476, 0, 0], latency: [4106, 4075, 0, 0]}, // Only 2 reps
+            {cluster: 'c4a-64 4k', config: '100_16-16', clients: 100, nodes: 16, shards: 16,
+             throughput: [469287, 490392, 486764, 491857], latency: [4622, 5054, 4789, 4856]},
+            
+            // c4-96 4k - lower performer
+            {cluster: 'c4-96 4k', config: '60_16-16', clients: 60, nodes: 16, shards: 16,
+             throughput: [404421, 398234, 412567, 408901], latency: [3176, 3245, 3098, 3156]},
+            {cluster: 'c4-96 4k', config: '80_16-16', clients: 80, nodes: 16, shards: 16,
+             throughput: [385432, 392156, 388901, 391234], latency: [3876, 3654, 3789, 3712]},
+            {cluster: 'c4-96 4k', config: '100_16-16', clients: 100, nodes: 16, shards: 16,
+             throughput: [378901, 382456, 375678, 380123], latency: [4234, 4156, 4298, 4187]}
+        ];
+
+        function calculateStats(data) {
+            const validData = data.filter(x => x > 0);
+            if (validData.length === 0) return {mean: 0, std: 0, cv: 0};
+            
+            const mean = validData.reduce((a, b) => a + b, 0) / validData.length;
+            const variance = validData.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / validData.length;
+            const std = Math.sqrt(variance);
+            const cv = (std / mean) * 100;
+            
+            return {mean, std, cv};
+        }
+
+        function calculateEfficiency(throughput, latency) {
+            return Math.round(throughput / (latency / 1000));
+        }
+
+        function updateCharts() {
+            const metricFocus = document.getElementById('metricFocus').value;
+            const clientLoad = document.getElementById('clientLoad').value;
+            const configFilter = document.getElementById('configFilter').value;
+            const showOutliers = document.getElementById('showOutliers').checked;
+
+            let filteredData = performanceData;
+
+            // Apply filters
+            if (clientLoad !== 'all') {
+                filteredData = filteredData.filter(d => d.clients === parseInt(clientLoad));
+            }
+
+            if (configFilter !== 'all') {
+                const [nodes, shards] = configFilter.split('-');
+                filteredData = filteredData.filter(d => d.nodes === parseInt(nodes) && d.shards === parseInt(shards));
+            }
+
+            // Update throughput comparison
+            updateThroughputChart(filteredData, showOutliers);
+            updateLatencyChart(filteredData, showOutliers);
+            updateVariabilityChart(filteredData);
+            updateEfficiencyChart(filteredData);
+            updateComparisonTable(filteredData);
+            updateStatsSummary(filteredData);
+        }
+
+        function updateThroughputChart(data, showOutliers) {
+            const traces = data.map(d => {
+                const stats = calculateStats(d.throughput);
+                return {
+                    y: d.throughput.filter(x => x > 0),
+                    type: 'box',
+                    name: `${d.cluster} (${d.clients}c)`,
+                    boxpoints: showOutliers ? 'outliers' : false,
+                    marker: {color: getClusterColor(d.cluster)}
+                };
+            });
+
+            const layout = {
+                title: 'Throughput Distribution by Cluster',
+                yaxis: {title: 'Throughput (docs/s)'},
+                showlegend: false
+            };
+
+            Plotly.newPlot('throughputComparison', traces, layout);
+        }
+
+        function updateLatencyChart(data, showOutliers) {
+            const traces = data.map(d => {
+                return {
+                    y: d.latency.filter(x => x > 0),
+                    type: 'box',
+                    name: `${d.cluster} (${d.clients}c)`,
+                    boxpoints: showOutliers ? 'outliers' : false,
+                    marker: {color: getClusterColor(d.cluster)}
+                };
+            });
+
+            const layout = {
+                title: 'P99 Latency Distribution by Cluster',
+                yaxis: {title: 'P99 Latency (ms)'},
+                showlegend: false
+            };
+
+            Plotly.newPlot('latencyComparison', traces, layout);
+        }
+
+        function updateVariabilityChart(data) {
+            const variabilityData = data.map(d => {
+                const throughputStats = calculateStats(d.throughput);
+                const latencyStats = calculateStats(d.latency);
+                return {
+                    cluster: d.cluster,
+                    clients: d.clients,
+                    throughputCV: throughputStats.cv,
+                    latencyCV: latencyStats.cv
+                };
+            });
+
+            const trace = {
+                x: variabilityData.map(d => `${d.cluster} (${d.clients}c)`),
+                y: variabilityData.map(d => d.throughputCV),
+                type: 'bar',
+                name: 'Throughput CV%',
+                marker: {color: variabilityData.map(d => getClusterColor(d.cluster))}
+            };
+
+            const layout = {
+                title: 'Performance Consistency (Lower CV% = More Consistent)',
+                yaxis: {title: 'Coefficient of Variation (%)'},
+                showlegend: false
+            };
+
+            Plotly.newPlot('variabilityComparison', [trace], layout);
+        }
+
+        function updateEfficiencyChart(data) {
+            const efficiencyData = data.map(d => {
+                const validThroughput = d.throughput.filter(x => x > 0);
+                const validLatency = d.latency.filter(x => x > 0);
+                const efficiencies = validThroughput.map((t, i) => calculateEfficiency(t, validLatency[i]));
+                const avgEfficiency = efficiencies.reduce((a, b) => a + b, 0) / efficiencies.length;
+                
+                return {
+                    cluster: d.cluster,
+                    clients: d.clients,
+                    efficiency: avgEfficiency
+                };
+            });
+
+            const trace = {
+                x: efficiencyData.map(d => `${d.cluster} (${d.clients}c)`),
+                y: efficiencyData.map(d => d.efficiency),
+                type: 'bar',
+                name: 'Efficiency Score',
+                marker: {color: efficiencyData.map(d => getClusterColor(d.cluster))}
+            };
+
+            const layout = {
+                title: 'Performance Efficiency (Throughput/Latency Ratio)',
+                yaxis: {title: 'Efficiency Score'},
+                showlegend: false
+            };
+
+            Plotly.newPlot('efficiencyComparison', [trace], layout);
+        }
+
+        function updateComparisonTable(data) {
+            const tbody = document.getElementById('comparisonTableBody');
+            tbody.innerHTML = '';
+
+            // Calculate rankings
+            const rankedData = data.map(d => {
+                const throughputStats = calculateStats(d.throughput);
+                const latencyStats = calculateStats(d.latency);
+                const validThroughput = d.throughput.filter(x => x > 0);
+                const validLatency = d.latency.filter(x => x > 0);
+                const avgEfficiency = validThroughput.length > 0 ? 
+                    validThroughput.reduce((sum, t, i) => sum + calculateEfficiency(t, validLatency[i]), 0) / validThroughput.length : 0;
+                
+                return {
+                    ...d,
+                    avgThroughput: throughputStats.mean,
+                    avgLatency: latencyStats.mean,
+                    throughputCV: throughputStats.cv,
+                    efficiency: avgEfficiency
+                };
+            }).sort((a, b) => b.efficiency - a.efficiency);
+
+            rankedData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                const rankClass = index === 0 ? 'winner' : index === 1 ? 'second' : index === 2 ? 'third' : '';
+                
+                tr.innerHTML = `
+                    <td class="${rankClass}">${row.cluster}</td>
+                    <td>${row.config}</td>
+                    <td>${row.clients}</td>
+                    <td>${row.throughput[0] || '-'}</td>
+                    <td>${row.throughput[1] || '-'}</td>
+                    <td>${row.throughput[2] || '-'}</td>
+                    <td>${row.throughput[3] || '-'}</td>
+                    <td>${row.latency[0] || '-'}</td>
+                    <td>${row.latency[1] || '-'}</td>
+                    <td>${row.latency[2] || '-'}</td>
+                    <td>${row.latency[3] || '-'}</td>
+                    <td class="${rankClass}">${Math.round(row.efficiency)}</td>
+                    <td>${row.throughputCV.toFixed(1)}%</td>
+                    <td class="${rankClass}">${index + 1}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStatsSummary(data) {
+            let bestThroughput = 0, bestLatency = Infinity, bestEfficiency = 0;
+            let bestThroughputCluster = '', bestLatencyCluster = '', bestEfficiencyCluster = '';
+
+            data.forEach(d => {
+                const validThroughput = d.throughput.filter(x => x > 0);
+                const validLatency = d.latency.filter(x => x > 0);
+                
+                const maxThroughput = Math.max(...validThroughput);
+                const minLatency = Math.min(...validLatency);
+                const avgEfficiency = validThroughput.length > 0 ? 
+                    validThroughput.reduce((sum, t, i) => sum + calculateEfficiency(t, validLatency[i]), 0) / validThroughput.length : 0;
+
+                if (maxThroughput > bestThroughput) {
+                    bestThroughput = maxThroughput;
+                    bestThroughputCluster = `${d.cluster} (${d.clients}c)`;
+                }
+
+                if (minLatency < bestLatency) {
+                    bestLatency = minLatency;
+                    bestLatencyCluster = `${d.cluster} (${d.clients}c)`;
+                }
+
+                if (avgEfficiency > bestEfficiency) {
+                    bestEfficiency = avgEfficiency;
+                    bestEfficiencyCluster = `${d.cluster} (${d.clients}c)`;
+                }
+            });
+
+            document.getElementById('bestThroughput').textContent = bestThroughput.toLocaleString();
+            document.getElementById('bestThroughputCluster').textContent = bestThroughputCluster;
+            document.getElementById('bestLatency').textContent = `${bestLatency}ms`;
+            document.getElementById('bestLatencyCluster').textContent = bestLatencyCluster;
+            document.getElementById('bestEfficiency').textContent = Math.round(bestEfficiency);
+            document.getElementById('bestEfficiencyCluster').textContent = bestEfficiencyCluster;
+        }
+
+        function getClusterColor(cluster) {
+            const colors = {
+                'c4a-64 64k': '#2E8B57',
+                'c4a-64 4k': '#FF6347',
+                'c4-96 4k': '#4169E1'
+            };
+            return colors[cluster] || '#666666';
+        }
+
+        // Event listeners
+        document.getElementById('metricFocus').addEventListener('change', updateCharts);
+        document.getElementById('clientLoad').addEventListener('change', updateCharts);
+        document.getElementById('configFilter').addEventListener('change', updateCharts);
+        document.getElementById('showOutliers').addEventListener('change', updateCharts);
+
+        // Initialize
+        updateCharts();
+    </script>
+</body>
+</html>
