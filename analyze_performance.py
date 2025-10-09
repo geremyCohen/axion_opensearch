@@ -1139,13 +1139,29 @@ def main():
     
     print("Generating config comparison analysis...")
     config_analysis = create_config_comparison(df)
-    run_analysis = {'agg_metrics': df}  # Placeholder for run analysis
+    
+    # Create correlation matrix and other required data for dashboard
+    numeric_cols = ['throughput_mean', 'latency_p50', 'latency_p90', 'latency_p99']
+    correlation = df[numeric_cols].corr()
+    
+    # Create placeholder data for all required dashboard keys
+    placeholder_df = df[['throughput_mean', 'latency_p99', 'config']].copy()
+    
+    run_analysis = {
+        'agg_metrics': df, 
+        'heatmap': df,
+        'correlation': correlation,
+        'latency_cpu': placeholder_df,
+        'throughput_cpu': placeholder_df,
+        'throughput_queue': placeholder_df,
+        'latency_queue': placeholder_df,
+        'throughput_latency': placeholder_df,
+        'config_heatmap': df
+    }
     
     # Generate HTML dashboard
     print("Creating comprehensive HTML dashboard...")
-    # Temporarily disable dashboard generation for multi-cluster mode
-    print("Dashboard generation temporarily disabled for multi-cluster analysis")
-    dashboard_path = None
+    dashboard_path = generate_html_dashboard(rep_analysis, run_analysis, config_analysis, output_dir)
     
     # Legacy analysis for backward compatibility
     outliers = analyze_repetitions(df, data_dir)
