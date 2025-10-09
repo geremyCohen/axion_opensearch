@@ -53,15 +53,14 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-# Find existing run or create new timestamp
-if [[ -d "$BASE_RESULTS_DIR" ]]; then
-    EXISTING_RUN=$(find "$BASE_RESULTS_DIR" -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
-else
-    EXISTING_RUN=""
-fi
+TIMESTAMP="20251009a"
 
-TIMESTAMP="20251008"
-echo "Using existing run: $TIMESTAMP"
+# Check if this timestamp already has a checkpoint
+if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
+    echo "Using existing run: $TIMESTAMP"
+else
+    echo "Starting new run: $TIMESTAMP"
+fi
 echo "Detected instance type: $INSTANCE_TYPE_RAW -> $INSTANCE_TYPE"
 echo "Detected page size: $PAGE_SIZE bytes -> using $PAGE_SIZE_DIR directory"
 
