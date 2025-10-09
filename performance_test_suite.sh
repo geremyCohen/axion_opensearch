@@ -343,29 +343,6 @@ configure_cluster() {
     
     log "Configuring cluster: $nodes nodes, $shards shards"
     
-    # Pre-scaling validation and cleanup
-    log "Pre-scaling validation..."
-    
-    # Always perform aggressive index reset before cluster operations
-    log "Performing aggressive index reset..."
-    aggressive_index_reset "$shards"
-    
-    # Check for red status and attempt recovery
-    local cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
-    if [[ "$cluster_status" == "red" ]]; then
-        log "Cluster is red - attempting recovery before scaling"
-        local unassigned=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.unassigned_shards // 0' 2>/dev/null)
-        if [[ $unassigned -gt 0 ]]; then
-            log "Found $unassigned unassigned shards - forcing index cleanup"
-            curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-            sleep 10
-            
-            # Recheck status after cleanup
-            cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
-            log "Cluster status after cleanup: $cluster_status"
-        fi
-    fi
-    
     log "Attempting cluster configuration update..."
     if nodesize=$nodes system_memory_percent=80 indices_breaker_total_limit=85% \
          indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% \
@@ -375,6 +352,10 @@ configure_cluster() {
         log "WARNING: Cluster configuration may have failed"
         return 1
     fi
+    
+    # Now perform aggressive index reset after cluster is properly configured
+    log "Performing aggressive index reset after cluster configuration..."
+    aggressive_index_reset "$shards"
     
     # Post-scaling validation with timeout
     sleep 30
@@ -427,10 +408,6 @@ run_benchmark() {
     local metrics_file="$RESULTS_DIR/metrics_${test_name}"
     
     log "Starting benchmark: $test_name"
-    
-    # Aggressive index cleanup before benchmark
-    log "Performing aggressive index cleanup before benchmark..."
-    aggressive_index_reset "$shards"
     
     # Verify cluster is healthy before benchmark
     if ! detect_cluster_issues; then
