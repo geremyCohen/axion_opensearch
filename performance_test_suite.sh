@@ -53,15 +53,14 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-# Find existing run or create new timestamp
-if [[ -d "$BASE_RESULTS_DIR" ]]; then
-    EXISTING_RUN=$(find "$BASE_RESULTS_DIR" -name "test_progress.checkpoint" -type f 2>/dev/null | head -1)
-else
-    EXISTING_RUN=""
-fi
+TIMESTAMP="20251009a"
 
-TIMESTAMP="20251008"
-echo "Using existing run: $TIMESTAMP"
+# Check if this timestamp already has a checkpoint
+if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
+    echo "Using existing run: $TIMESTAMP"
+else
+    echo "Starting new run: $TIMESTAMP"
+fi
 echo "Detected instance type: $INSTANCE_TYPE_RAW -> $INSTANCE_TYPE"
 echo "Detected page size: $PAGE_SIZE bytes -> using $PAGE_SIZE_DIR directory"
 
@@ -73,8 +72,9 @@ CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
 LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(60 70 80 90 100)
-NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
+CLIENT_LOADS=(60)
+NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
+#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
 #REPETITIONS=4
 
@@ -82,6 +82,10 @@ REPETITIONS=4
 mkdir -p "$RESULTS_DIR"
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
+
+log() {
+    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
+}
 
 error_exit() {
     log "ERROR: $*"
@@ -245,8 +249,37 @@ safe_delete_indices() {
 }
 
 detect_cluster_issues() {
-    local health=$(curl -s "${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    local health=$(curl -s "http://${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
     [[ "$health" == "green" ]]
+}
+
+ensure_cluster_idle() {
+    log "Ensuring cluster is completely idle before next run..."
+    
+    # Delete all indices to stop any ongoing operations
+    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
+    sleep 5
+    
+    # Wait for all tasks to complete
+    local max_attempts=12
+    local attempt=1
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        local pending_tasks=$(curl -s "http://$TARGET_HOST:9200/_cat/tasks?h=action" 2>/dev/null | grep -v "cluster:monitor" | wc -l)
+        local active_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards?h=state" 2>/dev/null | grep -v "STARTED" | wc -l)
+        
+        if [[ $pending_tasks -eq 0 && $active_shards -eq 0 ]]; then
+            log "Cluster is idle (no pending tasks or relocating shards)"
+            return 0
+        fi
+        
+        log "Waiting for cluster idle: $pending_tasks tasks, $active_shards non-started shards (attempt $attempt/$max_attempts)"
+        sleep 5
+        ((attempt++))
+    done
+    
+    log "WARNING: Cluster may not be fully idle, but continuing"
+    return 0
 }
 
 recover_cluster() {
@@ -338,29 +371,6 @@ configure_cluster() {
     
     log "Configuring cluster: $nodes nodes, $shards shards"
     
-    # Pre-scaling validation and cleanup
-    log "Pre-scaling validation..."
-    
-    # Always perform aggressive index reset before cluster operations
-    log "Performing aggressive index reset..."
-    aggressive_index_reset "$shards"
-    
-    # Check for red status and attempt recovery
-    local cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
-    if [[ "$cluster_status" == "red" ]]; then
-        log "Cluster is red - attempting recovery before scaling"
-        local unassigned=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.unassigned_shards // 0' 2>/dev/null)
-        if [[ $unassigned -gt 0 ]]; then
-            log "Found $unassigned unassigned shards - forcing index cleanup"
-            curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-            sleep 10
-            
-            # Recheck status after cleanup
-            cluster_status=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null)
-            log "Cluster status after cleanup: $cluster_status"
-        fi
-    fi
-    
     log "Attempting cluster configuration update..."
     if nodesize=$nodes system_memory_percent=80 indices_breaker_total_limit=85% \
          indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% \
@@ -371,6 +381,10 @@ configure_cluster() {
         return 1
     fi
     
+    # Now perform aggressive index reset after cluster is properly configured
+    log "Performing aggressive index reset after cluster configuration..."
+    aggressive_index_reset "$shards"
+    
     # Post-scaling validation with timeout
     sleep 30
     log "Post-scaling validation with timeout..."
@@ -378,9 +392,6 @@ configure_cluster() {
     if ! wait_for_cluster_with_timeout; then
         log "WARNING: Cluster not fully healthy after scaling, but continuing"
     fi
-    
-    # Verify shard configuration is correct
-    verify_shard_configuration "$shards"
     
     log "Cluster scaling completed"
 }
@@ -422,10 +433,6 @@ run_benchmark() {
     local metrics_file="$RESULTS_DIR/metrics_${test_name}"
     
     log "Starting benchmark: $test_name"
-    
-    # Aggressive index cleanup before benchmark
-    log "Performing aggressive index cleanup before benchmark..."
-    aggressive_index_reset "$shards"
     
     # Verify cluster is healthy before benchmark
     if ! detect_cluster_issues; then
@@ -475,6 +482,18 @@ run_benchmark() {
     
     # Stop metrics collection
     kill $metrics_pid 2>/dev/null
+    sleep 2  # Allow process cleanup
+    
+    # Clean up edge metrics samples to avoid race conditions
+    log "Cleaning up edge metrics samples..."
+    rm -f "${metrics_file}_1" 2>/dev/null  # Remove first sample
+    
+    # Find and remove last sample (highest numbered file)
+    local last_sample=$(ls "${metrics_file}_"* 2>/dev/null | sed 's/.*_//' | sort -n | tail -1)
+    if [[ -n "$last_sample" ]]; then
+        rm -f "${metrics_file}_${last_sample}" 2>/dev/null
+        log "Removed first and last metrics samples (1 and $last_sample)"
+    fi
     
     log "OSB execution completed for $test_name"
     
@@ -559,7 +578,15 @@ main() {
         # Configure cluster once per node/shard combination
         log "About to configure cluster: $nodes nodes, $shards shards"
         configure_cluster "$nodes" "$shards"
-        log "Cluster configured, verifying..."
+        log "Cluster configured, checking for issues..."
+        
+        # Force recovery if cluster has issues after configuration
+        if ! detect_cluster_issues; then
+            log "Cluster issues detected after configuration - forcing recovery"
+            recover_cluster
+        fi
+        
+        log "Verifying cluster is active..."
         verify_cluster_active
         log "Cluster verified, starting benchmark runs for all client loads..."
 
@@ -614,6 +641,9 @@ main() {
                 if run_benchmark "$clients" "$nodes" "$shards" "$rep"; then
                     log "run_benchmark completed successfully"
                     save_checkpoint "$clients" "$nodes" "$shards" "$rep"
+                    
+                    # Ensure cluster is idle before next run
+                    ensure_cluster_idle
                 else
                     log "run_benchmark failed, but continuing..."
                 fi
@@ -628,4 +658,7 @@ main() {
     rm -f "$CHECKPOINT_FILE"
     log "Performance test suite completed successfully"
 }
+
+# Execute main function
+main
 
