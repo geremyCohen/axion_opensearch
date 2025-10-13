@@ -386,7 +386,6 @@ configure_cluster() {
     aggressive_index_reset "$shards"
     
     # Post-scaling validation with timeout
-    sleep 30
     log "Post-scaling validation with timeout..."
     
     if ! wait_for_cluster_with_timeout; then
