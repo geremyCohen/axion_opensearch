@@ -12,24 +12,29 @@ import re
 from pathlib import Path
 
 def load_performance_data(data_dir):
-    """Load performance data from summary files"""
+    """Load performance data from json files"""
     if not os.path.exists(data_dir):
         print(f"Error: Data directory not found: {data_dir}")
         sys.exit(1)
     
     data = []
-    summary_files = glob.glob(f"{data_dir}/**/*_summary.json", recursive=True)
+    json_files = glob.glob(f"{data_dir}/**/*.json", recursive=True)
+    # Exclude summary files
+    json_files = [f for f in json_files if '_summary.json' not in f]
     
-    if not summary_files:
-        print(f"Error: No summary files found in {data_dir}")
+    if not json_files:
+        print(f"Error: No json files found in {data_dir}")
         sys.exit(1)
     
-    print(f"Found {len(summary_files)} summary files")
+    print(f"Found {len(json_files)} json files")
     
-    for file_path in summary_files:
+    for file_path in json_files:
         try:
             with open(file_path, 'r') as f:
-                summary = json.load(f)
+                full_data = json.load(f)
+            
+            # Extract metrics from op_metrics section
+            op_metrics = full_data['results']['op_metrics'][0]
             
             # Extract cluster info from path
             path_parts = Path(file_path).parts
@@ -54,11 +59,11 @@ def load_performance_data(data_dir):
             clean_cluster_name = cluster_name.replace(" - nyc_taxis", "").replace(" nyc_taxis", "")
             
             # Extract performance metrics
-            throughput = summary.get('throughput', {}).get('mean', 0)
-            latency_p99 = summary.get('latency', {}).get('99_0', 0)
-            latency_p90 = summary.get('latency', {}).get('90_0', 0)
-            latency_p50 = summary.get('latency', {}).get('50_0', 0)
-            error_rate = summary.get('error_rate', 0)
+            throughput = op_metrics.get('throughput', {}).get('mean', 0)
+            latency_p99 = op_metrics.get('latency', {}).get('99_0', 0)
+            latency_p90 = op_metrics.get('latency', {}).get('90_0', 0)
+            latency_p50 = op_metrics.get('latency', {}).get('50_0', 0)
+            error_rate = op_metrics.get('error_rate', 0)
             
             # Extract configuration from filename
             filename = Path(file_path).stem
