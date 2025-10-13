@@ -408,17 +408,6 @@ verify_cluster_active() {
     fi
 }
 
-collect_metrics() {
-    local output_file=$1
-    local sample_num=$2
-    
-    {
-        echo "timestamp,$(date -Iseconds)"
-        curl -s "http://$TARGET_HOST:9200/_nodes/stats/thread_pool,indices,os,process" | jq -c '.'
-        curl -s "http://$TARGET_HOST:9200/_cluster/stats" | jq -c '.'
-    } >> "${output_file}_${sample_num}"
-}
-
 run_benchmark() {
     set +e  # Disable exit on error for debugging
     local clients=$1
@@ -429,7 +418,6 @@ run_benchmark() {
     local test_name="${clients}_${nodes}-${shards}_${rep}"
     local osb_output="$RESULTS_DIR/${test_name}.json"
     local osb_log="$RESULTS_DIR/${test_name}.log"
-    local metrics_file="$RESULTS_DIR/metrics_${test_name}"
     
     log "Starting benchmark: $test_name"
     
@@ -454,19 +442,7 @@ run_benchmark() {
     
     log "Executing OSB run, please wait for completion."
     
-    # Start metrics collection in background
-    (
-        local sample=1
-        while kill -0 $$ 2>/dev/null; do
-            collect_metrics "$metrics_file" "$sample"
-            sample=$((sample + 1))
-            sleep 60
-        done
-    ) &
-    local metrics_pid=$!
-    
     if ! eval "$osb_cmd" > "$osb_log" 2>&1; then
-        kill $metrics_pid 2>/dev/null
         log "OSB execution failed for $test_name, checking output..."
         if [[ -f "$osb_log" ]]; then
             log "OSB output file exists, showing last 10 lines:"
@@ -477,21 +453,6 @@ run_benchmark() {
         log "Continuing despite OSB failure..."
         set -e  # Re-enable exit on error
         return 1
-    fi
-    
-    # Stop metrics collection
-    kill $metrics_pid 2>/dev/null
-    sleep 2  # Allow process cleanup
-    
-    # Clean up edge metrics samples to avoid race conditions
-    log "Cleaning up edge metrics samples..."
-    rm -f "${metrics_file}_1" 2>/dev/null  # Remove first sample
-    
-    # Find and remove last sample (highest numbered file)
-    local last_sample=$(ls "${metrics_file}_"* 2>/dev/null | sed 's/.*_//' | sort -n | tail -1)
-    if [[ -n "$last_sample" ]]; then
-        rm -f "${metrics_file}_${last_sample}" 2>/dev/null
-        log "Removed first and last metrics samples (1 and $last_sample)"
     fi
     
     log "OSB execution completed for $test_name"
