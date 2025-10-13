@@ -359,6 +359,7 @@
             }
 
             // Update throughput comparison
+            updateTableHeader();
             updateThroughputChart(filteredData, showOutliers);
             updateLatencyChart(filteredData, showOutliers);
             updateVariabilityChart(filteredData);
@@ -477,16 +478,27 @@
             Plotly.newPlot('efficiencyComparison', [trace], layout);
         }
 
+        function updateTableHeader() {
+            const percentile = document.getElementById('latencyPercentile').value;
+            const latencyHeader = document.querySelector('#comparisonTable thead tr:first-child th:nth-child(6)');
+            latencyHeader.textContent = `P${percentile} Latency (ms)`;
+        }
+
         function updateComparisonTable(data) {
             const tbody = document.getElementById('comparisonTableBody');
             tbody.innerHTML = '';
 
+            const percentile = document.getElementById('latencyPercentile').value;
+            const latencyField = percentile === '99' ? 'latency' : 
+                                percentile === '90' ? 'latency_p90' : 'latency_p50';
+
             // Calculate rankings
             const rankedData = data.map(d => {
                 const throughputStats = calculateStats(d.throughput);
-                const latencyStats = calculateStats(d.latency);
+                const latencyData = d[latencyField] || d.latency;
+                const latencyStats = calculateStats(Array.isArray(latencyData) ? latencyData : [latencyData]);
                 const validThroughput = d.throughput.filter(x => x > 0);
-                const validLatency = d.latency.filter(x => x > 0);
+                const validLatency = Array.isArray(latencyData) ? latencyData.filter(x => x > 0) : [latencyData];
                 const avgEfficiency = validThroughput.length > 0 ? 
                     validThroughput.reduce((sum, t, i) => sum + calculateEfficiency(t, validLatency[i]), 0) / validThroughput.length : 0;
                 
@@ -495,13 +507,15 @@
                     avgThroughput: throughputStats.mean,
                     avgLatency: latencyStats.mean,
                     throughputCV: throughputStats.cv,
-                    efficiency: avgEfficiency
+                    efficiency: avgEfficiency,
+                    selectedLatency: latencyData
                 };
             }).sort((a, b) => b.efficiency - a.efficiency);
 
             rankedData.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 const rankClass = index === 0 ? 'winner' : index === 1 ? 'second' : index === 2 ? 'third' : '';
+                const latencyArray = Array.isArray(row.selectedLatency) ? row.selectedLatency : [row.selectedLatency];
                 
                 tr.innerHTML = `
                     <td class="${rankClass}">${row.cluster}</td>
@@ -511,10 +525,10 @@
                     <td>${row.throughput[1] || '-'}</td>
                     <td>${row.throughput[2] || '-'}</td>
                     <td>${row.throughput[3] || '-'}</td>
-                    <td>${row.latency[0] || '-'}</td>
-                    <td>${row.latency[1] || '-'}</td>
-                    <td>${row.latency[2] || '-'}</td>
-                    <td>${row.latency[3] || '-'}</td>
+                    <td>${latencyArray[0] || '-'}</td>
+                    <td>${latencyArray[1] || '-'}</td>
+                    <td>${latencyArray[2] || '-'}</td>
+                    <td>${latencyArray[3] || '-'}</td>
                     <td class="${rankClass}">${Math.round(row.efficiency)}</td>
                     <td>${row.throughputCV.toFixed(1)}%</td>
                     <td class="${rankClass}">${index + 1}</td>
