@@ -16,9 +16,14 @@
         .comparison-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .comparison-table th, .comparison-table td { padding: 6px 8px; border: 1px solid #ddd; text-align: center; }
         .comparison-table th { background-color: #e9ecef; font-weight: bold; }
-        .winner { background-color: #d4edda; font-weight: bold; }
-        .second { background-color: #d1ecf1; }
-        .third { background-color: #fff3cd; }
+        .comparison-table tr:nth-child(even) { background-color: #f8f9fa; }
+        .comparison-table tr:nth-child(odd) { background-color: #ffffff; }
+        .winner { background-color: #d4edda !important; font-weight: bold; }
+        .winner td { background-color: #d4edda !important; }
+        .second { background-color: #d1ecf1 !important; }
+        .second td { background-color: #d1ecf1 !important; }
+        .third { background-color: #fff3cd !important; }
+        .third td { background-color: #fff3cd !important; }
         .stats-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
         .stat-card { background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center; border-left: 4px solid #007bff; }
         .stat-value { font-size: 24px; font-weight: bold; color: #007bff; }
@@ -367,6 +372,7 @@
             rankedData.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 const rankClass = index === 0 ? 'winner' : index === 1 ? 'second' : index === 2 ? 'third' : '';
+                if (rankClass) tr.className = rankClass;
                 
                 // Get all latency arrays
                 const latencyP99 = Array.isArray(row.latency) ? row.latency : [row.latency];
@@ -374,7 +380,7 @@
                 const latencyP50 = Array.isArray(row.latency_p50) ? row.latency_p50 : [row.latency_p50];
                 
                 tr.innerHTML = `
-                    <td class="${rankClass}">${row.cluster}</td>
+                    <td>${row.cluster}</td>
                     <td>${row.config}</td>
                     <td>${row.clients}</td>
                     <td>${row.throughput[0] || '-'}</td>
@@ -393,9 +399,9 @@
                     <td>${latencyP50[1] || '-'}</td>
                     <td>${latencyP50[2] || '-'}</td>
                     <td>${latencyP50[3] || '-'}</td>
-                    <td class="${rankClass}">${Math.round(row.efficiency)}</td>
+                    <td><strong>${Math.round(row.efficiency)}</strong></td>
                     <td>${row.throughputCV.toFixed(1)}%</td>
-                    <td class="${rankClass}">${index + 1}</td>
+                    <td><strong>${index + 1}</strong></td>
                 `;
                 tbody.appendChild(tr);
             });
