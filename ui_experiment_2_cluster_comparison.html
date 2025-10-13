@@ -117,7 +117,6 @@
                         <th rowspan="3">Clients</th>
                         <th colspan="4">Throughput (docs/s)</th>
                         <th colspan="12">Latency (ms)</th>
-                        <th rowspan="3">Efficiency</th>
                         <th rowspan="3">CV %</th>
                         <th rowspan="3">Rank</th>
                     </tr>
@@ -399,7 +398,6 @@
                     <td>${latencyP50[1] || '-'}</td>
                     <td>${latencyP50[2] || '-'}</td>
                     <td>${latencyP50[3] || '-'}</td>
-                    <td><strong>${Math.round(row.efficiency)}</strong></td>
                     <td>${row.throughputCV.toFixed(1)}%</td>
                     <td><strong>${index + 1}</strong></td>
                 `;
