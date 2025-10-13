@@ -3,17 +3,23 @@
 set -euo pipefail
 
 # Command line parameter validation
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <workload>"
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: $0 <workload> [include_tasks]"
     echo ""
     echo "Required parameter:"
-    echo "  workload    Must be one of: nyc_taxis, big5, vectorsearch"
+    echo "  workload       Must be one of: nyc_taxis, big5, vectorsearch"
     echo ""
-    echo "Example: $0 nyc_taxis"
+    echo "Optional parameter:"
+    echo "  include_tasks  Tasks to include in OSB benchmark (e.g., index, search)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 nyc_taxis"
+    echo "  $0 nyc_taxis index"
     exit 1
 fi
 
 WORKLOAD_PARAM="$1"
+INCLUDE_TASKS_PARAM="${2:-}"
 ALLOWED_WORKLOADS=("nyc_taxis" "big5" "vectorsearch")
 
 # Validate workload parameter
@@ -53,7 +59,7 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-TIMESTAMP="20251009a"
+TIMESTAMP="nyc_taxi_1013_full"
 
 # Check if this timestamp already has a checkpoint
 if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
@@ -437,8 +443,14 @@ run_benchmark() {
     local osb_cmd="opensearch-benchmark run --workload=$WORKLOAD_NAME \
         --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
         --client-options=use_ssl:false,verify_certs:false,timeout:60 \
-        --kill-running-processes --include-tasks=index \
-        --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
+        --kill-running-processes"
+    
+    # Add include-tasks parameter if specified
+    if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
+        osb_cmd="$osb_cmd --include-tasks=$INCLUDE_TASKS_PARAM"
+    fi
+    
+    osb_cmd="$osb_cmd --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
     log "Executing OSB run, please wait for completion."
     
