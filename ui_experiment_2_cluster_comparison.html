@@ -112,13 +112,13 @@
             <table id="comparisonTable">
                 <thead>
                     <tr>
+                        <th rowspan="3">Rank</th>
                         <th rowspan="3">Cluster</th>
                         <th rowspan="3">Config</th>
                         <th rowspan="3">Clients</th>
                         <th colspan="4">Throughput (docs/s)</th>
                         <th colspan="12">Latency (ms)</th>
                         <th rowspan="3">CV %</th>
-                        <th rowspan="3">Rank</th>
                     </tr>
                     <tr>
                         <th colspan="4">Repetitions</th>
@@ -379,6 +379,7 @@
                 const latencyP50 = Array.isArray(row.latency_p50) ? row.latency_p50 : [row.latency_p50];
                 
                 tr.innerHTML = `
+                    <td><strong>${index + 1}</strong></td>
                     <td>${row.cluster}</td>
                     <td>${row.config}</td>
                     <td>${row.clients}</td>
@@ -399,7 +400,6 @@
                     <td>${latencyP50[2] || '-'}</td>
                     <td>${latencyP50[3] || '-'}</td>
                     <td>${row.throughputCV.toFixed(1)}%</td>
-                    <td><strong>${index + 1}</strong></td>
                 `;
                 tbody.appendChild(tr);
             });
