@@ -101,7 +101,6 @@ load_checkpoint() {
         if [[ -f "$RESULTS_DIR/${incomplete_run}.json" ]]; then
             log "Removing incomplete run file: ${incomplete_run}.json"
             rm -f "$RESULTS_DIR/${incomplete_run}.json"
-            rm -f "$RESULTS_DIR/${incomplete_run}_summary.json"
             rm -f "$RESULTS_DIR/metrics_${incomplete_run}"*
         fi
     else
@@ -489,20 +488,6 @@ run_benchmark() {
         if [[ -f "$osb_json_file" ]]; then
             cp "$osb_json_file" "$osb_output"
             log "Copied OSB JSON results to $osb_output"
-            
-            # Create summary JSON
-            if command -v jq >/dev/null 2>&1; then
-                jq '{
-                    test_run_id: ."test-run-id",
-                    throughput: .results.op_metrics[0].throughput,
-                    latency: .results.op_metrics[0].latency,
-                    service_time: .results.op_metrics[0].service_time,
-                    error_rate: (.results.op_metrics[0].error_rate // 0)
-                }' "$osb_output" > "${osb_output%.json}_summary.json" 2>/dev/null || {
-                    log "Warning: Failed to create summary JSON for $test_name"
-                    echo '{"error": "Failed to parse results"}' > "${osb_output%.json}_summary.json"
-                }
-            fi
         else
             log "Warning: OSB JSON results file not found: $osb_json_file"
         fi
