@@ -107,16 +107,30 @@
             <table id="comparisonTable">
                 <thead>
                     <tr>
-                        <th rowspan="2">Cluster</th>
-                        <th rowspan="2">Config</th>
-                        <th rowspan="2">Clients</th>
+                        <th rowspan="3">Cluster</th>
+                        <th rowspan="3">Config</th>
+                        <th rowspan="3">Clients</th>
                         <th colspan="4">Throughput (docs/s)</th>
-                        <th colspan="4">P99 Latency (ms)</th>
-                        <th rowspan="2">Efficiency</th>
-                        <th rowspan="2">CV %</th>
-                        <th rowspan="2">Rank</th>
+                        <th colspan="12">Latency (ms)</th>
+                        <th rowspan="3">Efficiency</th>
+                        <th rowspan="3">CV %</th>
+                        <th rowspan="3">Rank</th>
                     </tr>
                     <tr>
+                        <th colspan="4">Repetitions</th>
+                        <th colspan="4">P99</th>
+                        <th colspan="4">P90</th>
+                        <th colspan="4">P50</th>
+                    </tr>
+                    <tr>
+                        <th>Rep1</th>
+                        <th>Rep2</th>
+                        <th>Rep3</th>
+                        <th>Rep4</th>
+                        <th>Rep1</th>
+                        <th>Rep2</th>
+                        <th>Rep3</th>
+                        <th>Rep4</th>
                         <th>Rep1</th>
                         <th>Rep2</th>
                         <th>Rep3</th>
@@ -137,189 +151,34 @@
         // Extended sample data with more configurations
         const performanceData = [
             {
-                        "cluster": "c4-144 4k",
-                        "config": "60_16-16",
-                        "clients": 60,
-                        "nodes": 16,
-                        "shards": 16,
-                        "throughput": [
-                                    456201,
-                                    504117,
-                                    478530,
-                                    483479
-                        ],
-                        "latency": [
-                                    3021,
-                                    2399,
-                                    2623,
-                                    2635
-                        ],
-                        "latency_p90": [
-                                    2251,
-                                    1973,
-                                    1819,
-                                    1906
-                        ],
-                        "latency_p50": [
-                                    1194,
-                                    1322,
-                                    1177,
-                                    1135
-                        ]
-            },
-            {
-                        "cluster": "c4a-64 64k",
-                        "config": "60_16-16",
-                        "clients": 60,
-                        "nodes": 16,
-                        "shards": 16,
-                        "throughput": [
-                                    569347,
-                                    590181,
-                                    589969,
-                                    595534
-                        ],
-                        "latency": [
-                                    2211,
-                                    2253,
-                                    2062,
-                                    2120
-                        ],
-                        "latency_p90": [
-                                    1710,
-                                    1587,
-                                    1603,
-                                    1661
-                        ],
-                        "latency_p50": [
-                                    917,
-                                    851,
-                                    880,
-                                    869
-                        ]
-            },
-            {
-                        "cluster": "c4a-64 4k",
-                        "config": "60_16-16",
-                        "clients": 60,
-                        "nodes": 16,
-                        "shards": 16,
-                        "throughput": [
-                                    527350,
-                                    544303,
-                                    549078,
-                                    552318
-                        ],
-                        "latency": [
-                                    3081,
-                                    3253,
-                                    3239,
-                                    3094
-                        ],
-                        "latency_p90": [
-                                    2095,
-                                    2231,
-                                    2255,
-                                    2130
-                        ],
-                        "latency_p50": [
-                                    808,
-                                    829,
-                                    889,
-                                    875
-                        ]
-            },
-            {
                         "cluster": "c4a-72 64k",
                         "config": "60_16-16",
                         "clients": 60,
                         "nodes": 16,
                         "shards": 16,
                         "throughput": [
-                                    609553,
-                                    635634,
-                                    644383,
-                                    642717
+                                    627175,
+                                    624806,
+                                    632199,
+                                    590024
                         ],
                         "latency": [
-                                    1915,
-                                    1980,
-                                    1935,
-                                    2070
+                                    1771,
+                                    1890,
+                                    1851,
+                                    2080
                         ],
                         "latency_p90": [
-                                    1446,
-                                    1418,
-                                    1463,
-                                    1413
+                                    1353,
+                                    1393,
+                                    1375,
+                                    1424
                         ],
                         "latency_p50": [
-                                    846,
-                                    820,
-                                    811,
-                                    809
-                        ]
-            },
-            {
-                        "cluster": "c4a-72 4k",
-                        "config": "60_16-16",
-                        "clients": 60,
-                        "nodes": 16,
-                        "shards": 16,
-                        "throughput": [
-                                    548151,
-                                    565037,
-                                    564659,
-                                    566414
-                        ],
-                        "latency": [
-                                    3095,
-                                    3032,
-                                    2792,
-                                    2605
-                        ],
-                        "latency_p90": [
-                                    2063,
-                                    2056,
-                                    1942,
-                                    2037
-                        ],
-                        "latency_p50": [
-                                    877,
-                                    917,
-                                    873,
-                                    874
-                        ]
-            },
-            {
-                        "cluster": "c4-96 4k",
-                        "config": "60_16-16",
-                        "clients": 60,
-                        "nodes": 16,
-                        "shards": 16,
-                        "throughput": [
-                                    360936,
-                                    369652,
-                                    375809,
-                                    384374
-                        ],
-                        "latency": [
-                                    3570,
-                                    3203,
-                                    3379,
-                                    3441
-                        ],
-                        "latency_p90": [
-                                    2695,
-                                    2491,
-                                    2649,
-                                    2730
-                        ],
-                        "latency_p50": [
-                                    1465,
-                                    1630,
-                                    1544,
-                                    1456
+                                    850,
+                                    903,
+                                    773,
+                                    907
                         ]
             }
 ];
@@ -359,7 +218,6 @@
             }
 
             // Update throughput comparison
-            updateTableHeader();
             updateThroughputChart(filteredData, showOutliers);
             updateLatencyChart(filteredData, showOutliers);
             updateVariabilityChart(filteredData);
@@ -478,12 +336,6 @@
             Plotly.newPlot('efficiencyComparison', [trace], layout);
         }
 
-        function updateTableHeader() {
-            const percentile = document.getElementById('latencyPercentile').value;
-            const latencyHeader = document.querySelector('#comparisonTable thead tr:first-child th:nth-child(6)');
-            latencyHeader.textContent = `P${percentile} Latency (ms)`;
-        }
-
         function updateComparisonTable(data) {
             const tbody = document.getElementById('comparisonTableBody');
             tbody.innerHTML = '';
@@ -515,7 +367,11 @@
             rankedData.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 const rankClass = index === 0 ? 'winner' : index === 1 ? 'second' : index === 2 ? 'third' : '';
-                const latencyArray = Array.isArray(row.selectedLatency) ? row.selectedLatency : [row.selectedLatency];
+                
+                // Get all latency arrays
+                const latencyP99 = Array.isArray(row.latency) ? row.latency : [row.latency];
+                const latencyP90 = Array.isArray(row.latency_p90) ? row.latency_p90 : [row.latency_p90];
+                const latencyP50 = Array.isArray(row.latency_p50) ? row.latency_p50 : [row.latency_p50];
                 
                 tr.innerHTML = `
                     <td class="${rankClass}">${row.cluster}</td>
@@ -525,10 +381,18 @@
                     <td>${row.throughput[1] || '-'}</td>
                     <td>${row.throughput[2] || '-'}</td>
                     <td>${row.throughput[3] || '-'}</td>
-                    <td>${latencyArray[0] || '-'}</td>
-                    <td>${latencyArray[1] || '-'}</td>
-                    <td>${latencyArray[2] || '-'}</td>
-                    <td>${latencyArray[3] || '-'}</td>
+                    <td>${latencyP99[0] || '-'}</td>
+                    <td>${latencyP99[1] || '-'}</td>
+                    <td>${latencyP99[2] || '-'}</td>
+                    <td>${latencyP99[3] || '-'}</td>
+                    <td>${latencyP90[0] || '-'}</td>
+                    <td>${latencyP90[1] || '-'}</td>
+                    <td>${latencyP90[2] || '-'}</td>
+                    <td>${latencyP90[3] || '-'}</td>
+                    <td>${latencyP50[0] || '-'}</td>
+                    <td>${latencyP50[1] || '-'}</td>
+                    <td>${latencyP50[2] || '-'}</td>
+                    <td>${latencyP50[3] || '-'}</td>
                     <td class="${rankClass}">${Math.round(row.efficiency)}</td>
                     <td>${row.throughputCV.toFixed(1)}%</td>
                     <td class="${rankClass}">${index + 1}</td>
