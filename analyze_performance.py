@@ -131,10 +131,14 @@ def discover_clusters_and_workloads(root_dir):
     """Discover all unique clusters and workloads under root directory"""
     clusters = {}
     
-    # Find all summary.json files recursively
-    for summary_file in glob.glob(os.path.join(root_dir, "**/*_summary.json"), recursive=True):
+    # Find all .json files (excluding summary files) recursively
+    for json_file in glob.glob(os.path.join(root_dir, "**/*.json"), recursive=True):
+        # Skip summary files since we're using regular json files now
+        if '_summary.json' in json_file:
+            continue
+            
         # Extract path components
-        rel_path = os.path.relpath(summary_file, root_dir)
+        rel_path = os.path.relpath(json_file, root_dir)
         path_parts = rel_path.split(os.sep)
         
         if len(path_parts) >= 4:  # instance_type/page_size/workload/file
@@ -155,7 +159,7 @@ def discover_clusters_and_workloads(root_dir):
                     'files': []
                 }
             
-            clusters[cluster_key]['files'].append(summary_file)
+            clusters[cluster_key]['files'].append(json_file)
     
     return clusters
 
@@ -187,12 +191,14 @@ def load_all_cluster_data(root_dir):
         return pd.DataFrame(), clusters
 
 def load_summary_data(data_dir):
-    """Load all summary JSON files and parse CPU metrics"""
-    summary_files = glob.glob(os.path.join(data_dir, "*_summary.json"))
+    """Load all JSON files and parse CPU metrics"""
+    json_files = glob.glob(os.path.join(data_dir, "*.json"))
+    # Exclude summary files
+    json_files = [f for f in json_files if '_summary.json' not in f]
     data = []
     
-    for file_path in summary_files:
-        filename = os.path.basename(file_path).replace('_summary.json', '')
+    for file_path in json_files:
+        filename = os.path.basename(file_path).replace('.json', '')
         clients, nodes, shards, rep = parse_filename(filename)
         
         if clients is None:
@@ -200,7 +206,10 @@ def load_summary_data(data_dir):
             
         try:
             with open(file_path, 'r') as f:
-                summary = json.load(f)
+                full_data = json.load(f)
+            
+            # Extract metrics from op_metrics section
+            op_metrics = full_data['results']['op_metrics'][0]
             
             # Parse CPU metrics for this repetition
             cpu_metrics = parse_cpu_metrics(data_dir, clients, nodes, shards, rep)
@@ -214,14 +223,14 @@ def load_summary_data(data_dir):
                 'shards': shards,
                 'repetition': rep,
                 'config': f"{clients}_{nodes}-{shards}",
-                'throughput_mean': summary['throughput']['mean'],
-                'throughput_min': summary['throughput']['min'],
-                'throughput_max': summary['throughput']['max'],
-                'latency_p50': summary['latency']['50_0'],
-                'latency_p90': summary['latency']['90_0'],
-                'latency_p99': summary['latency']['99_0'],
-                'latency_mean': summary['latency']['mean'],
-                'error_rate': summary['error_rate'],
+                'throughput_mean': op_metrics['throughput']['mean'],
+                'throughput_min': op_metrics['throughput']['min'],
+                'throughput_max': op_metrics['throughput']['max'],
+                'latency_p50': op_metrics['latency']['50_0'],
+                'latency_p90': op_metrics['latency']['90_0'],
+                'latency_p99': op_metrics['latency']['99_0'],
+                'latency_mean': op_metrics['latency']['mean'],
+                'error_rate': op_metrics['error_rate'],
                 'cpu_avg': cpu_metrics['cpu_avg'],
                 'cpu_peak': cpu_metrics['cpu_peak'],
                 'cpu_p95': cpu_metrics['cpu_p95'],
@@ -1109,7 +1118,7 @@ def main():
     df, clusters_info = load_all_cluster_data(data_dir)
     
     if df.empty:
-        print("No summary data found!")
+        print("No JSON data found!")
         exit(1)
     
     print(f"\nDiscovered {len(clusters_info)} unique cluster(s):")
