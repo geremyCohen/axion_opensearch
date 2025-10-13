@@ -41,6 +41,14 @@
                 </select>
             </div>
             <div class="filter-group">
+                <label>Latency Percentile:</label>
+                <select id="latencyPercentile">
+                    <option value="99">P99</option>
+                    <option value="90">P90</option>
+                    <option value="50">P50</option>
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Client Load:</label>
                 <select id="clientLoad">
                     <option value="all">All Loads</option>
@@ -145,6 +153,18 @@
                                     2399,
                                     2623,
                                     2635
+                        ],
+                        "latency_p90": [
+                                    2251,
+                                    1973,
+                                    1819,
+                                    1906
+                        ],
+                        "latency_p50": [
+                                    1194,
+                                    1322,
+                                    1177,
+                                    1135
                         ]
             },
             {
@@ -164,6 +184,18 @@
                                     2253,
                                     2062,
                                     2120
+                        ],
+                        "latency_p90": [
+                                    1710,
+                                    1587,
+                                    1603,
+                                    1661
+                        ],
+                        "latency_p50": [
+                                    917,
+                                    851,
+                                    880,
+                                    869
                         ]
             },
             {
@@ -183,6 +215,18 @@
                                     3253,
                                     3239,
                                     3094
+                        ],
+                        "latency_p90": [
+                                    2095,
+                                    2231,
+                                    2255,
+                                    2130
+                        ],
+                        "latency_p50": [
+                                    808,
+                                    829,
+                                    889,
+                                    875
                         ]
             },
             {
@@ -202,6 +246,18 @@
                                     1980,
                                     1935,
                                     2070
+                        ],
+                        "latency_p90": [
+                                    1446,
+                                    1418,
+                                    1463,
+                                    1413
+                        ],
+                        "latency_p50": [
+                                    846,
+                                    820,
+                                    811,
+                                    809
                         ]
             },
             {
@@ -221,6 +277,18 @@
                                     3032,
                                     2792,
                                     2605
+                        ],
+                        "latency_p90": [
+                                    2063,
+                                    2056,
+                                    1942,
+                                    2037
+                        ],
+                        "latency_p50": [
+                                    877,
+                                    917,
+                                    873,
+                                    874
                         ]
             },
             {
@@ -240,6 +308,18 @@
                                     3203,
                                     3379,
                                     3441
+                        ],
+                        "latency_p90": [
+                                    2695,
+                                    2491,
+                                    2649,
+                                    2730
+                        ],
+                        "latency_p50": [
+                                    1465,
+                                    1630,
+                                    1544,
+                                    1456
                         ]
             }
 ];
@@ -300,7 +380,7 @@
             });
 
             const layout = {
-                title: 'Throughput Distribution by Cluster',
+                title: 'Throughput Distribution by Cluster<br><sub>Mean throughput across repetitions</sub>',
                 yaxis: {title: 'Throughput (docs/s)'},
                 margin: {b: 120},
                 showlegend: false
@@ -310,9 +390,14 @@
         }
 
         function updateLatencyChart(data, showOutliers) {
+            const percentile = document.getElementById('latencyPercentile').value;
+            const latencyField = percentile === '99' ? 'latency' : 
+                                percentile === '90' ? 'latency_p90' : 'latency_p50';
+            
             const traces = data.map(d => {
+                const latencyData = d[latencyField] || d.latency;
                 return {
-                    y: d.latency.filter(x => x > 0),
+                    y: Array.isArray(latencyData) ? latencyData.filter(x => x > 0) : [latencyData],
                     type: 'box',
                     name: d.cluster,
                     boxpoints: showOutliers ? 'outliers' : false,
@@ -321,8 +406,8 @@
             });
 
             const layout = {
-                title: 'P99 Latency Distribution by Cluster',
-                yaxis: {title: 'P99 Latency (ms)'},
+                title: `P${percentile} Latency Distribution by Cluster<br><sub>P${percentile} latency across repetitions</sub>`,
+                yaxis: {title: `P${percentile} Latency (ms)`},
                 margin: {b: 120},
                 showlegend: false
             };
@@ -351,7 +436,7 @@
             };
 
             const layout = {
-                title: 'Performance Consistency (Lower CV% = More Consistent)',
+                title: 'Performance Consistency (Lower CV% = More Consistent)<br><sub>Coefficient of variation across repetitions</sub>',
                 yaxis: {title: 'Coefficient of Variation (%)'},
                 margin: {b: 120},
                 showlegend: false
@@ -383,7 +468,7 @@
             };
 
             const layout = {
-                title: 'Performance Efficiency (Throughput/Latency Ratio)',
+                title: 'Performance Efficiency (Throughput/Latency Ratio)<br><sub>Mean efficiency across repetitions</sub>',
                 yaxis: {title: 'Efficiency Score'},
                 margin: {b: 120},
                 showlegend: false
@@ -489,6 +574,7 @@
 
         // Event listeners
         document.getElementById('metricFocus').addEventListener('change', updateCharts);
+        document.getElementById('latencyPercentile').addEventListener('change', updateCharts);
         document.getElementById('clientLoad').addEventListener('change', updateCharts);
         document.getElementById('configFilter').addEventListener('change', updateCharts);
         document.getElementById('showOutliers').addEventListener('change', updateCharts);

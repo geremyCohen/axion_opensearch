@@ -56,6 +56,7 @@ def load_performance_data(data_dir):
             # Extract performance metrics
             throughput = summary.get('throughput', {}).get('mean', 0)
             latency_p99 = summary.get('latency', {}).get('99_0', 0)
+            latency_p90 = summary.get('latency', {}).get('90_0', 0)
             latency_p50 = summary.get('latency', {}).get('50_0', 0)
             error_rate = summary.get('error_rate', 0)
             
@@ -78,6 +79,7 @@ def load_performance_data(data_dir):
                 'rep': rep,
                 'throughput': int(throughput),
                 'latency': int(latency_p99),
+                'latency_p90': int(latency_p90),
                 'latency_p50': int(latency_p50),
                 'efficiency': int(throughput / (latency_p99 / 1000)) if latency_p99 > 0 else 0,
                 'error_rate': error_rate,
@@ -152,12 +154,16 @@ def transform_for_ui2(data):
                 'nodes': item['nodes'],
                 'shards': item['shards'],
                 'throughput': [],
-                'latency': []
+                'latency': [],
+                'latency_p90': [],
+                'latency_p50': []
             }
         
         # Append all rep data (don't assume specific rep numbers)
         grouped[key]['throughput'].append(item['throughput'])
         grouped[key]['latency'].append(item['latency'])
+        grouped[key]['latency_p90'].append(item['latency_p90'])
+        grouped[key]['latency_p50'].append(item['latency_p50'])
     
     # Ensure we have 4 reps, pad with zeros if needed
     result = []
@@ -166,6 +172,10 @@ def transform_for_ui2(data):
             item['throughput'].append(0)
         while len(item['latency']) < 4:
             item['latency'].append(0)
+        while len(item['latency_p90']) < 4:
+            item['latency_p90'].append(0)
+        while len(item['latency_p50']) < 4:
+            item['latency_p50'].append(0)
         result.append(item)
     
     return result
