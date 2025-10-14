@@ -382,10 +382,9 @@ plugins.security.disabled: true
 bootstrap.memory_lock: true
 EOF
                 
-                # Set heap
-                local heap_size=$(calculate_heap_size "${HEAP:-80}" "$NODES")
-                remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
-                remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
+                # Set default 8GB heap for new nodes
+                remote_exec "sed -i 's/-Xms.*/-Xms8192m/' /opt/opensearch-node$i/config/jvm.options"
+                remote_exec "sed -i 's/-Xmx.*/-Xmx8192m/' /opt/opensearch-node$i/config/jvm.options"
                 
                 # Create service
                 remote_exec "cat > /etc/systemd/system/opensearch-node$i.service" <<EOF

@@ -393,7 +393,7 @@ configure_cluster() {
     log "Configuring cluster: $nodes nodes, $shards shards"
     
     log "Attempting cluster configuration update..."
-    if IP="$TARGET_HOST" ./install/dual_installer.sh update --nodes "$nodes" --shards "$shards" --heap 80; then
+    if IP="$TARGET_HOST" ./install/dual_installer.sh update --nodes "$nodes" --shards "$shards"; then
         log "Cluster configuration completed"
     else
         log "WARNING: Cluster configuration may have failed"
