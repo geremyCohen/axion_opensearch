@@ -10,6 +10,7 @@ Actions:
   read      Display current cluster configuration (no options)
   update    Update existing cluster configuration (one or more options required)
   delete    Remove all nodes from cluster (no options)
+  drop      Drop all data except index templates (no options)
   
 Options:
   --nodes N         Number of nodes
@@ -27,6 +28,7 @@ Examples:
   $0 update --nodes 8 --shards 16 --heap 90   # Update multiple settings
   $0 read                                      # Show current configuration
   $0 delete                                    # Remove all cluster nodes
+  $0 drop                                      # Drop all data, keep templates
   IP="10.0.0.205" $0 create --nodes 4 --shards 4 --heap 80
 USAGE
 }
@@ -64,7 +66,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate action
-if [[ ! "$ACTION" =~ ^(create|read|update|delete)$ ]]; then
+if [[ ! "$ACTION" =~ ^(create|read|update|delete|drop)$ ]]; then
     echo "ERROR: Invalid action '$ACTION'"
     usage
     exit 1
@@ -485,5 +487,11 @@ case "$ACTION" in
   delete)
     require_root
     remove_install
+    ;;
+    
+  drop)
+    log "Dropping all data except index templates..."
+    remote_exec "curl -X DELETE 'localhost:9200/*' >/dev/null 2>&1"
+    log "✅ All data dropped, index templates preserved"
     ;;
 esac
