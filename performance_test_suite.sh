@@ -491,6 +491,24 @@ run_benchmark() {
         return 1
     fi
     
+    # Create index from template and wait for shards to be active
+    log "Creating nyc_taxis index with $shards shards..."
+    if ! ssh "$TARGET_HOST" "curl -X PUT 'localhost:9200/nyc_taxis' -H 'Content-Type: application/json' >/dev/null 2>&1"; then
+        log "Failed to create nyc_taxis index"
+        return 1
+    fi
+    
+    log "Waiting for all $shards shards to be active..."
+    for attempt in {1..30}; do
+        active_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=state' 2>/dev/null | grep -c 'STARTED' || echo 0")
+        if [[ "$active_shards" -eq "$shards" ]]; then
+            log "All $shards primary shards are active"
+            break
+        fi
+        log "Waiting for shards... ($active_shards/$shards active, attempt $attempt/30)"
+        sleep 2
+    done
+    
     log "Starting OSB execution..."
     if ! bash -c "$osb_cmd"; then
         log "OSB execution failed for $test_name"
