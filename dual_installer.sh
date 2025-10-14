@@ -1,0 +1,1 @@
+./install/dual_installer.sh

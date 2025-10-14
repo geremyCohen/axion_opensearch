@@ -3,17 +3,34 @@
 set -euo pipefail
 
 # Command line parameter validation
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <workload>"
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+    echo "Usage: $0 <workload> [include_tasks] [--dry-run]"
     echo ""
     echo "Required parameter:"
-    echo "  workload    Must be one of: nyc_taxis, big5, vectorsearch"
+    echo "  workload       Must be one of: nyc_taxis, big5, vectorsearch"
     echo ""
-    echo "Example: $0 nyc_taxis"
+    echo "Optional parameters:"
+    echo "  include_tasks  Tasks to include in OSB benchmark (e.g., index, search)"
+    echo "  --dry-run      Show commands without executing them"
+    echo ""
+    echo "Examples:"
+    echo "  $0 nyc_taxis"
+    echo "  $0 nyc_taxis index"
+    echo "  $0 nyc_taxis index --dry-run"
     exit 1
 fi
 
 WORKLOAD_PARAM="$1"
+INCLUDE_TASKS_PARAM="${2:-}"
+DRY_RUN=false
+
+# Check for --dry-run flag
+if [[ "${2:-}" == "--dry-run" ]]; then
+    INCLUDE_TASKS_PARAM=""
+    DRY_RUN=true
+elif [[ "${3:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+fi
 ALLOWED_WORKLOADS=("nyc_taxis" "big5" "vectorsearch")
 
 # Validate workload parameter
@@ -32,6 +49,9 @@ if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
 fi
 
 echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "DRY RUN MODE: Commands will be shown but not executed"
+fi
 
 # Configuration
 TARGET_HOST="$IP"
@@ -53,7 +73,7 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-TIMESTAMP="20251009a"
+TIMESTAMP="nyc_taxi_1014_full"
 
 # Check if this timestamp already has a checkpoint
 if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
@@ -72,6 +92,7 @@ CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
 LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
+#CLIENT_LOADS=(20 40 60 80)
 CLIENT_LOADS=(60)
 NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
 #NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
@@ -372,9 +393,7 @@ configure_cluster() {
     log "Configuring cluster: $nodes nodes, $shards shards"
     
     log "Attempting cluster configuration update..."
-    if nodesize=$nodes system_memory_percent=80 indices_breaker_total_limit=85% \
-         indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% \
-         num_of_shards=$shards ./install/dual_installer.sh update "$TARGET_HOST" 2>&1 | tee -a "$LOG_FILE"; then
+    if IP="$TARGET_HOST" ./install/dual_installer.sh update --nodes "$nodes" --shards "$shards"; then
         log "Cluster configuration completed"
     else
         log "WARNING: Cluster configuration may have failed"
@@ -417,7 +436,6 @@ run_benchmark() {
     
     local test_name="${clients}_${nodes}-${shards}_${rep}"
     local osb_output="$RESULTS_DIR/${test_name}.json"
-    local osb_log="$RESULTS_DIR/${test_name}.log"
     
     log "Starting benchmark: $test_name"
     
@@ -434,22 +452,66 @@ run_benchmark() {
     # Run OSB
     log "Executing OSB for $test_name..."
     
-    local osb_cmd="opensearch-benchmark run --workload=$WORKLOAD_NAME \
-        --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
-        --client-options=use_ssl:false,verify_certs:false,timeout:60 \
-        --kill-running-processes --include-tasks=index \
-        --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
+    # Generate OSB command using dual_installer.sh
+    local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients --osb-shards $shards"
+    if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
+        osb_cmd_args="$osb_cmd_args --include-tasks $INCLUDE_TASKS_PARAM"
+    fi
+    
+    local osb_cmd
+    if ! osb_cmd=$(IP="$TARGET_HOST" ./install/dual_installer.sh osb_command $osb_cmd_args); then
+        log "Failed to generate OSB command"
+        return 1
+    fi
     
     log "Executing OSB run, please wait for completion."
+    log "OSB Command: $osb_cmd"
+    log "DEBUG: Full command being executed:"
+    log "$osb_cmd"
     
-    if ! eval "$osb_cmd" > "$osb_log" 2>&1; then
-        log "OSB execution failed for $test_name, checking output..."
-        if [[ -f "$osb_log" ]]; then
-            log "OSB output file exists, showing last 10 lines:"
-            tail -10 "$osb_log" | while read line; do log "OSB: $line"; done
-        else
-            log "OSB output file does not exist"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "DRY RUN: Skipping OSB execution"
+        return 0
+    fi
+    
+    # Prepare cluster before OSB execution
+    log "Preparing cluster for benchmark..."
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop_all; then
+        log "Failed to drop all data"
+        return 1
+    fi
+    
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh update --shards $shards; then
+        log "Failed to update shards to $shards"
+        return 1
+    fi
+    
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
+        log "Failed to drop indices"
+        return 1
+    fi
+    
+    # Create index from template and wait for shards to be active
+    log "Creating nyc_taxis index with $shards shards..."
+    if ! ssh "$TARGET_HOST" "curl -X PUT 'localhost:9200/nyc_taxis' -H 'Content-Type: application/json' >/dev/null 2>&1"; then
+        log "Failed to create nyc_taxis index"
+        return 1
+    fi
+    
+    log "Waiting for all $shards primary shards to be active..."
+    for attempt in {1..30}; do
+        active_primary_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=prirep,state' 2>/dev/null | grep -c '^p.*STARTED' || echo 0")
+        if [[ "$active_primary_shards" -eq "$shards" ]]; then
+            log "All $shards primary shards are active"
+            break
         fi
+        log "Waiting for primary shards... ($active_primary_shards/$shards active, attempt $attempt/30)"
+        sleep 2
+    done
+    
+    log "Starting OSB execution..."
+    if ! bash -c "$osb_cmd"; then
+        log "OSB execution failed for $test_name"
         log "Continuing despite OSB failure..."
         set -e  # Re-enable exit on error
         return 1
@@ -457,13 +519,11 @@ run_benchmark() {
     
     log "OSB execution completed for $test_name"
     
-    # Extract test-run-id from OSB output
-    local test_run_id=$(grep -o '\[Test Run ID\]: [a-f0-9-]*' "$osb_log" | cut -d' ' -f4)
-    if [[ -n "$test_run_id" ]]; then
-        log "Found test-run-id: $test_run_id"
-        
-        # Copy JSON results from OSB data directory
-        local osb_json_file="$HOME/.benchmark/benchmarks/test-runs/$test_run_id/test_run.json"
+    # Copy JSON results from OSB data directory (find latest test run)
+    # Copy JSON results from OSB data directory (find latest test run)
+    local latest_test_run=$(ls -t "$HOME/.benchmark/benchmarks/test-runs/" | head -1)
+    if [[ -n "$latest_test_run" ]]; then
+        local osb_json_file="$HOME/.benchmark/benchmarks/test-runs/$latest_test_run/test_run.json"
         if [[ -f "$osb_json_file" ]]; then
             cp "$osb_json_file" "$osb_output"
             log "Copied OSB JSON results to $osb_output"
@@ -471,12 +531,7 @@ run_benchmark() {
             log "Warning: OSB JSON results file not found: $osb_json_file"
         fi
     else
-        log "Warning: Could not extract test-run-id from OSB output"
-    fi
-    
-    # Verify success
-    if ! grep -q "SUCCESS\|✅ SUCCESS" "$osb_log"; then
-        log "Warning: Success marker not found in $test_name output"
+        log "Warning: No test runs found in OSB directory"
     fi
     
     log "Completed benchmark: $test_name"
