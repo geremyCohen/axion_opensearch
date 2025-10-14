@@ -454,9 +454,9 @@ run_benchmark() {
     
     # Generate OSB command using dual_installer.sh
     local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients --osb-shards $shards"
-    # Default to "index" task if no include_tasks specified
-    local tasks_to_include="${INCLUDE_TASKS_PARAM:-index}"
-    osb_cmd_args="$osb_cmd_args --include-tasks $tasks_to_include"
+    if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
+        osb_cmd_args="$osb_cmd_args --include-tasks $INCLUDE_TASKS_PARAM"
+    fi
     
     local osb_cmd
     if ! osb_cmd=$(IP="$TARGET_HOST" ./install/dual_installer.sh osb_command $osb_cmd_args); then
