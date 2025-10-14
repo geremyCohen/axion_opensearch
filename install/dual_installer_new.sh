@@ -3,49 +3,89 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 <action> [node_count] [shard_count] [heap_percent]
+Usage: $0 <action> [options]
   
 Actions:
-  create    Create new OpenSearch cluster
-  read      Display current cluster configuration
-  update    Update existing cluster configuration  
-  delete    Remove all nodes from cluster
+  create    Create new OpenSearch cluster (all options required)
+  read      Display current cluster configuration (no options)
+  update    Update existing cluster configuration (one or more options required)
+  delete    Remove all nodes from cluster (no options)
   
-Parameters (for create/update only):
-  node_count    Number of nodes (default: 2)
-  shard_count   Number of primary shards for nyc_taxis index (default: node_count)
-  heap_percent  JVM heap memory percentage (default: 80)
+Options:
+  --nodes N         Number of nodes
+  --shards N        Number of primary shards for nyc_taxis index  
+  --heap N          JVM heap memory percentage (1-100)
 
 Environment Variables:
-  IP           Remote host IP (optional, defaults to localhost)
+  IP               Remote host IP (optional, defaults to localhost)
 
 Examples:
-  $0 create                        # Create 2-node cluster locally
-  $0 create 4                      # Create 4-node cluster with 4 shards, 80% heap
-  $0 create 8 16 90                # Create 8-node cluster with 16 shards, 90% heap
-  IP="10.0.0.205" $0 create 4      # Create 4-node cluster on remote host
-  $0 update 6                      # Scale to 6 nodes, keep existing shard/heap settings
-  $0 update 0 24                   # Update to 24 shards, keep existing node/heap settings
-  $0 update 0 0 85                 # Update heap to 85%, keep existing node/shard settings
-  $0 read                          # Show current configuration
-  $0 delete                        # Remove all cluster nodes
-  IP="10.0.0.205" $0 delete        # Remove cluster from remote host
+  $0 create --nodes 4 --shards 8 --heap 90    # Create 4-node cluster
+  $0 update --nodes 6                         # Scale to 6 nodes
+  $0 update --shards 24                       # Update to 24 shards
+  $0 update --heap 85                         # Update heap to 85%
+  $0 update --nodes 8 --shards 16 --heap 90   # Update multiple settings
+  $0 read                                      # Show current configuration
+  $0 delete                                    # Remove all cluster nodes
+  IP="10.0.0.205" $0 create --nodes 4 --shards 4 --heap 80
 USAGE
 }
 
 # =========================
-# Parameters
+# Parse arguments
 # =========================
 ACTION="${1:-}"
-NODE_COUNT="${2:-0}"
-SHARD_COUNT="${3:-0}"
-HEAP_PERCENT="${4:-0}"
+shift || true
+
+NODES=""
+SHARDS=""
+HEAP=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --nodes)
+      NODES="$2"
+      shift 2
+      ;;
+    --shards)
+      SHARDS="$2"
+      shift 2
+      ;;
+    --heap)
+      HEAP="$2"
+      shift 2
+      ;;
+    *)
+      echo "ERROR: Unknown option $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
 
 # Validate action
 if [[ ! "$ACTION" =~ ^(create|read|update|delete)$ ]]; then
     echo "ERROR: Invalid action '$ACTION'"
     usage
     exit 1
+fi
+
+# Validate required parameters for create
+if [[ "$ACTION" == "create" ]]; then
+    if [[ -z "$NODES" || -z "$SHARDS" || -z "$HEAP" ]]; then
+        echo "ERROR: create requires --nodes, --shards, and --heap"
+        usage
+        exit 1
+    fi
+fi
+
+# Validate at least one parameter for update
+if [[ "$ACTION" == "update" ]]; then
+    if [[ -z "$NODES" && -z "$SHARDS" && -z "$HEAP" ]]; then
+        echo "ERROR: update requires at least one of --nodes, --shards, or --heap"
+        usage
+        exit 1
+    fi
 fi
 
 # Remote execution detection
@@ -55,7 +95,7 @@ if [[ -n "$REMOTE_HOST_IP" ]]; then
     echo "[install] Copying installer to remote host..."
     scp "$0" "$REMOTE_HOST_IP:/tmp/"
     echo "[install] Executing remotely: sudo /tmp/$(basename "$0") $*"
-    ssh "$REMOTE_HOST_IP" "sudo /tmp/$(basename "$0") $*"
+    ssh "$REMOTE_HOST_IP" "sudo /tmp/$(basename "$0") $ACTION $([ -n "$NODES" ] && echo "--nodes $NODES") $([ -n "$SHARDS" ] && echo "--shards $SHARDS") $([ -n "$HEAP" ] && echo "--heap $HEAP")"
     exit $?
 fi
 
@@ -67,7 +107,7 @@ log() {
 # Main CRUD operations
 case "$ACTION" in
   create)
-    log "Creating $NODE_COUNT-node cluster..."
+    log "Creating $NODES-node cluster with $SHARDS shards, ${HEAP}% heap..."
     # Call original installer logic here
     ;;
     
@@ -95,6 +135,9 @@ case "$ACTION" in
     
   update)
     log "Updating cluster configuration..."
+    [[ -n "$NODES" ]] && log "  Nodes: $NODES"
+    [[ -n "$SHARDS" ]] && log "  Shards: $SHARDS" 
+    [[ -n "$HEAP" ]] && log "  Heap: ${HEAP}%"
     # Call original update logic here
     ;;
     
