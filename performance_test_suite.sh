@@ -73,7 +73,7 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-TIMESTAMP="nyc_taxi_1014_full"
+TIMESTAMP="nyc_taxi_1014_full-2"
 
 # Check if this timestamp already has a checkpoint
 if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
@@ -454,9 +454,9 @@ run_benchmark() {
     
     # Generate OSB command using dual_installer.sh
     local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients --osb-shards $shards"
-    if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
-        osb_cmd_args="$osb_cmd_args --include-tasks $INCLUDE_TASKS_PARAM"
-    fi
+    # Default to "index" task if no include_tasks specified
+    local tasks_to_include="${INCLUDE_TASKS_PARAM:-index}"
+    osb_cmd_args="$osb_cmd_args --include-tasks $tasks_to_include"
     
     local osb_cmd
     if ! osb_cmd=$(IP="$TARGET_HOST" ./install/dual_installer.sh osb_command $osb_cmd_args); then
