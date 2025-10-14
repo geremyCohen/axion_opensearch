@@ -280,7 +280,7 @@ ExecStart=/opt/opensearch-node$i/bin/opensearch
 Restart=always
 RestartSec=10
 LimitNOFILE=65536
-LimitNPROC=4096
+LimitNPROC=65536
 LimitMEMLOCK=infinity
 Environment=OPENSEARCH_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
 Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
@@ -410,7 +410,7 @@ ExecStart=/opt/opensearch-node$i/bin/opensearch
 Restart=always
 RestartSec=10
 LimitNOFILE=65536
-LimitNPROC=4096
+LimitNPROC=65536
 LimitMEMLOCK=infinity
 Environment=OPENSEARCH_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
 Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
