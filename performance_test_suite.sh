@@ -455,7 +455,7 @@ run_benchmark() {
     log "Executing OSB run, please wait for completion."
     log "OSB Command: $osb_cmd"
     
-    if ! script -qec "$osb_cmd" /dev/null | tee -a "$osb_log"; then
+    if ! unbuffer bash -c "$osb_cmd" 2>&1 | tee -a "$osb_log"; then
         log "OSB execution failed for $test_name, checking output..."
         if [[ -f "$osb_log" ]]; then
             log "OSB output file exists, showing last 10 lines:"
