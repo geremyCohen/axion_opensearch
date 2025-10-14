@@ -452,7 +452,7 @@ run_benchmark() {
     log "Executing OSB for $test_name..."
     
     # Generate OSB command using dual_installer.sh
-    local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients"
+    local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients --osb-shards $shards"
     if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
         osb_cmd_args="$osb_cmd_args --include-tasks $INCLUDE_TASKS_PARAM"
     fi
