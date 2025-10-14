@@ -3,23 +3,34 @@
 set -euo pipefail
 
 # Command line parameter validation
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "Usage: $0 <workload> [include_tasks]"
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+    echo "Usage: $0 <workload> [include_tasks] [--dry-run]"
     echo ""
     echo "Required parameter:"
     echo "  workload       Must be one of: nyc_taxis, big5, vectorsearch"
     echo ""
-    echo "Optional parameter:"
+    echo "Optional parameters:"
     echo "  include_tasks  Tasks to include in OSB benchmark (e.g., index, search)"
+    echo "  --dry-run      Show commands without executing them"
     echo ""
     echo "Examples:"
     echo "  $0 nyc_taxis"
     echo "  $0 nyc_taxis index"
+    echo "  $0 nyc_taxis index --dry-run"
     exit 1
 fi
 
 WORKLOAD_PARAM="$1"
 INCLUDE_TASKS_PARAM="${2:-}"
+DRY_RUN=false
+
+# Check for --dry-run flag
+if [[ "${2:-}" == "--dry-run" ]]; then
+    INCLUDE_TASKS_PARAM=""
+    DRY_RUN=true
+elif [[ "${3:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+fi
 ALLOWED_WORKLOADS=("nyc_taxis" "big5" "vectorsearch")
 
 # Validate workload parameter
@@ -38,6 +49,9 @@ if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
 fi
 
 echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "DRY RUN MODE: Commands will be shown but not executed"
+fi
 
 # Configuration
 TARGET_HOST="$IP"
@@ -451,6 +465,11 @@ run_benchmark() {
     
     log "Executing OSB run, please wait for completion."
     log "OSB Command: $osb_cmd"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "DRY RUN: Skipping OSB execution"
+        return 0
+    fi
     
     if ! eval "$osb_cmd"; then
         log "OSB execution failed for $test_name"
