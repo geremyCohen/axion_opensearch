@@ -371,13 +371,17 @@ EOF
         fi
         
         # Wait for cluster to stabilize
-        sleep 30
-        for attempt in {1..15}; do
-            if remote_exec "curl -s localhost:9200/_cluster/health | jq -r '.status' | grep -q green"; then
+        log "Polling for cluster stabilization..."
+        for attempt in {1..60}; do
+            local current_node_count=$(remote_exec "curl -s localhost:9200/_cat/nodes?h=name 2>/dev/null | wc -l || echo 0")
+            local cluster_status=$(remote_exec "curl -s localhost:9200/_cluster/health 2>/dev/null | jq -r '.status // \"unknown\"' 2>/dev/null || echo 'unknown'")
+            
+            if [[ "$current_node_count" -eq "$NODES" && "$cluster_status" == "green" ]]; then
+                log "Cluster stabilized: $current_node_count nodes, status: $cluster_status"
                 break
             fi
-            log "Waiting for cluster stabilization... (attempt $attempt/15)"
-            sleep 10
+            log "Waiting for cluster stabilization... (attempt $attempt/60, nodes: $current_node_count/$NODES, status: $cluster_status)"
+            sleep 1
         done
     fi
     
@@ -385,10 +389,10 @@ EOF
     if [[ -n "$SHARDS" ]]; then
         log "Updating nyc_taxis index to $SHARDS shards..."
         
-        # Delete existing index
-        remote_exec "curl -X DELETE 'localhost:9200/nyc_taxis*' >/dev/null 2>&1 || true"
+        # Delete existing index asynchronously
+        remote_exec "curl -X DELETE 'localhost:9200/nyc_taxis*' >/dev/null 2>&1 &"
         
-        # Update index template
+        # Update index template asynchronously
         remote_exec "curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' -H 'Content-Type: application/json' -d '{
             \"index_patterns\": [\"nyc_taxis*\"],
             \"template\": {
@@ -398,7 +402,19 @@ EOF
                     \"refresh_interval\": \"30s\"
                 }
             }
-        }' >/dev/null 2>&1"
+        }' >/dev/null 2>&1 &"
+        
+        # Poll every 1 second to verify template is updated
+        log "Polling for template update completion..."
+        for attempt in {1..30}; do
+            local current_shards=$(remote_exec "curl -s 'localhost:9200/_index_template/nyc_taxis_template' 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // \"0\"' 2>/dev/null || echo '0'")
+            if [[ "$current_shards" == "$SHARDS" ]]; then
+                log "Template updated successfully to $SHARDS shards"
+                break
+            fi
+            log "Waiting for template update... (attempt $attempt/30, current: $current_shards, target: $SHARDS)"
+            sleep 1
+        done
     fi
     
     log "✅ Update completed"
