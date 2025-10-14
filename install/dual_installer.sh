@@ -561,7 +561,7 @@ case "$ACTION" in
         fi
         
         # Output the complete OSB command
-        echo "opensearch-benchmark execute-test --workload=nyc_taxis \\"
+        echo "opensearch-benchmark run --workload=nyc_taxis \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes --include-tasks=\"index\" \\"
