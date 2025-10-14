@@ -115,7 +115,7 @@ log() {
 
 # Memory monitoring for async operations
 check_memory_and_sleep() {
-    sleep 0.5
+    sleep 0.25
     
     local available_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$7}'")
     local total_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
