@@ -135,7 +135,7 @@ calculate_heap_size() {
     
     local total_memory_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
     local target_heap_mb=$(( total_memory_mb * heap_percent / 100 / node_count ))
-    local max_heap_mb=31744  # 31GB in MB
+    local max_heap_mb=8192  # 8GB in MB
     
     # Never exceed 31GB per node
     if [[ $target_heap_mb -gt $max_heap_mb ]]; then
@@ -387,6 +387,28 @@ EOF
                 remote_exec "rm -rf /opt/opensearch-node$i"
             done
             remote_exec "systemctl daemon-reload"
+            
+            # Update remaining nodes' configurations for new cluster topology
+            log "Updating remaining nodes' configurations..."
+            for i in $(seq 1 "$NODES"); do
+                local http_port=$((9199 + i))
+                local transport_port=$((9299 + i))
+                
+                remote_exec "cat > /opt/opensearch-node$i/config/opensearch.yml" <<EOF
+cluster.name: axion-cluster
+node.name: node-$i
+path.data: /opt/opensearch-node$i/data
+path.logs: /opt/opensearch-node$i/logs
+network.host: 0.0.0.0
+http.port: $http_port
+transport.port: $transport_port
+discovery.seed_hosts: [$(for j in $(seq 1 "$NODES"); do echo -n "\"127.0.0.1:$((9299 + j))\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
+cluster.initial_cluster_manager_nodes: [$(for j in $(seq 1 "$NODES"); do echo -n "\"node-$j\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
+plugins.security.disabled: true
+bootstrap.memory_lock: true
+EOF
+                remote_exec "systemctl restart opensearch-node$i"
+            done
         fi
         
         # Monitor cluster stabilization with memory checks every 1s
