@@ -73,7 +73,7 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-TIMESTAMP="nyc_taxi_1013_full"
+TIMESTAMP="nyc_taxi_1014_full"
 
 # Check if this timestamp already has a checkpoint
 if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
@@ -92,10 +92,10 @@ CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
 LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(20 40 60 80)
-#CLIENT_LOADS=(60)
-#NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
-NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
+#CLIENT_LOADS=(20 40 60 80)
+CLIENT_LOADS=(60)
+NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
+#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
 #REPETITIONS=4
 
