@@ -28,6 +28,11 @@ Examples:
   $0 update --shards 24                       # Update to 24 shards
   $0 update --heap 85                         # Update heap to 85%
   $0 update --nodes 8 --shards 16 --heap 90   # Update multiple settings
+  
+  # Complete benchmark workflow:
+  $0 update --shards 16                       # Set index template to 16 shards
+  $0 drop                                      # Clear all data, keep templates
+  # Then run the OSB command from 'read' output
   $0 read                                      # Show current configuration
   $0 delete                                    # Remove all cluster nodes
   $0 drop                                      # Drop all data, keep templates
