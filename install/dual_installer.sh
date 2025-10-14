@@ -496,7 +496,7 @@ case "$ACTION" in
     ;;
     
   read)
-    log "=== Current Cluster Configuration ==="
+    echo "=== Current Cluster Configuration ==="
     
     # Get node count
     node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
@@ -505,7 +505,7 @@ case "$ACTION" in
     else
         actual_nodes=$(echo "$node_response" | wc -l)
     fi
-    log "Nodes: $actual_nodes"
+    echo "Nodes: $actual_nodes"
     
     # Get shard count for nyc_taxis
     index_name="nyc_taxis"
@@ -513,27 +513,27 @@ case "$ACTION" in
     if [[ "$shard_response" == *"error"* ]] || [[ -z "$shard_response" ]]; then
         # No index exists, check template
         template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/${index_name}_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "0"' 2>/dev/null || echo "0")
-        log "${index_name} shards: $template_shards (template)"
+        echo "${index_name} shards: $template_shards (template)"
     else
         actual_shards=$(echo "$shard_response" | grep "p" | wc -l)
-        log "${index_name} shards: $actual_shards (active index)"
+        echo "${index_name} shards: $actual_shards (active index)"
     fi
     
     # Get heap settings (from first node)
     if [[ -f "/opt/opensearch-node1/config/jvm.options" ]]; then
       heap_mb=$(grep "^-Xmx" /opt/opensearch-node1/config/jvm.options | sed 's/-Xmx\|m//g')
       heap_gb=$(( heap_mb / 1024 ))
-      log "Heap Size: ${heap_gb}GB (${heap_mb}MB)"
+      echo "Heap Size: ${heap_gb}GB (${heap_mb}MB)"
     fi
     
     # Get cluster health
     health=$(timeout 10 curl -s "localhost:9200/_cluster/health" 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unknown")
-    log "Health: $health"
+    echo "Health: $health"
     
     # Generate OSB connection string if nodes exist
     if [[ "$actual_nodes" -gt 0 ]]; then
-        log ""
-        log "=== OpenSearch Benchmark Command ==="
+        echo ""
+        echo "=== OpenSearch Benchmark Command ==="
         
         # Determine host IP
         if [[ -n "${IP:-}" ]]; then
@@ -561,11 +561,11 @@ case "$ACTION" in
         fi
         
         # Output the complete OSB command
-        log "opensearch-benchmark execute-test --workload=nyc_taxis \\"
-        log "  --target-hosts=${target_hosts} \\"
-        log "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
-        log "  --kill-running-processes --include-tasks=\"index\" \\"
-        log "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+        echo "opensearch-benchmark execute-test --workload=nyc_taxis \\"
+        echo "  --target-hosts=${target_hosts} \\"
+        echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
+        echo "  --kill-running-processes --include-tasks=\"index\" \\"
+        echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
     fi
     ;;
     
