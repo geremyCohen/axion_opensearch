@@ -115,19 +115,16 @@ log() {
 
 # Memory monitoring for async operations
 check_memory_and_sleep() {
-    sleep 0.25
+    sleep 1.0
     
     local available_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$7}'")
     local total_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
     local available_percent=$(( available_mb * 100 / total_mb ))
     
-    if [[ $available_percent -lt 5 ]]; then
+    if [[ $available_percent -le 10 ]]; then
         log "FATAL: Available memory critically low: ${available_percent}% (${available_mb}MB/${total_mb}MB)"
         log "Aborting operation to prevent system instability"
         exit 1
-    elif [[ $available_percent -lt 10 ]]; then
-        log "WARNING: Available memory low: ${available_percent}% (${available_mb}MB/${total_mb}MB) - extending sleep"
-        sleep 3.0
     fi
 }
 
