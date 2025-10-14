@@ -529,6 +529,44 @@ case "$ACTION" in
     # Get cluster health
     health=$(timeout 10 curl -s "localhost:9200/_cluster/health" 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unknown")
     log "Health: $health"
+    
+    # Generate OSB connection string if nodes exist
+    if [[ "$actual_nodes" -gt 0 ]]; then
+        log ""
+        log "=== OpenSearch Benchmark Command ==="
+        
+        # Determine host IP
+        if [[ -n "${IP:-}" ]]; then
+            host_ip="$IP"
+        else
+            # Get the actual IP of the current machine
+            host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
+        fi
+        
+        # Build target-hosts string
+        target_hosts=""
+        for ((i=1; i<=actual_nodes; i++)); do
+            port=$((9199 + i))
+            if [[ $i -eq 1 ]]; then
+                target_hosts="${host_ip}:${port}"
+            else
+                target_hosts="${target_hosts},${host_ip}:${port}"
+            fi
+        done
+        
+        # Calculate bulk_indexing_clients (nodes * 4 + 20, capped at 150)
+        bulk_clients=$((actual_nodes * 4 + 20))
+        if [[ $bulk_clients -gt 150 ]]; then
+            bulk_clients=150
+        fi
+        
+        # Output the complete OSB command
+        log "opensearch-benchmark execute-test --workload=nyc_taxis \\"
+        log "  --target-hosts=${target_hosts} \\"
+        log "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
+        log "  --kill-running-processes --include-tasks=\"index\" \\"
+        log "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+    fi
     ;;
     
   update)
