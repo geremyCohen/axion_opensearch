@@ -461,8 +461,9 @@ case "$ACTION" in
     
     # Get heap settings (from first node)
     if [[ -f "/opt/opensearch-node1/config/jvm.options" ]]; then
-      heap_max=$(grep "^-Xmx" /opt/opensearch-node1/config/jvm.options | sed 's/-Xmx//')
-      log "Heap Size: $heap_max"
+      heap_mb=$(grep "^-Xmx" /opt/opensearch-node1/config/jvm.options | sed 's/-Xmx\|m//g')
+      heap_gb=$(( heap_mb / 1024 ))
+      log "Heap Size: ${heap_gb}GB (${heap_mb}MB)"
     fi
     
     # Get cluster health
