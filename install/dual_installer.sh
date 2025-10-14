@@ -535,8 +535,14 @@ generate_osb_command() {
     local clients="${3:-20}"
     local osb_shards="${4:-8}"
     
-    # Get node count
-    node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
+    # Get node count (use remote_exec if in remote context, otherwise direct curl)
+    local node_response
+    if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
+        node_response=$(remote_exec "timeout 10 curl -s 'localhost:9200/_cat/nodes?h=name' 2>/dev/null || echo ''")
+    else
+        node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
+    fi
+    
     if [[ -z "$node_response" ]]; then
         echo "ERROR: No OpenSearch nodes found" >&2
         exit 1
