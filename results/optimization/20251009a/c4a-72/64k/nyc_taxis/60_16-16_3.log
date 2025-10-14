@@ -6,7 +6,7 @@
 \____/ .___/\___/_/ /_/____/\___/\__,_/_/   \___/_/ /_/  /_____/\___/_/ /_/\___/_/ /_/_/ /_/ /_/\__,_/_/  /_/|_|
     /_/
 
-[INFO] [Test Run ID]: 0c9a90f9-20d7-4cb2-a85c-e5926d7ff170
+[INFO] [Test Run ID]: cc5b881d-c517-4823-9e75-4fb5b9b07309
 [WARNING] WARNING: Benchmark runs with multiple target hosts should be passed in as a JSON file such as:
 {
   "default": [
@@ -16,7 +16,15 @@
     {"host": "10.127.0.3", "port": 9200} # Specify nodes for cluster 2
   ]
 }
+[ERROR] ❌ Cannot run. .
 
------------------------------------
-[INFO] ✅ SUCCESS (took 377 seconds)
------------------------------------
+[1mGetting further help:[0m
+*********************
+* Check the log files in /home/geremy_cohen_arm_com/.osb/logs for errors.
+* Read the documentation at [4mhttps://opensearch.org/docs[0m.
+* Ask a question on the forum at [4mhttps://forum.opensearch.org/[0m.
+* Raise an issue at [4mhttps://github.com/opensearch-project/OpenSearch-Benchmark/issues[0m and include the log files in /home/geremy_cohen_arm_com/.osb/logs.
+
+----------------------------------
+[INFO] ❌ FAILURE (took 32 seconds)
+----------------------------------
