@@ -543,6 +543,8 @@ case "$ACTION" in
             host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
         fi
         
+        echo "# Delete existing index first: curl -X DELETE 'http://${host_ip}:9200/nyc_taxis*'"
+        
         # Build target-hosts string
         target_hosts=""
         for ((i=1; i<=actual_nodes; i++)); do
@@ -560,12 +562,15 @@ case "$ACTION" in
             bulk_clients=150
         fi
         
+        # Get shard count from template for OSB parameters
+        template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/${index_name}_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "1"' 2>/dev/null || echo "1")
+        
         # Output the complete OSB command
         echo "opensearch-benchmark run --workload=nyc_taxis \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes --include-tasks=\"index\" \\"
-        echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
+        echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
     fi
     ;;
     
