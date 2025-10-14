@@ -40,7 +40,7 @@ fi
 echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
 
 # Configuration
-TARGET_HOST="${IP:-10.0.0.120}"
+TARGET_HOST="$IP"
 
 # Path configuration - consolidate all path components
 WORKLOAD_NAME="$WORKLOAD_PARAM"
@@ -455,7 +455,7 @@ run_benchmark() {
     log "Executing OSB run, please wait for completion."
     log "OSB Command: $osb_cmd"
     
-    if ! bash -c "$osb_cmd" 2>&1 | tee -a "$osb_log"; then
+    if ! script -qec "$osb_cmd" /dev/null | tee -a "$osb_log"; then
         log "OSB execution failed for $test_name, checking output..."
         if [[ -f "$osb_log" ]]; then
             log "OSB output file exists, showing last 10 lines:"
