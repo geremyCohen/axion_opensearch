@@ -578,7 +578,6 @@ case "$ACTION" in
         template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/${index_name}_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "1"' 2>/dev/null || echo "1")
         
         # Output the complete command sequence
-        echo "./dual_installer.sh drop && \\"
         echo "opensearch-benchmark run --workload=nyc_taxis \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
