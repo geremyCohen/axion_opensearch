@@ -476,14 +476,15 @@ case "$ACTION" in
     log "Nodes: $actual_nodes"
     
     # Get shard count for nyc_taxis
-    shard_response=$(timeout 10 curl -s "localhost:9200/_cat/shards/nyc_taxis?h=shard,prirep" 2>/dev/null || echo "")
+    index_name="nyc_taxis"
+    shard_response=$(timeout 10 curl -s "localhost:9200/_cat/shards/${index_name}?h=shard,prirep" 2>/dev/null || echo "")
     if [[ "$shard_response" == *"error"* ]] || [[ -z "$shard_response" ]]; then
         # No index exists, check template
-        template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/nyc_taxis_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "0"' 2>/dev/null || echo "0")
-        log "NYC Taxis Primary Shards: $template_shards (template)"
+        template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/${index_name}_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "0"' 2>/dev/null || echo "0")
+        log "${index_name} shards: $template_shards (template)"
     else
         actual_shards=$(echo "$shard_response" | grep "p" | wc -l)
-        log "NYC Taxis Primary Shards: $actual_shards (active index)"
+        log "${index_name} shards: $actual_shards (active index)"
     fi
     
     # Get heap settings (from first node)
