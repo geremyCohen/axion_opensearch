@@ -92,7 +92,7 @@ CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
 LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(20 40 60i 80)
+CLIENT_LOADS=(20 40 60 80)
 #CLIENT_LOADS=(60)
 #NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
 NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
@@ -470,6 +470,23 @@ run_benchmark() {
     if [[ "$DRY_RUN" == "true" ]]; then
         log "DRY RUN: Skipping OSB execution"
         return 0
+    fi
+    
+    # Prepare cluster before OSB execution
+    log "Preparing cluster for benchmark..."
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop_all; then
+        log "Failed to drop all data"
+        return 1
+    fi
+    
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh update --shards $shards; then
+        log "Failed to update shards to $shards"
+        return 1
+    fi
+    
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
+        log "Failed to drop indices"
+        return 1
     fi
     
     if ! eval "$osb_cmd"; then
