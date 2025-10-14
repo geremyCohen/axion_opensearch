@@ -443,7 +443,7 @@ run_benchmark() {
     local osb_cmd="opensearch-benchmark run --workload=$WORKLOAD_NAME \
         --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
         --client-options=use_ssl:false,verify_certs:false,timeout:60 \
-        --kill-running-processes --report-format=console"
+        --kill-running-processes"
     
     # Add include-tasks parameter if specified
     if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
