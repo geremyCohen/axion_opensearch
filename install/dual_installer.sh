@@ -678,7 +678,7 @@ case "$ACTION" in
         echo "opensearch-benchmark run --workload=nyc_taxis \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
-        echo "  --kill-running-processes --include-tasks=\"index\" \\"
+        echo "  --kill-running-processes \\"
         echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
     fi
     ;;
