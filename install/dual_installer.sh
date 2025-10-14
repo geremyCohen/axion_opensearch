@@ -540,7 +540,14 @@ case "$ACTION" in
     if [[ "$actual_nodes" -gt 0 ]]; then
         echo ""
         echo "=== OpenSearch Benchmark Command ==="
+        echo "# Standard workflow:"
         echo "./dual_installer.sh update --shards 16 && \\"
+        echo "./dual_installer.sh drop && \\"
+        echo ""
+        echo "# Hard reset workflow:"
+        echo "./dual_installer.sh drop_all && \\"
+        echo "./dual_installer.sh update --shards 16 && \\"
+        echo "./dual_installer.sh drop && \\"
         
         # Determine host IP
         if [[ -n "${IP:-}" ]]; then
