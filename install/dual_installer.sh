@@ -11,6 +11,7 @@ Actions:
   update    Update existing cluster configuration (one or more options required)
   delete    Remove all nodes from cluster (no options)
   drop      Drop all data except index templates (no options)
+  drop_all  Drop all data including templates, aliases, pipelines (no options)
   
 Options:
   --nodes N         Number of nodes
@@ -29,6 +30,7 @@ Examples:
   $0 read                                      # Show current configuration
   $0 delete                                    # Remove all cluster nodes
   $0 drop                                      # Drop all data, keep templates
+  $0 drop_all                                  # Drop everything (data + templates)
   IP="10.0.0.205" $0 create --nodes 4 --shards 4 --heap 80
 USAGE
 }
@@ -66,7 +68,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate action
-if [[ ! "$ACTION" =~ ^(create|read|update|delete|drop)$ ]]; then
+if [[ ! "$ACTION" =~ ^(create|read|update|delete|drop|drop_all)$ ]]; then
     echo "ERROR: Invalid action '$ACTION'"
     usage
     exit 1
@@ -512,5 +514,32 @@ case "$ACTION" in
     log "Dropping all data except index templates..."
     remote_exec "curl -X DELETE 'localhost:9200/*' >/dev/null 2>&1"
     log "✅ All data dropped, index templates preserved"
+    ;;
+    
+  drop_all)
+    log "Dropping ALL data including templates, aliases, and pipelines..."
+    
+    # Delete all indices (including system indices)
+    remote_exec "curl -X DELETE 'localhost:9200/*?expand_wildcards=all' >/dev/null 2>&1"
+    
+    # Delete all index templates
+    remote_exec "curl -X DELETE 'localhost:9200/_index_template/*' >/dev/null 2>&1"
+    
+    # Delete all legacy templates
+    remote_exec "curl -X DELETE 'localhost:9200/_template/*' >/dev/null 2>&1"
+    
+    # Delete all aliases
+    remote_exec "curl -X DELETE 'localhost:9200/_alias/*' >/dev/null 2>&1"
+    
+    # Delete all ingest pipelines
+    remote_exec "curl -X DELETE 'localhost:9200/_ingest/pipeline/*' >/dev/null 2>&1"
+    
+    # Delete all component templates
+    remote_exec "curl -X DELETE 'localhost:9200/_component_template/*' >/dev/null 2>&1"
+    
+    # Delete all stored scripts
+    remote_exec "curl -X DELETE 'localhost:9200/_scripts/*' >/dev/null 2>&1"
+    
+    log "✅ All data, templates, aliases, and pipelines dropped"
     ;;
 esac
