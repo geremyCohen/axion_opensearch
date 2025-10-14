@@ -237,20 +237,136 @@ EOF
 
 # Minimal update implementation  
 update_cluster() {
-    log "Update functionality - calling old installer temporarily"
+    local current_nodes=$(remote_exec "ls -d /opt/opensearch-node* 2>/dev/null | wc -l")
     
-    # Convert to old format and call old installer
-    env_vars=""
-    [[ -n "$NODES" ]] && env_vars="$env_vars nodesize=$NODES"
-    [[ -n "$HEAP" ]] && env_vars="$env_vars system_memory_percent=$HEAP" 
-    [[ -n "$SHARDS" ]] && env_vars="$env_vars num_of_shards=$SHARDS"
+    # Update heap if specified
+    if [[ -n "$HEAP" ]]; then
+        log "Updating heap to ${HEAP}%..."
+        local heap_size=$(( $(remote_exec "free -m | awk '/^Mem:/ {print \$2}'") * HEAP / 100 / current_nodes ))
+        
+        for i in $(seq 1 "$current_nodes"); do
+            remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
+            remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
+            remote_exec "systemctl restart opensearch-node$i"
+        done
+        
+        # Wait for cluster to recover
+        sleep 30
+        for attempt in {1..10}; do
+            if remote_exec "curl -s localhost:9200/_cluster/health | jq -r '.status' | grep -q green"; then
+                break
+            fi
+            log "Waiting for cluster recovery... (attempt $attempt/10)"
+            sleep 10
+        done
+    fi
     
-    # For now, show what would be updated
-    [[ -n "$NODES" ]] && log "Would update nodes to: $NODES"
-    [[ -n "$SHARDS" ]] && log "Would update shards to: $SHARDS"
-    [[ -n "$HEAP" ]] && log "Would update heap to: ${HEAP}%"
+    # Scale nodes if specified
+    if [[ -n "$NODES" && "$NODES" -ne "$current_nodes" ]]; then
+        if [[ "$NODES" -gt "$current_nodes" ]]; then
+            # Add nodes
+            log "Scaling up from $current_nodes to $NODES nodes..."
+            for i in $(seq $((current_nodes + 1)) "$NODES"); do
+                log "Adding node $i..."
+                remote_exec "cp -r /opt/opensearch /opt/opensearch-node$i"
+                remote_exec "mkdir -p /opt/opensearch-node$i/data /opt/opensearch-node$i/logs"
+                remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
+                
+                # Create config
+                local http_port=$((9199 + i))
+                local transport_port=$((9299 + i))
+                
+                remote_exec "cat > /opt/opensearch-node$i/config/opensearch.yml" <<EOF
+cluster.name: axion-cluster
+node.name: node-$i
+path.data: /opt/opensearch-node$i/data
+path.logs: /opt/opensearch-node$i/logs
+network.host: 0.0.0.0
+http.port: $http_port
+transport.port: $transport_port
+discovery.seed_hosts: [$(for j in $(seq 1 "$NODES"); do echo -n "\"127.0.0.1:$((9299 + j))\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
+cluster.initial_cluster_manager_nodes: [$(for j in $(seq 1 "$NODES"); do echo -n "\"node-$j\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
+plugins.security.disabled: true
+bootstrap.memory_lock: true
+EOF
+                
+                # Set heap
+                local heap_size=$(( $(remote_exec "free -m | awk '/^Mem:/ {print \$2}'") * ${HEAP:-80} / 100 / NODES ))
+                remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
+                remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
+                
+                # Create service
+                remote_exec "cat > /etc/systemd/system/opensearch-node$i.service" <<EOF
+[Unit]
+Description=OpenSearch Node $i
+After=network.target
+
+[Service]
+Type=simple
+User=opensearch
+Group=opensearch
+ExecStart=/opt/opensearch-node$i/bin/opensearch
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+LimitNPROC=4096
+LimitMEMLOCK=infinity
+Environment=OPENSEARCH_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
+WorkingDirectory=/opt/opensearch-node$i
+
+[Install]
+WantedBy=multi-user.target
+EOF
+                
+                remote_exec "systemctl daemon-reload"
+                remote_exec "systemctl enable opensearch-node$i && systemctl start opensearch-node$i"
+            done
+        else
+            # Remove nodes
+            log "Scaling down from $current_nodes to $NODES nodes..."
+            for i in $(seq $((NODES + 1)) "$current_nodes"); do
+                log "Removing node $i..."
+                remote_exec "systemctl stop opensearch-node$i || true"
+                remote_exec "systemctl disable opensearch-node$i || true"
+                remote_exec "rm -f /etc/systemd/system/opensearch-node$i.service"
+                remote_exec "rm -rf /opt/opensearch-node$i"
+            done
+            remote_exec "systemctl daemon-reload"
+        fi
+        
+        # Wait for cluster to stabilize
+        sleep 30
+        for attempt in {1..15}; do
+            if remote_exec "curl -s localhost:9200/_cluster/health | jq -r '.status' | grep -q green"; then
+                break
+            fi
+            log "Waiting for cluster stabilization... (attempt $attempt/15)"
+            sleep 10
+        done
+    fi
     
-    log "✅ Update completed (placeholder implementation)"
+    # Update shards if specified
+    if [[ -n "$SHARDS" ]]; then
+        log "Updating nyc_taxis index to $SHARDS shards..."
+        
+        # Delete existing index
+        remote_exec "curl -X DELETE 'localhost:9200/nyc_taxis*' >/dev/null 2>&1 || true"
+        
+        # Update index template
+        remote_exec "curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' -H 'Content-Type: application/json' -d '{
+            \"index_patterns\": [\"nyc_taxis*\"],
+            \"template\": {
+                \"settings\": {
+                    \"number_of_shards\": $SHARDS,
+                    \"number_of_replicas\": 1,
+                    \"refresh_interval\": \"30s\"
+                }
+            }
+        }' >/dev/null 2>&1"
+    fi
+    
+    log "✅ Update completed"
 }
 
 remove_install() {
