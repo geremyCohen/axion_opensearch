@@ -413,19 +413,23 @@ EOF
         fi
         
         # Monitor cluster stabilization with memory checks every 1s
-        log "Monitoring cluster stabilization with memory checks..."
-        for attempt in {1..60}; do
-            check_memory_and_sleep
-            
-            local current_node_count=$(remote_exec "curl -s localhost:9200/_cat/nodes?h=name 2>/dev/null | wc -l || echo 0")
-            local cluster_status=$(remote_exec "curl -s localhost:9200/_cluster/health 2>/dev/null | jq -r '.status // \"unknown\"' 2>/dev/null || echo 'unknown'")
-            
-            if [[ "$current_node_count" -eq "$NODES" && "$cluster_status" == "green" ]]; then
-                log "Cluster stabilized: $current_node_count nodes, status: $cluster_status"
-                break
-            fi
-            log "Waiting for cluster stabilization... (attempt $attempt/60, nodes: $current_node_count/$NODES, status: $cluster_status)"
-        done
+        if [[ "$NODES" -gt 0 ]]; then
+            log "Monitoring cluster stabilization with memory checks..."
+            for attempt in {1..60}; do
+                check_memory_and_sleep
+                
+                local current_node_count=$(remote_exec "curl -s localhost:9200/_cat/nodes?h=name 2>/dev/null | wc -l" | tr -d '\n' || echo "0")
+                local cluster_status=$(remote_exec "curl -s localhost:9200/_cluster/health 2>/dev/null | jq -r '.status // \"unknown\"' 2>/dev/null" | tr -d '\n' || echo "unknown")
+                
+                if [[ "$current_node_count" -eq "$NODES" && "$cluster_status" == "green" ]]; then
+                    log "Cluster stabilized: $current_node_count nodes, status: $cluster_status"
+                    break
+                fi
+                log "Waiting for cluster stabilization... (attempt $attempt/60, nodes: $current_node_count/$NODES, status: $cluster_status)"
+            done
+        else
+            log "Scaled to 0 nodes - no cluster to monitor"
+        fi
     fi
     
     # Update shards if specified
