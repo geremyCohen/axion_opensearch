@@ -453,8 +453,9 @@ run_benchmark() {
     osb_cmd="$osb_cmd --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
     
     log "Executing OSB run, please wait for completion."
+    log "OSB Command: $osb_cmd"
     
-    if ! eval "$osb_cmd" > "$osb_log" 2>&1; then
+    if ! eval "$osb_cmd" 2>&1 | tee "$osb_log"; then
         log "OSB execution failed for $test_name, checking output..."
         if [[ -f "$osb_log" ]]; then
             log "OSB output file exists, showing last 10 lines:"
