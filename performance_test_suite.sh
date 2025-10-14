@@ -40,7 +40,7 @@ fi
 echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
 
 # Configuration
-TARGET_HOST="$IP"
+TARGET_HOST="${IP:-10.0.0.120}"
 
 # Path configuration - consolidate all path components
 WORKLOAD_NAME="$WORKLOAD_PARAM"
