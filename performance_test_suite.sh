@@ -92,9 +92,10 @@ CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
 LOG_FILE="$RUN_BASE_DIR/performance_test.log"
 
 # Test parameters
-CLIENT_LOADS=(60)
-NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
-#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
+CLIENT_LOADS=(20 40 60i 80)
+#CLIENT_LOADS=(60)
+#NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
+NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
 #REPETITIONS=4
 
