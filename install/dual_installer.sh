@@ -221,6 +221,16 @@ create_cluster() {
     log "Setting system limits..."
     remote_exec "echo 'vm.max_map_count=262144' >/etc/sysctl.d/99-opensearch.conf && sysctl --system >/dev/null"
     
+    # Set user limits for opensearch user
+    remote_exec "cat > /etc/security/limits.d/99-opensearch.conf" <<EOF
+opensearch soft nofile 65536
+opensearch hard nofile 65536
+opensearch soft nproc 65536
+opensearch hard nproc 65536
+opensearch soft memlock unlimited
+opensearch hard memlock unlimited
+EOF
+    
     # Download and install OpenSearch
     log "Downloading OpenSearch $OPENSEARCH_VERSION..."
     remote_exec "cd /tmp && curl -L -o opensearch.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/$OPENSEARCH_VERSION/opensearch-$OPENSEARCH_VERSION-linux-x64.tar.gz"
