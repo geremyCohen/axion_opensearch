@@ -115,8 +115,6 @@ log() {
 
 # Memory monitoring for async operations
 check_memory_and_sleep() {
-    sleep 1.0
-    
     local available_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$7}'")
     local total_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
     local available_percent=$(( available_mb * 100 / total_mb ))
@@ -126,6 +124,8 @@ check_memory_and_sleep() {
         log "Aborting operation to prevent system instability"
         exit 1
     fi
+    
+    sleep 1.0
 }
 
 # Calculate heap size with safety limits
@@ -389,10 +389,11 @@ EOF
             remote_exec "systemctl daemon-reload"
         fi
         
-        # Wait for cluster to stabilize
-        log "Polling for cluster stabilization..."
+        # Monitor cluster stabilization with memory checks every 1s
+        log "Monitoring cluster stabilization with memory checks..."
         for attempt in {1..60}; do
             check_memory_and_sleep
+            
             local current_node_count=$(remote_exec "curl -s localhost:9200/_cat/nodes?h=name 2>/dev/null | wc -l || echo 0")
             local cluster_status=$(remote_exec "curl -s localhost:9200/_cluster/health 2>/dev/null | jq -r '.status // \"unknown\"' 2>/dev/null || echo 'unknown'")
             
@@ -408,10 +409,9 @@ EOF
     if [[ -n "$SHARDS" ]]; then
         log "Updating nyc_taxis index to $SHARDS shards..."
         
-        # Delete existing index asynchronously
+        # Start async operations
+        log "Starting async shard operations..."
         remote_exec "curl -X DELETE 'localhost:9200/nyc_taxis*' >/dev/null 2>&1 &"
-        
-        # Update index template asynchronously
         remote_exec "curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' -H 'Content-Type: application/json' -d '{
             \"index_patterns\": [\"nyc_taxis*\"],
             \"template\": {
@@ -423,10 +423,11 @@ EOF
             }
         }' >/dev/null 2>&1 &"
         
-        # Poll every 1 second to verify template is updated
-        log "Polling for template update completion..."
+        # Monitor with memory checks every 1s
+        log "Monitoring template update with memory checks..."
         for attempt in {1..30}; do
             check_memory_and_sleep
+            
             local current_shards=$(remote_exec "curl -s 'localhost:9200/_index_template/nyc_taxis_template' 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // \"0\"' 2>/dev/null || echo '0'")
             if [[ "$current_shards" == "$SHARDS" ]]; then
                 log "Template updated successfully to $SHARDS shards"
