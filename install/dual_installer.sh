@@ -379,16 +379,8 @@ EOF
         else
             # Remove nodes
             log "Scaling down from $current_nodes to $NODES nodes..."
-            for i in $(seq $((NODES + 1)) "$current_nodes"); do
-                log "Removing node $i..."
-                remote_exec "systemctl stop opensearch-node$i || true"
-                remote_exec "systemctl disable opensearch-node$i || true"
-                remote_exec "rm -f /etc/systemd/system/opensearch-node$i.service"
-                remote_exec "rm -rf /opt/opensearch-node$i"
-            done
-            remote_exec "systemctl daemon-reload"
             
-            # Update remaining nodes' configurations for new cluster topology
+            # First, update remaining nodes' configurations before removing nodes
             log "Updating remaining nodes' configurations..."
             for i in $(seq 1 "$NODES"); do
                 local http_port=$((9199 + i))
@@ -407,8 +399,17 @@ cluster.initial_cluster_manager_nodes: [$(for j in $(seq 1 "$NODES"); do echo -n
 plugins.security.disabled: true
 bootstrap.memory_lock: true
 EOF
-                remote_exec "systemctl restart opensearch-node$i"
             done
+            
+            # Then remove the excess nodes
+            for i in $(seq $((NODES + 1)) "$current_nodes"); do
+                log "Removing node $i..."
+                remote_exec "systemctl stop opensearch-node$i || true"
+                remote_exec "systemctl disable opensearch-node$i || true"
+                remote_exec "rm -f /etc/systemd/system/opensearch-node$i.service"
+                remote_exec "rm -rf /opt/opensearch-node$i"
+            done
+            remote_exec "systemctl daemon-reload"
         fi
         
         # Monitor cluster stabilization with memory checks every 1s
