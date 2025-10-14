@@ -130,7 +130,7 @@ if [[ -n "$REMOTE_HOST_IP" ]]; then
     echo "[install] Copying installer to remote host..."
     scp "$0" "$REMOTE_HOST_IP:/tmp/"
     echo "[install] Executing remotely: sudo /tmp/$(basename "$0") $*"
-    ssh "$REMOTE_HOST_IP" "sudo /tmp/$(basename "$0") $ACTION $([ -n "$NODES" ] && echo "--nodes $NODES") $([ -n "$SHARDS" ] && echo "--shards $SHARDS") $([ -n "$HEAP" ] && echo "--heap $HEAP")"
+    ssh "$REMOTE_HOST_IP" "sudo /tmp/$(basename "$0") $ACTION $([ -n "$NODES" ] && echo "--nodes $NODES") $([ -n "$SHARDS" ] && echo "--shards $SHARDS") $([ -n "$HEAP" ] && echo "--heap $HEAP") $([ -n "$WORKLOAD" ] && echo "--workload $WORKLOAD") $([ -n "$INCLUDE_TASKS" ] && echo "--include-tasks $INCLUDE_TASKS") $([ -n "$CLIENTS" ] && echo "--clients $CLIENTS") $([ -n "$OSB_SHARDS" ] && echo "--osb-shards $OSB_SHARDS")"
     exit $?
 fi
 
