@@ -111,6 +111,24 @@ log() {
     echo -e "\033[1;32m[install]\033[0m $*"
 }
 
+# Memory monitoring for async operations
+check_memory_and_sleep() {
+    sleep 0.5
+    
+    local available_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$7}'")
+    local total_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
+    local available_percent=$(( available_mb * 100 / total_mb ))
+    
+    if [[ $available_percent -lt 5 ]]; then
+        log "FATAL: Available memory critically low: ${available_percent}% (${available_mb}MB/${total_mb}MB)"
+        log "Aborting operation to prevent system instability"
+        exit 1
+    elif [[ $available_percent -lt 10 ]]; then
+        log "WARNING: Available memory low: ${available_percent}% (${available_mb}MB/${total_mb}MB) - extending sleep"
+        sleep 3.0
+    fi
+}
+
 # Calculate heap size with safety limits
 calculate_heap_size() {
     local heap_percent="$1"
@@ -375,6 +393,7 @@ EOF
         # Wait for cluster to stabilize
         log "Polling for cluster stabilization..."
         for attempt in {1..60}; do
+            check_memory_and_sleep
             local current_node_count=$(remote_exec "curl -s localhost:9200/_cat/nodes?h=name 2>/dev/null | wc -l || echo 0")
             local cluster_status=$(remote_exec "curl -s localhost:9200/_cluster/health 2>/dev/null | jq -r '.status // \"unknown\"' 2>/dev/null || echo 'unknown'")
             
@@ -383,7 +402,6 @@ EOF
                 break
             fi
             log "Waiting for cluster stabilization... (attempt $attempt/60, nodes: $current_node_count/$NODES, status: $cluster_status)"
-            sleep 1
         done
     fi
     
@@ -409,13 +427,13 @@ EOF
         # Poll every 1 second to verify template is updated
         log "Polling for template update completion..."
         for attempt in {1..30}; do
+            check_memory_and_sleep
             local current_shards=$(remote_exec "curl -s 'localhost:9200/_index_template/nyc_taxis_template' 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // \"0\"' 2>/dev/null || echo '0'")
             if [[ "$current_shards" == "$SHARDS" ]]; then
                 log "Template updated successfully to $SHARDS shards"
                 break
             fi
             log "Waiting for template update... (attempt $attempt/30, current: $current_shards, target: $SHARDS)"
-            sleep 1
         done
     fi
     
