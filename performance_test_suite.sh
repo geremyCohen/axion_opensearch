@@ -466,6 +466,8 @@ run_benchmark() {
     
     log "Executing OSB run, please wait for completion."
     log "OSB Command: $osb_cmd"
+    log "DEBUG: Full command being executed:"
+    log "$osb_cmd"
     
     if [[ "$DRY_RUN" == "true" ]]; then
         log "DRY RUN: Skipping OSB execution"
@@ -489,7 +491,8 @@ run_benchmark() {
         return 1
     fi
     
-    if ! eval "$osb_cmd"; then
+    log "Starting OSB execution with 30 minute timeout..."
+    if ! timeout 1800 eval "$osb_cmd"; then
         log "OSB execution failed for $test_name"
         log "Continuing despite OSB failure..."
         set -e  # Re-enable exit on error
