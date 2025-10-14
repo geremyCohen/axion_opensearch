@@ -164,14 +164,15 @@ calculate_heap_size() {
     local heap_percent="$1"
     local node_count="$2"
     
-    # Prevent division by zero
-    if [[ "$node_count" -eq 0 ]]; then
-        echo "ERROR: Cannot calculate heap size with 0 nodes" >&2
-        return 1
-    fi
-    
     local total_memory_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
-    local target_heap_mb=$(( total_memory_mb * heap_percent / 100 / node_count ))
+    local target_heap_mb
+    
+    # Set to 8GB if node_count is 0, otherwise calculate normally
+    if [[ "$node_count" -eq 0 ]]; then
+        target_heap_mb=8192  # 8GB in MB
+    else
+        target_heap_mb=$(( total_memory_mb * heap_percent / 100 / node_count ))
+    fi
     local max_heap_mb=8192  # 8GB in MB
     
     # Never exceed 31GB per node
