@@ -138,10 +138,8 @@ case "$ACTION" in
   create)
     require_root
     log "Creating $NODES-node cluster with $SHARDS shards, ${HEAP}% heap..."
-    
-    # For now, call old installer with converted parameters
-    nodesize="$NODES" system_memory_percent="$HEAP" num_of_shards="$SHARDS" \
-    bash /home/geremy_cohen_arm_com/axion_opensearch/install/dual_installer_old.sh install "$NODES"
+    log "ERROR: Create function not fully implemented yet - requires porting install logic"
+    exit 1
     ;;
     
   read)
@@ -172,14 +170,8 @@ case "$ACTION" in
     [[ -n "$NODES" ]] && log "  Nodes: $NODES"
     [[ -n "$SHARDS" ]] && log "  Shards: $SHARDS" 
     [[ -n "$HEAP" ]] && log "  Heap: ${HEAP}%"
-    
-    # For now, call old installer with converted parameters
-    env_vars=""
-    [[ -n "$NODES" ]] && env_vars="$env_vars nodesize=$NODES"
-    [[ -n "$HEAP" ]] && env_vars="$env_vars system_memory_percent=$HEAP"
-    [[ -n "$SHARDS" ]] && env_vars="$env_vars num_of_shards=$SHARDS"
-    
-    eval "$env_vars bash /home/geremy_cohen_arm_com/axion_opensearch/install/dual_installer_old.sh update"
+    log "ERROR: Update function not fully implemented yet - requires porting update logic"
+    exit 1
     ;;
     
   delete)
