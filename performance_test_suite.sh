@@ -378,9 +378,7 @@ configure_cluster() {
     log "Configuring cluster: $nodes nodes, $shards shards"
     
     log "Attempting cluster configuration update..."
-    if nodesize=$nodes system_memory_percent=80 indices_breaker_total_limit=85% \
-         indices_breaker_request_limit=70% indices_breaker_fielddata_limit=50% \
-         num_of_shards=$shards ./install/dual_installer.sh update "$TARGET_HOST" 2>&1 | tee -a "$LOG_FILE"; then
+    if IP="$TARGET_HOST" ./install/dual_installer.sh update "$nodes" "$shards" 80; then
         log "Cluster configuration completed"
     else
         log "WARNING: Cluster configuration may have failed"

@@ -3,40 +3,33 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 [install|remove|update|get_con_string|set-node-size] [node_count] [remote_ip]
-  install        Install or upgrade OpenSearch cluster (default if omitted)
-  remove         Stop services and remove all OpenSearch installations (auto-detects node count)
-  update         Update existing cluster configuration (requires environment variables)
-  get_con_string Generate OpenSearch Benchmark command line for current cluster
-  set-node-size  Scale cluster to specified node count (requires nodesize env var)
-  node_count     Number of nodes to install (default: 2, ignored for remove/update/get_con_string/set-node-size)
-  remote_ip      Remote host IP for SSH installation (optional, uses IP env var if omitted)
+Usage: $0 <action> [node_count] [shard_count] [heap_percent]
+  
+Actions:
+  create    Create new OpenSearch cluster
+  read      Display current cluster configuration
+  update    Update existing cluster configuration  
+  delete    Remove all nodes from cluster
+  
+Parameters (for create/update only):
+  node_count    Number of nodes (default: 2)
+  shard_count   Number of primary shards for nyc_taxis index (default: node_count)
+  heap_percent  JVM heap memory percentage (default: 80)
+
+Environment Variables:
+  IP           Remote host IP (optional, defaults to localhost)
 
 Examples:
-  $0 install                    # Install 2-node cluster locally
-  $0 install 4                  # Install 4-node cluster locally
-  $0 install 4 10.0.0.205       # Install 4-node cluster on remote host
-  IP="10.0.0.205" $0 install 4  # Install 4-node cluster using IP env var
-  $0 remove                     # Remove all nodes locally (auto-detect)
-  $0 remove 10.0.0.205          # Remove all nodes from remote host (auto-detect)
-  IP="10.0.0.205" $0 remove     # Remove all nodes using IP env var
-  $0 get_con_string             # Generate OSB command for local cluster
-  IP="10.0.0.205" $0 get_con_string # Generate OSB command for remote cluster
-  nodesize=8 $0 set-node-size      # Scale cluster to 8 nodes locally
-  nodesize=12 IP="10.0.0.205" $0 set-node-size # Scale remote cluster to 12 nodes
-  
-Update examples:
-  system_memory_percent=80 $0 update 10.0.0.205                    # Update heap to 80% memory split
-  IP="10.0.0.205" system_memory_percent=80 $0 update              # Same using IP env var
-  indices_breaker_total_limit=85% $0 update 10.0.0.205            # Update total breaker limit
-  system_memory_percent=70 indices_breaker_request_limit=60% $0 update 10.0.0.205  # Multiple settings
-
-Update environment variables:
-  system_memory_percent         # Heap memory percentage (1-100)
-  indices_breaker_total_limit   # Total circuit breaker limit (e.g., 85%)
-  indices_breaker_request_limit # Request circuit breaker limit (e.g., 70%)
-  indices_breaker_fielddata_limit # Fielddata circuit breaker limit (e.g., 50%)
-  num_of_shards                 # Recreate nyc_taxis index with N primary shards
+  $0 create                        # Create 2-node cluster locally
+  $0 create 4                      # Create 4-node cluster with 4 shards, 80% heap
+  $0 create 8 16 90                # Create 8-node cluster with 16 shards, 90% heap
+  IP="10.0.0.205" $0 create 4      # Create 4-node cluster on remote host
+  $0 update 6                      # Scale to 6 nodes, keep existing shard/heap settings
+  $0 update 0 24                   # Update to 24 shards, keep existing node/heap settings
+  $0 update 0 0 85                 # Update heap to 85%, keep existing node/shard settings
+  $0 read                          # Show current configuration
+  $0 delete                        # Remove all cluster nodes
+  IP="10.0.0.205" $0 delete        # Remove cluster from remote host
 USAGE
 }
 
@@ -44,10 +37,17 @@ USAGE
 # Configurable parameters
 # =========================
 OPENSEARCH_VERSION="${OPENSEARCH_VERSION:-3.1.0}"
-ACTION="${1:-install}"
+ACTION="${1:-}"
+NODE_COUNT="${2:-0}"
+SHARD_COUNT="${3:-0}"
+HEAP_PERCENT="${4:-0}"
 
-# For remove/update/get_con_string/set-node-size, node_count is ignored (auto-detected)
-# For install, parse node_count and remote_ip normally
+# Validate action
+if [[ ! "$ACTION" =~ ^(create|read|update|delete)$ ]]; then
+    echo "ERROR: Invalid action '$ACTION'"
+    usage
+    exit 1
+fi
 if [[ "$ACTION" == "remove" || "$ACTION" == "update" || "$ACTION" == "get_con_string" || "$ACTION" == "set-node-size" ]]; then
   NODE_COUNT=0  # Will be auto-detected
   REMOTE_IP="${2:-${IP:-}}"  # Second parameter or IP env var for remove/update/get_con_string/set-node-size
