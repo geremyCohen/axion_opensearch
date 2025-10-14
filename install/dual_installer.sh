@@ -109,6 +109,29 @@ log() {
     echo -e "\033[1;32m[install]\033[0m $*"
 }
 
+# Calculate heap size with safety limits
+calculate_heap_size() {
+    local heap_percent="$1"
+    local node_count="$2"
+    
+    local total_memory_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
+    local target_heap_mb=$(( total_memory_mb * heap_percent / 100 / node_count ))
+    local max_heap_mb=31744  # 31GB in MB
+    
+    # Never exceed 31GB per node
+    if [[ $target_heap_mb -gt $max_heap_mb ]]; then
+        target_heap_mb=$max_heap_mb
+    fi
+    
+    # Never exceed 80% of system memory total (safety check)
+    local max_system_heap_mb=$(( total_memory_mb * 80 / 100 / node_count ))
+    if [[ $target_heap_mb -gt $max_system_heap_mb ]]; then
+        target_heap_mb=$max_system_heap_mb
+    fi
+    
+    echo "$target_heap_mb"
+}
+
 # Essential functions
 require_root() {
     if [[ $EUID -ne 0 ]]; then
@@ -172,7 +195,7 @@ bootstrap.memory_lock: true
 EOF
         
         # Set heap size
-        local heap_size=$(( $(remote_exec "free -m | awk '/^Mem:/ {print \$2}'") * heap / 100 / nodes ))
+        local heap_size=$(calculate_heap_size "$heap" "$nodes")
         remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
         remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
         
@@ -242,7 +265,7 @@ update_cluster() {
     # Update heap if specified
     if [[ -n "$HEAP" ]]; then
         log "Updating heap to ${HEAP}%..."
-        local heap_size=$(( $(remote_exec "free -m | awk '/^Mem:/ {print \$2}'") * HEAP / 100 / current_nodes ))
+        local heap_size=$(calculate_heap_size "$HEAP" "$current_nodes")
         
         # Stop all services first
         for i in $(seq 1 "$current_nodes"); do
@@ -303,7 +326,7 @@ bootstrap.memory_lock: true
 EOF
                 
                 # Set heap
-                local heap_size=$(( $(remote_exec "free -m | awk '/^Mem:/ {print \$2}'") * ${HEAP:-80} / 100 / NODES ))
+                local heap_size=$(calculate_heap_size "${HEAP:-80}" "$NODES")
                 remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
                 remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
                 
