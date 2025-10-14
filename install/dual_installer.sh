@@ -244,20 +244,32 @@ update_cluster() {
         log "Updating heap to ${HEAP}%..."
         local heap_size=$(( $(remote_exec "free -m | awk '/^Mem:/ {print \$2}'") * HEAP / 100 / current_nodes ))
         
+        # Stop all services first
+        for i in $(seq 1 "$current_nodes"); do
+            remote_exec "systemctl stop opensearch-node$i"
+        done
+        
+        # Update heap settings
         for i in $(seq 1 "$current_nodes"); do
             remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
             remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
-            remote_exec "systemctl restart opensearch-node$i"
+        done
+        
+        # Start all services
+        for i in $(seq 1 "$current_nodes"); do
+            remote_exec "systemctl start opensearch-node$i"
+            sleep 5  # Stagger startup
         done
         
         # Wait for cluster to recover
-        sleep 30
-        for attempt in {1..10}; do
-            if remote_exec "curl -s localhost:9200/_cluster/health | jq -r '.status' | grep -q green"; then
+        log "Waiting for cluster recovery after heap update..."
+        for attempt in {1..20}; do
+            if remote_exec "curl -s localhost:9200/_cluster/health >/dev/null 2>&1"; then
+                log "Cluster recovered!"
                 break
             fi
-            log "Waiting for cluster recovery... (attempt $attempt/10)"
-            sleep 10
+            log "Waiting for cluster recovery... (attempt $attempt/20)"
+            sleep 15
         done
     fi
     
