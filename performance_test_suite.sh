@@ -492,7 +492,7 @@ run_benchmark() {
     fi
     
     log "Starting OSB execution with 30 minute timeout..."
-    if ! timeout 1800 eval "$osb_cmd"; then
+    if ! timeout 1800 bash -c "$osb_cmd"; then
         log "OSB execution failed for $test_name"
         log "Continuing despite OSB failure..."
         set -e  # Re-enable exit on error
