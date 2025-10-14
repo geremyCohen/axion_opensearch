@@ -132,7 +132,7 @@ create_cluster() {
     local heap="$3"
     
     log "Installing packages..."
-    remote_exec "apt-get update -y && apt-get install -y curl jq openjdk-17-jre-headless"
+    remote_exec "apt-get update -y && apt-get install -y curl jq openjdk-21-jre-headless"
     
     log "Creating opensearch user..."
     remote_exec "getent group opensearch >/dev/null 2>&1 || groupadd --system opensearch"
@@ -150,6 +150,7 @@ create_cluster() {
     for i in $(seq 1 "$nodes"); do
         log "Setting up node $i..."
         remote_exec "cp -r /opt/opensearch /opt/opensearch-node$i"
+        remote_exec "mkdir -p /opt/opensearch-node$i/data /opt/opensearch-node$i/logs"
         remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
         
         # Create basic config
@@ -182,14 +183,18 @@ Description=OpenSearch Node $i
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
 User=opensearch
 Group=opensearch
 ExecStart=/opt/opensearch-node$i/bin/opensearch
 Restart=always
+RestartSec=10
 LimitNOFILE=65536
 LimitNPROC=4096
 LimitMEMLOCK=infinity
+Environment=OPENSEARCH_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
+WorkingDirectory=/opt/opensearch-node$i
 
 [Install]
 WantedBy=multi-user.target
@@ -205,7 +210,14 @@ EOF
     
     # Wait for cluster
     log "Waiting for cluster to be ready..."
-    sleep 30
+    for attempt in {1..30}; do
+        if remote_exec "curl -s localhost:9200/_cluster/health >/dev/null 2>&1"; then
+            log "Cluster is ready!"
+            break
+        fi
+        log "Waiting for cluster... (attempt $attempt/30)"
+        sleep 10
+    done
     
     # Create index template
     log "Creating index template with $shards shards..."
