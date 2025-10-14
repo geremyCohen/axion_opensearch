@@ -437,17 +437,17 @@ run_benchmark() {
     # Run OSB
     log "Executing OSB for $test_name..."
     
-    local osb_cmd="opensearch-benchmark run --workload=$WORKLOAD_NAME \
-        --target-hosts=$TARGET_HOST:9200,$TARGET_HOST:9201 \
-        --client-options=use_ssl:false,verify_certs:false,timeout:60 \
-        --kill-running-processes"
-    
-    # Add include-tasks parameter if specified
+    # Generate OSB command using dual_installer.sh
+    local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients"
     if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
-        osb_cmd="$osb_cmd --include-tasks=$INCLUDE_TASKS_PARAM"
+        osb_cmd_args="$osb_cmd_args --include-tasks $INCLUDE_TASKS_PARAM"
     fi
     
-    osb_cmd="$osb_cmd --workload-params=bulk_indexing_clients:$clients,bulk_size:10000"
+    local osb_cmd
+    if ! osb_cmd=$(IP="$TARGET_HOST" ./install/dual_installer.sh osb_command $osb_cmd_args); then
+        log "Failed to generate OSB command"
+        return 1
+    fi
     
     log "Executing OSB run, please wait for completion."
     log "OSB Command: $osb_cmd"

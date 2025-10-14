@@ -6,17 +6,22 @@ usage() {
 Usage: $0 <action> [options]
   
 Actions:
-  create    Create new OpenSearch cluster (all options required)
-  read      Display current cluster configuration (no options)
-  update    Update existing cluster configuration (one or more options required)
-  delete    Remove all nodes from cluster (no options)
-  drop      Drop all data except index templates (no options)
-  drop_all  Drop all data including templates, aliases, pipelines (no options)
+  create       Create new OpenSearch cluster (all options required)
+  read         Display current cluster configuration (no options)
+  update       Update existing cluster configuration (one or more options required)
+  delete       Remove all nodes from cluster (no options)
+  drop         Drop all data except index templates (no options)
+  drop_all     Drop all data including templates, aliases, pipelines (no options)
+  osb_command  Generate OpenSearch Benchmark command (optional parameters)
   
 Options:
   --nodes N         Number of nodes
   --shards N        Number of primary shards for nyc_taxis index  
   --heap N          JVM heap memory percentage (1-100)
+  --workload NAME   Workload name for OSB (default: nyc_taxis)
+  --include-tasks T Include tasks parameter for OSB (optional)
+  --clients N       Number of bulk indexing clients (default: 20)
+  --osb-shards N    Number of shards for OSB workload-params (default: 8)
 
 Environment Variables:
   IP               Remote host IP (optional, defaults to localhost)
@@ -50,6 +55,10 @@ shift || true
 NODES=""
 SHARDS=""
 HEAP=""
+WORKLOAD=""
+INCLUDE_TASKS=""
+CLIENTS=""
+OSB_SHARDS=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -65,6 +74,22 @@ while [[ $# -gt 0 ]]; do
       HEAP="$2"
       shift 2
       ;;
+    --workload)
+      WORKLOAD="$2"
+      shift 2
+      ;;
+    --include-tasks)
+      INCLUDE_TASKS="$2"
+      shift 2
+      ;;
+    --clients)
+      CLIENTS="$2"
+      shift 2
+      ;;
+    --osb-shards)
+      OSB_SHARDS="$2"
+      shift 2
+      ;;
     *)
       echo "ERROR: Unknown option $1"
       usage
@@ -74,7 +99,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate action
-if [[ ! "$ACTION" =~ ^(create|read|update|delete|drop|drop_all)$ ]]; then
+if [[ ! "$ACTION" =~ ^(create|read|update|delete|drop|drop_all|osb_command)$ ]]; then
     echo "ERROR: Invalid action '$ACTION'"
     usage
     exit 1
@@ -494,6 +519,56 @@ remove_install() {
     log "All OpenSearch installations removed"
 }
 
+# =========================
+# Generate OSB Command
+# =========================
+generate_osb_command() {
+    local workload="${1:-nyc_taxis}"
+    local include_tasks="$2"
+    local clients="${3:-20}"
+    local osb_shards="${4:-8}"
+    
+    # Get node count
+    node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
+    if [[ -z "$node_response" ]]; then
+        echo "ERROR: No OpenSearch nodes found" >&2
+        exit 1
+    fi
+    actual_nodes=$(echo "$node_response" | wc -l)
+    
+    # Determine host IP
+    if [[ -n "${IP:-}" ]]; then
+        host_ip="$IP"
+    else
+        host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
+    fi
+    
+    # Build target-hosts string
+    target_hosts=""
+    for ((i=1; i<=actual_nodes; i++)); do
+        port=$((9199 + i))
+        if [[ $i -eq 1 ]]; then
+            target_hosts="${host_ip}:${port}"
+        else
+            target_hosts="${target_hosts},${host_ip}:${port}"
+        fi
+    done
+    
+    # Build OSB command
+    local osb_cmd="opensearch-benchmark run --workload=${workload}"
+    osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
+    osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
+    osb_cmd="${osb_cmd} --kill-running-processes"
+    
+    if [[ -n "$include_tasks" ]]; then
+        osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
+    fi
+    
+    osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
+    
+    echo "$osb_cmd"
+}
+
 # Main CRUD operations
 case "$ACTION" in
   create)
@@ -589,6 +664,10 @@ case "$ACTION" in
   update)
     require_root
     update_cluster
+    ;;
+    
+  osb_command)
+    generate_osb_command "$WORKLOAD" "$INCLUDE_TASKS" "$CLIENTS" "$OSB_SHARDS"
     ;;
     
   delete)
