@@ -452,12 +452,18 @@ case "$ACTION" in
     log "=== Current Cluster Configuration ==="
     
     # Get node count
-    actual_nodes=$(timeout 10 curl -s "http://127.0.0.1:9200/_cat/nodes?h=name" 2>/dev/null | wc -l || echo "0")
+    actual_nodes=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null | wc -l || echo "0")
     log "Nodes: $actual_nodes"
     
     # Get shard count for nyc_taxis
-    actual_shards=$(timeout 10 curl -s "http://127.0.0.1:9200/_cat/shards/nyc_taxis?h=shard,prirep" 2>/dev/null | grep "p" | wc -l || echo "0")
-    log "NYC Taxis Primary Shards: $actual_shards"
+    actual_shards=$(timeout 10 curl -s "localhost:9200/_cat/shards/nyc_taxis?h=shard,prirep" 2>/dev/null | grep "p" | wc -l || echo "0")
+    if [[ "$actual_shards" -eq 0 ]]; then
+        # No index exists, check template
+        template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/nyc_taxis_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "0"' 2>/dev/null || echo "0")
+        log "NYC Taxis Primary Shards: $template_shards (template)"
+    else
+        log "NYC Taxis Primary Shards: $actual_shards (active index)"
+    fi
     
     # Get heap settings (from first node)
     if [[ -f "/opt/opensearch-node1/config/jvm.options" ]]; then
@@ -467,7 +473,7 @@ case "$ACTION" in
     fi
     
     # Get cluster health
-    health=$(timeout 10 curl -s "http://127.0.0.1:9200/_cluster/health" 2>/dev/null | jq -r '.status' || echo "unknown")
+    health=$(timeout 10 curl -s "localhost:9200/_cluster/health" 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unknown")
     log "Health: $health"
     ;;
     
