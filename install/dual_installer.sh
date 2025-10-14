@@ -126,10 +126,10 @@ fi
 # Remote execution detection
 REMOTE_HOST_IP="${IP:-}"
 if [[ -n "$REMOTE_HOST_IP" ]]; then
-    echo "[install] Remote execution detected for $REMOTE_HOST_IP"
-    echo "[install] Copying installer to remote host..."
+    echo "[install] Remote execution detected for $REMOTE_HOST_IP" >&2
+    echo "[install] Copying installer to remote host..." >&2
     scp "$0" "$REMOTE_HOST_IP:/tmp/"
-    echo "[install] Executing remotely: sudo /tmp/$(basename "$0") $*"
+    echo "[install] Executing remotely: sudo /tmp/$(basename "$0") $*" >&2
     ssh "$REMOTE_HOST_IP" "sudo /tmp/$(basename "$0") $ACTION $([ -n "$NODES" ] && echo "--nodes $NODES") $([ -n "$SHARDS" ] && echo "--shards $SHARDS") $([ -n "$HEAP" ] && echo "--heap $HEAP") $([ -n "$WORKLOAD" ] && echo "--workload $WORKLOAD") $([ -n "$INCLUDE_TASKS" ] && echo "--include-tasks $INCLUDE_TASKS") $([ -n "$CLIENTS" ] && echo "--clients $CLIENTS") $([ -n "$OSB_SHARDS" ] && echo "--osb-shards $OSB_SHARDS")"
     exit $?
 fi
