@@ -499,7 +499,12 @@ case "$ACTION" in
     log "=== Current Cluster Configuration ==="
     
     # Get node count
-    actual_nodes=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null | wc -l || echo "0")
+    node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
+    if [[ -z "$node_response" ]]; then
+        actual_nodes=0
+    else
+        actual_nodes=$(echo "$node_response" | wc -l)
+    fi
     log "Nodes: $actual_nodes"
     
     # Get shard count for nyc_taxis
