@@ -498,14 +498,14 @@ run_benchmark() {
         return 1
     fi
     
-    log "Waiting for all $shards shards to be active..."
+    log "Waiting for all $shards primary shards to be active..."
     for attempt in {1..30}; do
-        active_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=state' 2>/dev/null | grep -c 'STARTED' || echo 0")
-        if [[ "$active_shards" -eq "$shards" ]]; then
+        active_primary_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=prirep,state' 2>/dev/null | grep -c '^p.*STARTED' || echo 0")
+        if [[ "$active_primary_shards" -eq "$shards" ]]; then
             log "All $shards primary shards are active"
             break
         fi
-        log "Waiting for shards... ($active_shards/$shards active, attempt $attempt/30)"
+        log "Waiting for primary shards... ($active_primary_shards/$shards active, attempt $attempt/30)"
         sleep 2
     done
     
