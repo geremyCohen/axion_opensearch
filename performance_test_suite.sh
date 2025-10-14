@@ -423,7 +423,6 @@ run_benchmark() {
     
     local test_name="${clients}_${nodes}-${shards}_${rep}"
     local osb_output="$RESULTS_DIR/${test_name}.json"
-    local osb_log="$RESULTS_DIR/${test_name}.log"
     
     log "Starting benchmark: $test_name"
     
@@ -455,14 +454,8 @@ run_benchmark() {
     log "Executing OSB run, please wait for completion."
     log "OSB Command: $osb_cmd"
     
-    if ! unbuffer bash -c "$osb_cmd" 2>&1 | tee -a "$osb_log"; then
-        log "OSB execution failed for $test_name, checking output..."
-        if [[ -f "$osb_log" ]]; then
-            log "OSB output file exists, showing last 10 lines:"
-            tail -10 "$osb_log" | while read line; do log "OSB: $line"; done
-        else
-            log "OSB output file does not exist"
-        fi
+    if ! eval "$osb_cmd"; then
+        log "OSB execution failed for $test_name"
         log "Continuing despite OSB failure..."
         set -e  # Re-enable exit on error
         return 1
@@ -470,13 +463,11 @@ run_benchmark() {
     
     log "OSB execution completed for $test_name"
     
-    # Extract test-run-id from OSB output
-    local test_run_id=$(grep -o '\[Test Run ID\]: [a-f0-9-]*' "$osb_log" | cut -d' ' -f4)
-    if [[ -n "$test_run_id" ]]; then
-        log "Found test-run-id: $test_run_id"
-        
-        # Copy JSON results from OSB data directory
-        local osb_json_file="$HOME/.benchmark/benchmarks/test-runs/$test_run_id/test_run.json"
+    # Copy JSON results from OSB data directory (find latest test run)
+    # Copy JSON results from OSB data directory (find latest test run)
+    local latest_test_run=$(ls -t "$HOME/.benchmark/benchmarks/test-runs/" | head -1)
+    if [[ -n "$latest_test_run" ]]; then
+        local osb_json_file="$HOME/.benchmark/benchmarks/test-runs/$latest_test_run/test_run.json"
         if [[ -f "$osb_json_file" ]]; then
             cp "$osb_json_file" "$osb_output"
             log "Copied OSB JSON results to $osb_output"
@@ -484,12 +475,7 @@ run_benchmark() {
             log "Warning: OSB JSON results file not found: $osb_json_file"
         fi
     else
-        log "Warning: Could not extract test-run-id from OSB output"
-    fi
-    
-    # Verify success
-    if ! grep -q "SUCCESS\|✅ SUCCESS" "$osb_log"; then
-        log "Warning: Success marker not found in $test_name output"
+        log "Warning: No test runs found in OSB directory"
     fi
     
     log "Completed benchmark: $test_name"
