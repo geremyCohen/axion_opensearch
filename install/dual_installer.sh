@@ -581,6 +581,7 @@ generate_osb_command() {
     osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
     osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
     osb_cmd="${osb_cmd} --kill-running-processes"
+    osb_cmd="${osb_cmd} --warmup-time-period=300 --warmup-iterations=1000"
     
     if [[ -n "$include_tasks" ]]; then
         osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
