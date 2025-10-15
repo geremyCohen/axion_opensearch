@@ -578,13 +578,14 @@ generate_osb_command() {
     
     # Build OSB command
     local osb_cmd="opensearch-benchmark run --workload=${workload}"
-    osb_cmd="${osb_cmd} --exclude-tasks=wait-until-merges-finish"
     osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
     osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
     osb_cmd="${osb_cmd} --kill-running-processes"
     
     if [[ -n "$include_tasks" ]]; then
         osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
+    else
+        osb_cmd="${osb_cmd} --include-tasks=\"index\""
     fi
     
     osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
