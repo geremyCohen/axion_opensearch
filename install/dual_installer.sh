@@ -218,6 +218,10 @@ create_cluster() {
     remote_exec "getent group opensearch >/dev/null 2>&1 || groupadd --system opensearch"
     remote_exec "id -u opensearch >/dev/null 2>&1 || useradd --system --no-create-home --gid opensearch --shell /usr/sbin/nologin opensearch"
     
+    # Detect Java path
+    JAVA_HOME_PATH=$(remote_exec "find /usr/lib/jvm -name 'java-21-openjdk-*' -type d | head -1")
+    log "Detected Java path: $JAVA_HOME_PATH"
+    
     log "Setting system limits..."
     remote_exec "echo 'vm.max_map_count=262144' >/etc/sysctl.d/99-opensearch.conf && sysctl --system >/dev/null"
     
@@ -282,7 +286,7 @@ RestartSec=10
 LimitNOFILE=65536
 LimitNPROC=65536
 LimitMEMLOCK=infinity
-Environment=OPENSEARCH_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+Environment=OPENSEARCH_JAVA_HOME=$JAVA_HOME_PATH
 Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
 WorkingDirectory=/opt/opensearch-node$i
 
@@ -412,7 +416,7 @@ RestartSec=10
 LimitNOFILE=65536
 LimitNPROC=65536
 LimitMEMLOCK=infinity
-Environment=OPENSEARCH_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+Environment=OPENSEARCH_JAVA_HOME=$JAVA_HOME_PATH
 Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
 WorkingDirectory=/opt/opensearch-node$i
 
