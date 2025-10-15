@@ -689,12 +689,12 @@ case "$ACTION" in
         template_shards=$(timeout 10 curl -s "localhost:9200/_index_template/${index_name}_template" 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // "1"' 2>/dev/null || echo "1")
         
         # Output the complete command sequence
-        echo "opensearch-benchmark run --workload=nyc_taxis \\"
+        echo "opensearch-benchmark run --workload-path=\"./osb_local_workloads/nyc_taxis_clean\" \\"
         echo "  --include-tasks=delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
-        echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
+        echo "  --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
     fi
     ;;
     
