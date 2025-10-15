@@ -680,6 +680,7 @@ case "$ACTION" in
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
+        echo "  --warmup-time-period=60 --warmup-iterations=100 \\"
         echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
     fi
     ;;
