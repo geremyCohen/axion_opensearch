@@ -585,7 +585,7 @@ generate_osb_command() {
     if [[ -n "$include_tasks" ]]; then
         osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
     else
-        osb_cmd="${osb_cmd} --include-tasks=\"index\""
+        osb_cmd="${osb_cmd} --include-tasks=\"delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count\""
     fi
     
     osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
@@ -678,7 +678,7 @@ case "$ACTION" in
         
         # Output the complete command sequence
         echo "opensearch-benchmark run --workload=nyc_taxis \\"
-        echo "  --exclude-tasks=wait-until-merges-finish \\"
+        echo "  --include-tasks=delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
