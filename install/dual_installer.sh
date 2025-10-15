@@ -581,7 +581,11 @@ generate_osb_command() {
     done
     
     # Build OSB command
-    local osb_cmd="opensearch-benchmark run --workload=${workload}"
+    if [[ "$workload" == "nyc_taxis" ]]; then
+        local osb_cmd="opensearch-benchmark run --workload-path=\"./osb_local_workloads/nyc_taxis_clean\""
+    else
+        local osb_cmd="opensearch-benchmark run --workload=${workload}"
+    fi
     osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
     osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
     osb_cmd="${osb_cmd} --kill-running-processes"
@@ -592,7 +596,11 @@ generate_osb_command() {
         osb_cmd="${osb_cmd} --include-tasks=\"delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count\""
     fi
     
-    osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
+    if [[ "$workload" == "nyc_taxis" ]]; then
+        osb_cmd="${osb_cmd} --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
+    else
+        osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
+    fi
     
     echo "$osb_cmd"
 }
