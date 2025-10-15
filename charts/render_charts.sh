@@ -140,7 +140,8 @@ def update_ui_experiment(experiment_file, data):
         return
     
     # Create output directory if it doesn't exist
-    output_dir = "./output"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(script_dir, "output")
     os.makedirs(output_dir, exist_ok=True)
     
     # Write updated content to output directory
@@ -233,11 +234,11 @@ def main():
     
     # Update all UI experiments
     ui_files = [
-        '../ui_experiment_1_efficiency_curve.html',
-        '../ui_experiment_2_cluster_comparison.html',
-        '../ui_experiment_3_rep_level_analysis.html',
-        '../ui_experiment_4_performance_bands.html',
-        '../ui_experiment_5_optimal_finder.html'
+        '/Users/gercoh01/kustomer/axion_opensearch/ui_experiment_1_efficiency_curve.html',
+        '/Users/gercoh01/kustomer/axion_opensearch/ui_experiment_2_cluster_comparison.html',
+        '/Users/gercoh01/kustomer/axion_opensearch/ui_experiment_3_rep_level_analysis.html',
+        '/Users/gercoh01/kustomer/axion_opensearch/ui_experiment_4_performance_bands.html',
+        '/Users/gercoh01/kustomer/axion_opensearch/ui_experiment_5_optimal_finder.html'
     ]
     
     for ui_file in ui_files:
@@ -247,7 +248,8 @@ def main():
     print("You can now open the HTML files in ./output/ directory in your browser to see the updated data")
     
     # Get absolute path for HTTP link
-    output_dir = os.path.abspath("./output")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(script_dir, "output")
     cluster_comparison_file = os.path.join(output_dir, "ui_experiment_2_cluster_comparison.html")
     print(f"\nDirect link to Multi-Cluster Performance Comparison:")
     print(f"file://{cluster_comparison_file}")
