@@ -139,11 +139,16 @@ def update_ui_experiment(experiment_file, data):
         print(f"Warning: Could not find data section in {experiment_file}")
         return
     
-    # Write updated content
-    with open(experiment_file, 'w') as f:
+    # Create output directory if it doesn't exist
+    output_dir = "./output"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Write updated content to output directory
+    output_file = os.path.join(output_dir, os.path.basename(experiment_file))
+    with open(output_file, 'w') as f:
         f.write(content)
     
-    print(f"Updated {experiment_file}")
+    print(f"Updated {output_file}")
 
 def transform_for_ui2(data):
     """Transform data for UI experiment 2 (cluster comparison)"""
@@ -228,18 +233,24 @@ def main():
     
     # Update all UI experiments
     ui_files = [
-        'ui_experiment_1_efficiency_curve.html',
-        'ui_experiment_2_cluster_comparison.html',
-        'ui_experiment_3_rep_level_analysis.html',
-        'ui_experiment_4_performance_bands.html',
-        'ui_experiment_5_optimal_finder.html'
+        '../ui_experiment_1_efficiency_curve.html',
+        '../ui_experiment_2_cluster_comparison.html',
+        '../ui_experiment_3_rep_level_analysis.html',
+        '../ui_experiment_4_performance_bands.html',
+        '../ui_experiment_5_optimal_finder.html'
     ]
     
     for ui_file in ui_files:
         update_ui_experiment(ui_file, data)
     
     print(f"\nUpdated {len(ui_files)} UI experiments with real data")
-    print("You can now refresh the HTML files in your browser to see the updated data")
+    print("You can now open the HTML files in ./output/ directory in your browser to see the updated data")
+    
+    # Get absolute path for HTTP link
+    output_dir = os.path.abspath("./output")
+    cluster_comparison_file = os.path.join(output_dir, "ui_experiment_2_cluster_comparison.html")
+    print(f"\nDirect link to Multi-Cluster Performance Comparison:")
+    print(f"file://{cluster_comparison_file}")
 
 if __name__ == "__main__":
     main()

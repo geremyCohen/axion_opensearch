@@ -4,3 +4,8 @@
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/vcs.xml
 performance_test.log
+/charts/output/
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
