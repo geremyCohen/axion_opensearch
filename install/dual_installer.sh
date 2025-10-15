@@ -578,7 +578,7 @@ generate_osb_command() {
     
     # Build OSB command
     local osb_cmd="opensearch-benchmark run --workload=${workload}"
-    osb_cmd="${osb_cmd} --test-procedure=append-no-conflicts-index-only"
+    osb_cmd="${osb_cmd} --exclude-tasks=wait-until-merges-finish"
     osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
     osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
     osb_cmd="${osb_cmd} --kill-running-processes"
@@ -677,7 +677,7 @@ case "$ACTION" in
         
         # Output the complete command sequence
         echo "opensearch-benchmark run --workload=nyc_taxis \\"
-        echo "  --test-procedure=append-no-conflicts-index-only \\"
+        echo "  --exclude-tasks=wait-until-merges-finish \\"
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
