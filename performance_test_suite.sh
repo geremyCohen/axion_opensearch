@@ -73,7 +73,7 @@ else
     PAGE_SIZE_DIR="4k"
 fi
 
-TIMESTAMP="nyc_taxi_1014_full"
+TIMESTAMP="nyc_taxi_1014_full-2"
 
 # Check if this timestamp already has a checkpoint
 if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
