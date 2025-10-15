@@ -581,7 +581,6 @@ generate_osb_command() {
     osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
     osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
     osb_cmd="${osb_cmd} --kill-running-processes"
-    osb_cmd="${osb_cmd} --warmup-time-period=60 --warmup-iterations=100"
     
     if [[ -n "$include_tasks" ]]; then
         osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
@@ -680,7 +679,6 @@ case "$ACTION" in
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
-        echo "  --warmup-time-period=60 --warmup-iterations=100 \\"
         echo "  --workload-params=\"bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
     fi
     ;;
