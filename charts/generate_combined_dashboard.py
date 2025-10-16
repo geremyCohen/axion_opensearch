@@ -436,7 +436,6 @@ def generate_html(data_dir):
         }}
         
         @media (min-width: 1201px) {{
-            .container {{ max-width: 1400px; }}
             .chart-grid {{ 
                 grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
             }}
