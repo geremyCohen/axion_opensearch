@@ -801,22 +801,6 @@ def generate_html(data_dir):
         throttleTableHTML += '</tbody></table>';
         document.getElementById('throttle-table').innerHTML = throttleTableHTML;
 
-        // Memory table
-        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Segments (MB)</th><th>Terms (MB)</th><th>Doc Values (MB)</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            memoryTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('memory_segments', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_terms', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_doc_values', [])}[i].toFixed(1)}}</td></tr>`;
-        }}
-        memoryTableHTML += '</tbody></table>';
-        document.getElementById('memory-table').innerHTML = memoryTableHTML;
-
-        // Counts table
-        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Merge Count</th><th>Refresh Count</th><th>Flush Count</th><th>Segment Count</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            countsTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_count', [])}[i]}}</td><td>${{{system_data.get('refresh_count', [])}[i]}}</td><td>${{{system_data.get('flush_count', [])}[i]}}</td><td>${{{system_data.get('segment_count', [])}[i]}}</td></tr>`;
-        }}
-        countsTableHTML += '</tbody></table>';
-        document.getElementById('counts-table').innerHTML = countsTableHTML;
-
         {task_scripts}
     </script>
 </body>
