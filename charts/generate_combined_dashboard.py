@@ -592,7 +592,41 @@ def generate_html(data_dir):
             font-size: 12px;
             transition: background 0.2s ease;
         }}
-        .task-nav a:hover {{ background: #2980b9; }}
+        .accordion {{
+            margin: 20px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        .accordion-header {{
+            background: #f8fafc;
+            padding: 15px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #2d3748;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .accordion-header:hover {{
+            background: #edf2f7;
+        }}
+        .accordion-content {{
+            padding: 20px;
+            background: white;
+        }}
+        .accordion-content.collapsed {{
+            display: none;
+        }}
+        .accordion-toggle {{
+            font-size: 1.2rem;
+            transition: transform 0.2s ease;
+        }}
+        .accordion-toggle.expanded {{
+            transform: rotate(90deg);
+        }}
     </style>
 </head>
 <body>
@@ -614,13 +648,27 @@ def generate_html(data_dir):
         <div class="content">
             <div class="task-nav">
                 <strong>Quick Navigation:</strong>
-                <a href="#system-metrics">System Metrics</a>
+                <a href="#tasks-section">Tasks</a>
+                <a href="#system-section">System Metrics</a>
                 {' '.join([f'<a href="#{task_name.lower().replace("_", "-")}">{task_name.title()}</a>' for task_name in all_tasks_data.keys()])}
             </div>
             
-            <div class="section" id="system-metrics">
-                <h2 class="section-header">System-Wide Metrics</h2>
-                <div class="section-content">
+            <div class="accordion" id="tasks-section">
+                <div class="accordion-header" onclick="toggleAccordion('tasks')">
+                    <span>Task Metrics</span>
+                    <span class="accordion-toggle expanded" id="tasks-toggle">▶</span>
+                </div>
+                <div class="accordion-content" id="tasks-content">
+                    {task_sections}
+                </div>
+            </div>
+            
+            <div class="accordion" id="system-section">
+                <div class="accordion-header" onclick="toggleAccordion('system')">
+                    <span>System-Wide Metrics</span>
+                    <span class="accordion-toggle" id="system-toggle">▶</span>
+                </div>
+                <div class="accordion-content collapsed" id="system-content">
                     <div class="chart-grid">
                         <div class="chart-item"><div id="total_time-chart"></div><div id="total_time-table"></div></div>
                         <div class="chart-item"><div id="total_time_min-chart"></div><div id="total_time_min-table"></div></div>
@@ -653,8 +701,6 @@ def generate_html(data_dir):
                     </div>
                 </div>
             </div>
-            
-            {task_sections}
         </div>
     </div>
 
@@ -768,6 +814,19 @@ def generate_html(data_dir):
 
         // Initial render of task charts
         renderAllTaskCharts();
+
+        function toggleAccordion(section) {{
+            const content = document.getElementById(section + '-content');
+            const toggle = document.getElementById(section + '-toggle');
+            
+            if (content.classList.contains('collapsed')) {{
+                content.classList.remove('collapsed');
+                toggle.classList.add('expanded');
+            }} else {{
+                content.classList.add('collapsed');
+                toggle.classList.remove('expanded');
+            }}
+        }}
 
         {task_scripts}
     </script>
