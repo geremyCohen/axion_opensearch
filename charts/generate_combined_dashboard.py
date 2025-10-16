@@ -218,7 +218,7 @@ def generate_html(data_dir):
             title: '{task_name.title()} Throughput Distribution (docs/s)',
             xaxis: {{ title: 'Configuration' }},
             yaxis: {{ title: 'Throughput (docs/s)' }}
-        }});
+        }}, {{ responsive: true, displayModeBar: false }});
 
         // {task_name} - Throughput table
         let {task_name.replace('-', '_')}ThroughputTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
@@ -271,7 +271,7 @@ def generate_html(data_dir):
             title: '{task_name.title()} Latency Percentiles (ms)',
             xaxis: {{ title: 'Configuration & Percentile' }},
             yaxis: {{ title: 'Latency (ms)' }}
-        }});
+        }}, {{ responsive: true, displayModeBar: false }});
 
         // {task_name} - Latency table
         let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
@@ -338,7 +338,7 @@ def generate_html(data_dir):
             title: '{task_name.title()} Service Time Percentiles (ms)',
             xaxis: {{ title: 'Configuration & Percentile' }},
             yaxis: {{ title: 'Service Time (ms)' }}
-        }});
+        }}, {{ responsive: true, displayModeBar: false }});
 
         // {task_name} - Service time table
         let {task_name.replace('-', '_')}ServiceTimeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>P50</th><th>P90</th></tr></thead><tbody>';
@@ -366,7 +366,7 @@ def generate_html(data_dir):
             xaxis: {{ title: 'Configuration' }},
             yaxis: {{ title: 'Duration (seconds)' }},
             barmode: 'group'
-        }});
+        }}, {{ responsive: true, displayModeBar: false }});
 
         // {task_name} - Duration table
         let {task_name.replace('-', '_')}DurationTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
@@ -766,7 +766,7 @@ def generate_html(data_dir):
                 xaxis: {{ title: 'Configuration' }},
                 yaxis: {{ title: getMetricUnit(metric) }},
                 barmode: 'group'
-            }});
+            }}, {{ responsive: true, displayModeBar: false }});
 
             // Generate table for this metric
             let tableHTML = `<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>`;
