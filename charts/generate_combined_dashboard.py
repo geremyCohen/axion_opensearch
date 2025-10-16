@@ -313,21 +313,25 @@ def generate_html(data_dir):
             const p50Values = configIndices.map(idx => {task_data.get('service_time_p50', [])}[idx]);
             const p90Values = configIndices.map(idx => {task_data.get('service_time_p90', [])}[idx]);
             
-            {task_name.replace('-', '_')}ServiceTimeData.push({{
-                y: p50Values,
-                type: 'box',
-                name: uniqueConfigs[i] + ' P50',
-                boxpoints: 'all',
-                marker: {{ color: '#9b59b6' }}
-            }});
+            if (shouldShowTrace('P50')) {{
+                {task_name.replace('-', '_')}ServiceTimeData.push({{
+                    y: p50Values,
+                    type: 'box',
+                    name: uniqueConfigs[i] + ' P50',
+                    boxpoints: 'all',
+                    marker: {{ color: '#9b59b6' }}
+                }});
+            }}
             
-            {task_name.replace('-', '_')}ServiceTimeData.push({{
-                y: p90Values,
-                type: 'box',
-                name: uniqueConfigs[i] + ' P90',
-                boxpoints: 'all',
-                marker: {{ color: '#6c3483' }}
-            }});
+            if (shouldShowTrace('P90')) {{
+                {task_name.replace('-', '_')}ServiceTimeData.push({{
+                    y: p90Values,
+                    type: 'box',
+                    name: uniqueConfigs[i] + ' P90',
+                    boxpoints: 'all',
+                    marker: {{ color: '#6c3483' }}
+                }});
+            }}
         }}
 
         Plotly.newPlot('{task_name}-service-time-chart', {task_name.replace('-', '_')}ServiceTimeData, {{
@@ -679,7 +683,11 @@ def generate_html(data_dir):
                 renderMetricChart(metric);
             }});
             
-            // Re-render task charts with percentile filtering
+            // Re-render all task charts
+            renderAllTaskCharts();
+        }}
+
+        function renderAllTaskCharts() {{
             {task_scripts}
         }}
 
@@ -754,6 +762,9 @@ def generate_html(data_dir):
         systemMetrics.forEach(metric => {{
             renderMetricChart(metric);
         }});
+
+        // Initial render of task charts
+        renderAllTaskCharts();
 
         {task_scripts}
     </script>
