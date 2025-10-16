@@ -394,12 +394,52 @@ def generate_html(data_dir):
             min-height: 100vh;
         }}
         .container {{
-            max-width: 2000px;
+            max-width: 100%;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
+        }}
+        .content {{ padding: 20px; }}
+        .chart-grid {{ 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 30px;
+        }}
+        .chart-item {{ 
+            background: #f8f9fa; 
+            border-radius: 8px; 
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+            min-height: 300px;
+        }}
+        
+        @media (max-width: 768px) {{
+            body {{ padding: 10px; }}
+            .content {{ padding: 15px; }}
+            .chart-grid {{ 
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }}
+            .chart-item {{ padding: 10px; }}
+            .header h1 {{ font-size: 1.8rem; }}
+        }}
+        
+        @media (min-width: 769px) and (max-width: 1200px) {{
+            .container {{ max-width: 95%; }}
+            .chart-grid {{ 
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            }}
+        }}
+        
+        @media (min-width: 1201px) {{
+            .container {{ max-width: 1400px; }}
+            .chart-grid {{ 
+                grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            }}
         }}
         .header {{
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
