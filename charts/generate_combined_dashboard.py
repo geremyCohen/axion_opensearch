@@ -774,15 +774,29 @@ def generate_html(data_dir):
         }});
 
         // Throttle table
-        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
             const config = uniqueConfigs[configIdx];
             const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            throttleTableHTML += `<tr><td>${{config}}</td>`;
+            
+            // Indexing Throttle row
+            throttleTableHTML += `<tr><td rowspan="2">${{config}}</td><td>Indexing</td>`;
             for (let rep = 0; rep < 4; rep++) {{
                 const idx = configIndices[rep];
                 if (idx !== undefined) {{
                     throttleTableHTML += `<td>${{{system_data.get('indexing_throttle_time', [])}[idx].toFixed(3)}}</td>`;
+                }} else {{
+                    throttleTableHTML += '<td>-</td>';
+                }}
+            }}
+            throttleTableHTML += '</tr>';
+            
+            // Merge Throttle row
+            throttleTableHTML += '<tr><td>Merge</td>';
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    throttleTableHTML += `<td>${{{system_data.get('merge_throttle_time', [])}[idx].toFixed(3)}}</td>`;
                 }} else {{
                     throttleTableHTML += '<td>-</td>';
                 }}
