@@ -270,17 +270,17 @@ def generate_html(data_dir):
         }});
 
         // {task_name} - Latency table
-        let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
             const config = uniqueConfigs[configIdx];
             const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
             
             // P50 row
-            {task_name.replace('-', '_')}LatencyTableHTML += `<tr><td rowspan="2">${{config}}</td>`;
+            {task_name.replace('-', '_')}LatencyTableHTML += `<tr><td rowspan="2">${{config}}</td><td>P50</td>`;
             for (let rep = 0; rep < 4; rep++) {{
                 const idx = configIndices[rep];
                 if (idx !== undefined) {{
-                    {task_name.replace('-', '_')}LatencyTableHTML += `<td>P50: ${{({task_data.get('latency_p50', [])}[idx]).toFixed(1)}}</td>`;
+                    {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p50', [])}[idx].toFixed(1)}}</td>`;
                 }} else {{
                     {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
                 }}
@@ -288,11 +288,11 @@ def generate_html(data_dir):
             {task_name.replace('-', '_')}LatencyTableHTML += '</tr>';
             
             // P90 row
-            {task_name.replace('-', '_')}LatencyTableHTML += '<tr>';
+            {task_name.replace('-', '_')}LatencyTableHTML += '<tr><td>P90</td>';
             for (let rep = 0; rep < 4; rep++) {{
                 const idx = configIndices[rep];
                 if (idx !== undefined) {{
-                    {task_name.replace('-', '_')}LatencyTableHTML += `<td>P90: ${{({task_data.get('latency_p90', [])}[idx]).toFixed(1)}}</td>`;
+                    {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p90', [])}[idx].toFixed(1)}}</td>`;
                 }} else {{
                     {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
                 }}
