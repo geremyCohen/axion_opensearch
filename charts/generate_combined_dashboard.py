@@ -347,7 +347,7 @@ def generate_html(data_dir):
             min-height: 100vh;
         }}
         .container {{
-            max-width: 1400px;
+            max-width: 1800px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
