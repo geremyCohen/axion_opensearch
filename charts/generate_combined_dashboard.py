@@ -278,9 +278,8 @@ def generate_html(data_dir):
             if (shouldShowTrace('P50')) {{
                 {task_name.replace('-', '_')}LatencyTableHTML += `<tr class="percentile-row p50-row config-${{configIdx}}"><td>${{config}}</td><td>P50</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    const idx = configIndices[rep];
-                    if (idx !== undefined) {{
-                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p50', [])}[idx].toFixed(1)}}</td>`;
+                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
+                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p50', [])}[configIdx].toFixed(1)}}</td>`;
                     }} else {{
                         {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
                     }}
@@ -292,9 +291,8 @@ def generate_html(data_dir):
             if (shouldShowTrace('P90')) {{
                 {task_name.replace('-', '_')}LatencyTableHTML += `<tr class="percentile-row p90-row config-${{configIdx}}"><td>${{config}}</td><td>P90</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    const idx = configIndices[rep];
-                    if (idx !== undefined) {{
-                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p90', [])}[idx].toFixed(1)}}</td>`;
+                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
+                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p90', [])}[configIdx].toFixed(1)}}</td>`;
                     }} else {{
                         {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
                     }}
@@ -307,10 +305,9 @@ def generate_html(data_dir):
 
         // {task_name} - Service time
         const {task_name.replace('-', '_')}ServiceTimeData = [];
-        for (let i = 0; i < uniqueConfigs.length; i++) {{
-            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
-            const p50Values = configIndices.map(idx => {task_data.get('service_time_p50', [])}[idx]);
-            const p90Values = configIndices.map(idx => {task_data.get('service_time_p90', [])}[idx]);
+        for (let i = 0; i < configs.length; i++) {{
+            const p50Values = [{task_data.get('service_time_p50', [])}[i]];
+            const p90Values = [{task_data.get('service_time_p90', [])}[i]];
             
             if (shouldShowTrace('P50')) {{
                 {task_name.replace('-', '_')}ServiceTimeData.push({{
@@ -348,9 +345,8 @@ def generate_html(data_dir):
             if (shouldShowTrace('P50')) {{
                 {task_name.replace('-', '_')}ServiceTimeTableHTML += `<tr class="percentile-row p50-row config-${{configIdx}}"><td>${{config}}</td><td>P50</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    const idx = configIndices[rep];
-                    if (idx !== undefined) {{
-                        {task_name.replace('-', '_')}ServiceTimeTableHTML += `<td>${{{task_data.get('service_time_p50', [])}[idx].toFixed(1)}}</td>`;
+                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
+                        {task_name.replace('-', '_')}ServiceTimeTableHTML += `<td>${{{task_data.get('service_time_p50', [])}[configIdx].toFixed(1)}}</td>`;
                     }} else {{
                         {task_name.replace('-', '_')}ServiceTimeTableHTML += '<td>-</td>';
                     }}
@@ -362,9 +358,8 @@ def generate_html(data_dir):
             if (shouldShowTrace('P90')) {{
                 {task_name.replace('-', '_')}ServiceTimeTableHTML += `<tr class="percentile-row p90-row config-${{configIdx}}"><td>${{config}}</td><td>P90</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    const idx = configIndices[rep];
-                    if (idx !== undefined) {{
-                        {task_name.replace('-', '_')}ServiceTimeTableHTML += `<td>${{{task_data.get('service_time_p90', [])}[idx].toFixed(1)}}</td>`;
+                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
+                        {task_name.replace('-', '_')}ServiceTimeTableHTML += `<td>${{{task_data.get('service_time_p90', [])}[configIdx].toFixed(1)}}</td>`;
                     }} else {{
                         {task_name.replace('-', '_')}ServiceTimeTableHTML += '<td>-</td>';
                     }}
@@ -380,8 +375,8 @@ def generate_html(data_dir):
         for (let rep = 1; rep <= 4; rep++) {{
             const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
             {task_name.replace('-', '_')}DurationData.push({{
-                x: repIndices.map(idx => configs[idx]),
-                y: repIndices.map(idx => {task_data.get('duration', [])}[idx]),
+                x: repIndices.map(idx => configs[configIdx]),
+                y: repIndices.map(idx => {task_data.get('duration', [])}[configIdx]),
                 type: 'bar',
                 name: `Rep ${{rep}}`,
                 marker: {{ color: repColors[rep - 1] }}
@@ -401,9 +396,8 @@ def generate_html(data_dir):
             const config = configs[configIdx];
             {task_name.replace('-', '_')}DurationTableHTML += `<tr class="config-${{configIdx}}"><td>${{config}}</td>`;
             for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    {task_name.replace('-', '_')}DurationTableHTML += `<td>${{{task_data.get('duration', [])}[idx].toFixed(1)}}</td>`;
+                if (configIdx < {len(task_data.get('duration', []))}) {{
+                    {task_name.replace('-', '_')}DurationTableHTML += `<td>${{{task_data.get('duration', [])}[configIdx].toFixed(1)}}</td>`;
                 }} else {{
                     {task_name.replace('-', '_')}DurationTableHTML += '<td>-</td>';
                 }}
@@ -832,8 +826,8 @@ def generate_html(data_dir):
             for (let rep = 1; rep <= 4; rep++) {{
                 const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
                 metricData.push({{
-                    x: repIndices.map(idx => configs[idx]),
-                    y: repIndices.map(idx => systemData[metric][idx] || 0),
+                    x: repIndices.map(idx => configs[configIdx]),
+                    y: repIndices.map(idx => systemData[metric][configIdx] || 0),
                     type: 'bar',
                     name: `Rep ${{rep}}`,
                     marker: {{ color: repColors[rep - 1] }}
@@ -849,14 +843,12 @@ def generate_html(data_dir):
 
             // Generate table for this metric
             let tableHTML = `<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>`;
-            for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-                const config = uniqueConfigs[configIdx];
-                const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            for (let configIdx = 0; configIdx < configs.length; configIdx++) {{
+                const config = configs[configIdx];
                 tableHTML += `<tr><td>${{config}}</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    const idx = configIndices[rep];
-                    if (idx !== undefined) {{
-                        const value = systemData[metric][idx] || 0;
+                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
+                        const value = systemData[metric][configIdx] || 0;
                         tableHTML += `<td>${{formatMetricValue(value, metric)}}</td>`;
                     }} else {{
                         tableHTML += '<td>-</td>';
