@@ -204,11 +204,12 @@ def generate_html(data_dir):
         // {task_name} - Throughput Distribution
         const {task_name.replace('-', '_')}ThroughputData = [];
         for (let i = 0; i < configs.length; i++) {{
-            const values = [{task_data.get('throughput_min', [])}[i], {task_data.get('throughput_median', [])}[i], {task_data.get('throughput_mean', [])}[i], {task_data.get('throughput_max', [])}[i]];
+            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
+            const values = configIndices.map(idx => [{task_data.get('throughput_min', [])}[idx], {task_data.get('throughput_median', [])}[idx], {task_data.get('throughput_mean', [])}[idx], {task_data.get('throughput_max', [])}[idx]]).flat();
             {task_name.replace('-', '_')}ThroughputData.push({{
                 y: values,
                 type: 'box',
-                name: configs[i],
+                name: uniqueConfigs[i],
                 boxpoints: false
             }});
         }}
@@ -222,11 +223,13 @@ def generate_html(data_dir):
         // {task_name} - Throughput table
         let {task_name.replace('-', '_')}ThroughputTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < configs.length; configIdx++) {{
-            const config = configs[configIdx];
-            {task_name.replace('-', '_')}ThroughputTableHTML += `<tr class="config-${{configIdx}}"><td>${{config}}</td>`;
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            {task_name.replace('-', '_')}ThroughputTableHTML += `<tr><td>${{config}}</td>`;
             for (let rep = 0; rep < 4; rep++) {{
-                if (configIdx < {len(task_data.get('throughput_median', []))}) {{
-                    {task_name.replace('-', '_')}ThroughputTableHTML += `<td>${{{task_data.get('throughput_mean', [])}[configIdx].toFixed(0)}}</td>`;
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    {task_name.replace('-', '_')}ThroughputTableHTML += `<td>${{{task_data.get('throughput_mean', [])}[idx].toFixed(0)}}</td>`;
                 }} else {{
                     {task_name.replace('-', '_')}ThroughputTableHTML += '<td>-</td>';
                 }}
@@ -239,14 +242,15 @@ def generate_html(data_dir):
         // {task_name} - Latency percentiles
         const {task_name.replace('-', '_')}LatencyData = [];
         for (let i = 0; i < configs.length; i++) {{
-            const p50Values = [{task_data.get('latency_p50', [])}[i]];
-            const p90Values = [{task_data.get('latency_p90', [])}[i]];
+            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
+            const p50Values = configIndices.map(idx => {task_data.get('latency_p50', [])}[idx]);
+            const p90Values = configIndices.map(idx => {task_data.get('latency_p90', [])}[idx]);
             
             if (shouldShowTrace('P50')) {{
                 {task_name.replace('-', '_')}LatencyData.push({{
                     y: p50Values,
                     type: 'box',
-                    name: configs[i] + ' P50',
+                    name: uniqueConfigs[i] + ' P50',
                     boxpoints: 'all',
                     marker: {{ color: configColors[i % configColors.length] }}
                 }});
@@ -256,7 +260,7 @@ def generate_html(data_dir):
                 {task_name.replace('-', '_')}LatencyData.push({{
                     y: p90Values,
                     type: 'box',
-                    name: configs[i] + ' P90',
+                    name: uniqueConfigs[i] + ' P90',
                     boxpoints: 'all',
                     marker: {{ color: configColors[i % configColors.length], opacity: 0.7 }}
                 }});
@@ -272,14 +276,16 @@ def generate_html(data_dir):
         // {task_name} - Latency table
         let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < configs.length; configIdx++) {{
-            const config = configs[configIdx];
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
             
             // P50 row
             if (shouldShowTrace('P50')) {{
-                {task_name.replace('-', '_')}LatencyTableHTML += `<tr class="percentile-row p50-row config-${{configIdx}}"><td>${{config}}</td><td>P50</td>`;
+                {task_name.replace('-', '_')}LatencyTableHTML += `<tr class="percentile-row p50-row"><td rowspan="${{shouldShowTrace('P90') ? '2' : '1'}}">${{config}}</td><td>P50</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
-                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p50', [])}[configIdx].toFixed(1)}}</td>`;
+                    const idx = configIndices[rep];
+                    if (idx !== undefined) {{
+                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p50', [])}[idx].toFixed(1)}}</td>`;
                     }} else {{
                         {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
                     }}
@@ -289,10 +295,11 @@ def generate_html(data_dir):
             
             // P90 row
             if (shouldShowTrace('P90')) {{
-                {task_name.replace('-', '_')}LatencyTableHTML += `<tr class="percentile-row p90-row config-${{configIdx}}"><td>${{config}}</td><td>P90</td>`;
+                {task_name.replace('-', '_')}LatencyTableHTML += `<tr class="percentile-row p90-row"><td>P90</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
-                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p90', [])}[configIdx].toFixed(1)}}</td>`;
+                    const idx = configIndices[rep];
+                    if (idx !== undefined) {{
+                        {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p90', [])}[idx].toFixed(1)}}</td>`;
                     }} else {{
                         {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
                     }}
@@ -306,14 +313,15 @@ def generate_html(data_dir):
         // {task_name} - Service time
         const {task_name.replace('-', '_')}ServiceTimeData = [];
         for (let i = 0; i < configs.length; i++) {{
-            const p50Values = [{task_data.get('service_time_p50', [])}[i]];
-            const p90Values = [{task_data.get('service_time_p90', [])}[i]];
+            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
+            const p50Values = configIndices.map(idx => {task_data.get('service_time_p50', [])}[idx]);
+            const p90Values = configIndices.map(idx => {task_data.get('service_time_p90', [])}[idx]);
             
             if (shouldShowTrace('P50')) {{
                 {task_name.replace('-', '_')}ServiceTimeData.push({{
                     y: p50Values,
                     type: 'box',
-                    name: configs[i] + ' P50',
+                    name: uniqueConfigs[i] + ' P50',
                     boxpoints: 'all',
                     marker: {{ color: configColors[i % configColors.length] }}
                 }});
@@ -323,7 +331,7 @@ def generate_html(data_dir):
                 {task_name.replace('-', '_')}ServiceTimeData.push({{
                     y: p90Values,
                     type: 'box',
-                    name: configs[i] + ' P90',
+                    name: uniqueConfigs[i] + ' P90',
                     boxpoints: 'all',
                     marker: {{ color: configColors[i % configColors.length], opacity: 0.7 }}
                 }});
@@ -337,35 +345,9 @@ def generate_html(data_dir):
         }}, {{ responsive: true, displayModeBar: false }});
 
         // {task_name} - Service time table
-        let {task_name.replace('-', '_')}ServiceTimeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < configs.length; configIdx++) {{
-            const config = configs[configIdx];
-            
-            // P50 row
-            if (shouldShowTrace('P50')) {{
-                {task_name.replace('-', '_')}ServiceTimeTableHTML += `<tr class="percentile-row p50-row config-${{configIdx}}"><td>${{config}}</td><td>P50</td>`;
-                for (let rep = 0; rep < 4; rep++) {{
-                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
-                        {task_name.replace('-', '_')}ServiceTimeTableHTML += `<td>${{{task_data.get('service_time_p50', [])}[configIdx].toFixed(1)}}</td>`;
-                    }} else {{
-                        {task_name.replace('-', '_')}ServiceTimeTableHTML += '<td>-</td>';
-                    }}
-                }}
-                {task_name.replace('-', '_')}ServiceTimeTableHTML += '</tr>';
-            }}
-            
-            // P90 row
-            if (shouldShowTrace('P90')) {{
-                {task_name.replace('-', '_')}ServiceTimeTableHTML += `<tr class="percentile-row p90-row config-${{configIdx}}"><td>${{config}}</td><td>P90</td>`;
-                for (let rep = 0; rep < 4; rep++) {{
-                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
-                        {task_name.replace('-', '_')}ServiceTimeTableHTML += `<td>${{{task_data.get('service_time_p90', [])}[configIdx].toFixed(1)}}</td>`;
-                    }} else {{
-                        {task_name.replace('-', '_')}ServiceTimeTableHTML += '<td>-</td>';
-                    }}
-                }}
-                {task_name.replace('-', '_')}ServiceTimeTableHTML += '</tr>';
-            }}
+        let {task_name.replace('-', '_')}ServiceTimeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>P50</th><th>P90</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            {task_name.replace('-', '_')}ServiceTimeTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('service_time_p50', [])}[i].toFixed(1)}}</td><td>${{{task_data.get('service_time_p90', [])}[i].toFixed(1)}}</td></tr>`;
         }}
         {task_name.replace('-', '_')}ServiceTimeTableHTML += '</tbody></table>';
         document.getElementById('{task_name}-service-time-table').innerHTML = {task_name.replace('-', '_')}ServiceTimeTableHTML;
@@ -375,8 +357,8 @@ def generate_html(data_dir):
         for (let rep = 1; rep <= 4; rep++) {{
             const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
             {task_name.replace('-', '_')}DurationData.push({{
-                x: repIndices.map(idx => configs[configIdx]),
-                y: repIndices.map(idx => {task_data.get('duration', [])}[configIdx]),
+                x: repIndices.map(idx => configs[idx]),
+                y: repIndices.map(idx => {task_data.get('duration', [])}[idx]),
                 type: 'bar',
                 name: `Rep ${{rep}}`,
                 marker: {{ color: repColors[rep - 1] }}
@@ -393,11 +375,13 @@ def generate_html(data_dir):
         // {task_name} - Duration table
         let {task_name.replace('-', '_')}DurationTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < configs.length; configIdx++) {{
-            const config = configs[configIdx];
-            {task_name.replace('-', '_')}DurationTableHTML += `<tr class="config-${{configIdx}}"><td>${{config}}</td>`;
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            {task_name.replace('-', '_')}DurationTableHTML += `<tr><td>${{config}}</td>`;
             for (let rep = 0; rep < 4; rep++) {{
-                if (configIdx < {len(task_data.get('duration', []))}) {{
-                    {task_name.replace('-', '_')}DurationTableHTML += `<td>${{{task_data.get('duration', [])}[configIdx].toFixed(1)}}</td>`;
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    {task_name.replace('-', '_')}DurationTableHTML += `<td>${{{task_data.get('duration', [])}[idx].toFixed(1)}}</td>`;
                 }} else {{
                     {task_name.replace('-', '_')}DurationTableHTML += '<td>-</td>';
                 }}
@@ -647,28 +631,6 @@ def generate_html(data_dir):
         .accordion-toggle.expanded {{
             transform: rotate(90deg);
         }}
-        
-        /* Percentile filtering styles */
-        .percentile-row.p50-row {{
-            display: table-row;
-        }}
-        .percentile-row.p90-row {{
-            display: table-row;
-        }}
-        
-        /* Hide rows based on percentile selection */
-        body.show-p50-only .percentile-row.p90-row {{
-            display: none !important;
-        }}
-        body.show-p90-only .percentile-row.p50-row {{
-            display: none !important;
-        }}
-        
-        /* Config color coding for table rows */
-        .config-0 {{ background-color: rgba(30, 64, 175, 0.25) !important; }}
-        .config-1 {{ background-color: rgba(4, 120, 87, 0.25) !important; }}
-        .config-2 {{ background-color: rgba(185, 28, 28, 0.25) !important; }}
-        .config-3 {{ background-color: rgba(109, 40, 217, 0.25) !important; }}
     </style>
 </head>
 <body>
@@ -769,14 +731,6 @@ def generate_html(data_dir):
         function updatePercentileView() {{
             currentPercentile = document.getElementById('percentile-select').value;
             
-            // Update body class for CSS filtering
-            document.body.classList.remove('show-p50-only', 'show-p90-only');
-            if (currentPercentile === 'p50') {{
-                document.body.classList.add('show-p50-only');
-            }} else if (currentPercentile === 'p90') {{
-                document.body.classList.add('show-p90-only');
-            }}
-            
             // Re-render all charts with new percentile setting
             systemMetrics.forEach(metric => {{
                 renderMetricChart(metric);
@@ -784,16 +738,6 @@ def generate_html(data_dir):
             
             // Re-render all task charts
             renderAllTaskCharts();
-            
-            // Force table visibility update
-            setTimeout(() => {{
-                const tables = document.querySelectorAll('.data-table');
-                tables.forEach(table => {{
-                    table.style.display = 'none';
-                    table.offsetHeight; // Force reflow
-                    table.style.display = '';
-                }});
-            }}, 10);
         }}
 
         function renderAllTaskCharts() {{
@@ -805,13 +749,6 @@ def generate_html(data_dir):
             if (currentPercentile === 'p90' && traceName.includes('P90')) return true;
             if (currentPercentile === 'p50' && traceName.includes('P50')) return true;
             if (currentPercentile === 'p90' && !traceName.includes('P50') && !traceName.includes('P90')) return true;
-            return false;
-        }}
-
-        function shouldShowPercentile(percentile) {{
-            if (currentPercentile === 'all') return true;
-            if (currentPercentile === 'p90' && percentile === 'P90') return true;
-            if (currentPercentile === 'p50' && percentile === 'P50') return true;
             return false;
         }}
 
@@ -844,11 +781,13 @@ def generate_html(data_dir):
             // Generate table for this metric
             let tableHTML = `<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>`;
             for (let configIdx = 0; configIdx < configs.length; configIdx++) {{
-                const config = configs[configIdx];
+                const config = uniqueConfigs[configIdx];
+                const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
                 tableHTML += `<tr><td>${{config}}</td>`;
                 for (let rep = 0; rep < 4; rep++) {{
-                    if (configIdx < {len(task_data.get('latency_p50', []))}) {{
-                        const value = systemData[metric][configIdx] || 0;
+                    const idx = configIndices[rep];
+                    if (idx !== undefined) {{
+                        const value = systemData[metric][idx] || 0;
                         tableHTML += `<td>${{formatMetricValue(value, metric)}}</td>`;
                     }} else {{
                         tableHTML += '<td>-</td>';
