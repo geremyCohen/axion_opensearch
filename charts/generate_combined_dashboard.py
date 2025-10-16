@@ -172,31 +172,32 @@ def generate_html(data_dir):
     
     for task_name, task_data in all_tasks_data.items():
         task_sections += f'''
-    <div class="section">
-        <h2>Task: {task_name.title()}</h2>
-        
-        <div class="chart-row">
-            <div class="chart-half">
-                <div id="{task_name}-throughput-chart"></div>
-                <div id="{task_name}-throughput-table"></div>
-            </div>
-            <div class="chart-half">
-                <div id="{task_name}-latency-chart"></div>
-                <div id="{task_name}-latency-table"></div>
-            </div>
-        </div>
-        
-        <div class="chart-row">
-            <div class="chart-half">
-                <div id="{task_name}-service-time-chart"></div>
-                <div id="{task_name}-service-time-table"></div>
-            </div>
-            <div class="chart-half">
-                <div id="{task_name}-duration-chart"></div>
-                <div id="{task_name}-duration-table"></div>
-            </div>
-        </div>
-    </div>'''
+            <div class="section" id="{task_name.lower().replace('_', '-')}">
+                <h2 class="section-header">Task: {task_name.title()}</h2>
+                <div class="section-content">
+                    <div class="chart-row">
+                        <div class="chart-item">
+                            <div id="{task_name}-throughput-chart"></div>
+                            <div id="{task_name}-throughput-table"></div>
+                        </div>
+                        <div class="chart-item">
+                            <div id="{task_name}-latency-chart"></div>
+                            <div id="{task_name}-latency-table"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-item">
+                            <div id="{task_name}-service-time-chart"></div>
+                            <div id="{task_name}-service-time-table"></div>
+                        </div>
+                        <div class="chart-item">
+                            <div id="{task_name}-duration-chart"></div>
+                            <div id="{task_name}-duration-table"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>'''
         
         # Generate JavaScript for each task
         task_scripts += f'''
@@ -335,71 +336,199 @@ def generate_html(data_dir):
     html_content = f'''<!DOCTYPE html>
 <html>
 <head>
-    <title>Combined System & Task Metrics Dashboard</title>
+    <title>OpenSearch Benchmark Performance Dashboard</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-        .chart-container {{ margin: 30px 0; }}
-        .chart-row {{ display: flex; gap: 20px; }}
-        .chart-half {{ flex: 1; }}
-        .chart-third {{ flex: 1; }}
-        h1 {{ color: #2c3e50; }}
-        h2 {{ color: #34495e; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }}
-        .section {{ background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; }}
-        .data-table {{ margin-top: 15px; width: 100%; border-collapse: collapse; font-size: 12px; }}
-        .data-table th, .data-table td {{ border: 1px solid #ddd; padding: 8px; text-align: center; }}
-        .data-table th {{ background-color: #f2f2f2; font-weight: bold; }}
-        .data-table tr:nth-child(even) {{ background-color: #f9f9f9; }}
+        body {{ 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }}
+        .header h1 {{ 
+            margin: 0; 
+            font-size: 2.5em; 
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }}
+        .content {{ padding: 30px; }}
+        .chart-container {{ margin: 40px 0; }}
+        .chart-row {{ 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 30px; 
+            margin-bottom: 30px;
+        }}
+        .chart-triple {{ 
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr; 
+            gap: 20px; 
+            margin-bottom: 30px;
+        }}
+        .chart-item {{ 
+            background: #f8f9fa; 
+            border-radius: 8px; 
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }}
+        .chart-item:hover {{ transform: translateY(-2px); }}
+        .chart-full {{ 
+            background: #f8f9fa; 
+            border-radius: 8px; 
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }}
+        h2 {{ 
+            color: #2c3e50; 
+            border-bottom: 3px solid #3498db; 
+            padding-bottom: 15px; 
+            margin-top: 50px;
+            font-size: 1.8em;
+            font-weight: 400;
+        }}
+        .section {{ 
+            background: white; 
+            margin: 30px 0; 
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }}
+        .section-header {{
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px 12px 0 0;
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 400;
+        }}
+        .section-content {{ padding: 30px; }}
+        .data-table {{ 
+            margin-top: 20px; 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 11px;
+            background: white;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .data-table th {{ 
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+            color: white;
+            padding: 12px 8px; 
+            text-align: center; 
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .data-table td {{ 
+            border: 1px solid #dee2e6; 
+            padding: 10px 8px; 
+            text-align: center;
+        }}
+        .data-table tr:nth-child(even) {{ background-color: #f8f9fa; }}
+        .data-table tr:hover {{ background-color: #e3f2fd; }}
+        .task-nav {{
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }}
+        .task-nav a {{
+            display: inline-block;
+            margin: 5px 10px;
+            padding: 8px 16px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 12px;
+            transition: background 0.2s ease;
+        }}
+        .task-nav a:hover {{ background: #2980b9; }}
     </style>
 </head>
 <body>
-    <h1>OpenSearch Benchmark Performance Dashboard</h1>
-    
-    <div class="section">
-        <h2>System-Wide Metrics</h2>
-        
-        <div class="chart-row">
-            <div class="chart-half">
-                <div id="indexing-time-chart"></div>
-                <div id="indexing-time-table"></div>
-            </div>
-            <div class="chart-half">
-                <div id="merge-time-chart"></div>
-                <div id="merge-time-table"></div>
-            </div>
+    <div class="container">
+        <div class="header">
+            <h1>OpenSearch Benchmark Performance Dashboard</h1>
         </div>
         
-        <div class="chart-row">
-            <div class="chart-half">
-                <div id="refresh-flush-chart"></div>
-                <div id="refresh-flush-table"></div>
+        <div class="content">
+            <div class="task-nav">
+                <strong>Quick Navigation:</strong>
+                <a href="#system-metrics">System Metrics</a>
+                {' '.join([f'<a href="#{task_name.lower().replace("_", "-")}">{task_name.title()}</a>' for task_name in all_tasks_data.keys()])}
             </div>
-            <div class="chart-half">
-                <div id="throttle-chart"></div>
-                <div id="throttle-table"></div>
+            
+            <div class="section" id="system-metrics">
+                <h2 class="section-header">System-Wide Metrics</h2>
+                <div class="section-content">
+                    <div class="chart-row">
+                        <div class="chart-item">
+                            <div id="indexing-time-chart"></div>
+                            <div id="indexing-time-table"></div>
+                        </div>
+                        <div class="chart-item">
+                            <div id="merge-time-chart"></div>
+                            <div id="merge-time-table"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-item">
+                            <div id="refresh-flush-chart"></div>
+                            <div id="refresh-flush-table"></div>
+                        </div>
+                        <div class="chart-item">
+                            <div id="throttle-chart"></div>
+                            <div id="throttle-table"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-triple">
+                        <div class="chart-item">
+                            <div id="gc-chart"></div>
+                            <div id="gc-table"></div>
+                        </div>
+                        <div class="chart-item">
+                            <div id="storage-chart"></div>
+                            <div id="storage-table"></div>
+                        </div>
+                        <div class="chart-item">
+                            <div id="memory-chart"></div>
+                            <div id="memory-table"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-full">
+                        <div id="counts-chart"></div>
+                        <div id="counts-table"></div>
+                    </div>
+                </div>
             </div>
+            
+            {task_sections}
         </div>
-        
-        <div class="chart-row">
-            <div class="chart-third">
-                <div id="gc-chart"></div>
-                <div id="gc-table"></div>
-            </div>
-            <div class="chart-third">
-                <div id="storage-chart"></div>
-                <div id="storage-table"></div>
-            </div>
-            <div class="chart-third">
-                <div id="memory-chart"></div>
-                <div id="memory-table"></div>
-            </div>
-        </div>
-        
-        <div id="counts-chart"></div>
-        <div id="counts-table"></div>
     </div>
-    
-    {task_sections}
 
     <script>
         const configs = {configs};
@@ -456,7 +585,29 @@ def generate_html(data_dir):
             storageTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('store_size', [])}[i].toFixed(2)}}</td></tr>`;
         }}
         storageTableHTML += '</tbody></table>';
-        document.getElementById('storage-table').innerHTML = storageTableHTML;
+        // Throttle table
+        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Indexing Throttle</th><th>Merge Throttle</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            throttleTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('indexing_throttle_time', [])}[i].toFixed(3)}}</td><td>${{{system_data.get('merge_throttle_time', [])}[i].toFixed(3)}}</td></tr>`;
+        }}
+        throttleTableHTML += '</tbody></table>';
+        document.getElementById('throttle-table').innerHTML = throttleTableHTML;
+
+        // Memory table
+        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Segments (MB)</th><th>Terms (MB)</th><th>Doc Values (MB)</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            memoryTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('memory_segments', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_terms', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_doc_values', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        memoryTableHTML += '</tbody></table>';
+        document.getElementById('memory-table').innerHTML = memoryTableHTML;
+
+        // Counts table
+        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Merge Count</th><th>Refresh Count</th><th>Flush Count</th><th>Segment Count</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            countsTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_count', [])}[i]}}</td><td>${{{system_data.get('refresh_count', [])}[i]}}</td><td>${{{system_data.get('flush_count', [])}[i]}}</td><td>${{{system_data.get('segment_count', [])}[i]}}</td></tr>`;
+        }}
+        countsTableHTML += '</tbody></table>';
+        document.getElementById('counts-table').innerHTML = countsTableHTML;
 
         // Merge time
         const mergeTimeData = [];
