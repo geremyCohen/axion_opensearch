@@ -601,15 +601,41 @@ def generate_html(data_dir):
         }});
 
         // Indexing time table
-        let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
             const config = uniqueConfigs[configIdx];
             const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            indexingTableHTML += `<tr><td>${{config}}</td>`;
+            
+            // Min row
+            indexingTableHTML += `<tr><td rowspan="3">${{config}}</td><td>Min</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    indexingTableHTML += `<td>${{{system_data.get('total_time_min', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    indexingTableHTML += '<td>-</td>';
+                }}
+            }}
+            indexingTableHTML += '</tr>';
+            
+            // Median row
+            indexingTableHTML += '<tr><td>Median</td>';
             for (let rep = 0; rep < 4; rep++) {{
                 const idx = configIndices[rep];
                 if (idx !== undefined) {{
                     indexingTableHTML += `<td>${{{system_data.get('total_time_median', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    indexingTableHTML += '<td>-</td>';
+                }}
+            }}
+            indexingTableHTML += '</tr>';
+            
+            // Max row
+            indexingTableHTML += '<tr><td>Max</td>';
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    indexingTableHTML += `<td>${{{system_data.get('total_time_max', [])}[idx].toFixed(2)}}</td>`;
                 }} else {{
                     indexingTableHTML += '<td>-</td>';
                 }}
@@ -639,15 +665,41 @@ def generate_html(data_dir):
         }});
 
         // Merge time table
-        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
         for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
             const config = uniqueConfigs[configIdx];
             const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            mergeTableHTML += `<tr><td>${{config}}</td>`;
+            
+            // Min row
+            mergeTableHTML += `<tr><td rowspan="3">${{config}}</td><td>Min</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    mergeTableHTML += `<td>${{{system_data.get('merge_time_min', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    mergeTableHTML += '<td>-</td>';
+                }}
+            }}
+            mergeTableHTML += '</tr>';
+            
+            // Median row
+            mergeTableHTML += '<tr><td>Median</td>';
             for (let rep = 0; rep < 4; rep++) {{
                 const idx = configIndices[rep];
                 if (idx !== undefined) {{
                     mergeTableHTML += `<td>${{{system_data.get('merge_time_median', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    mergeTableHTML += '<td>-</td>';
+                }}
+            }}
+            mergeTableHTML += '</tr>';
+            
+            // Max row
+            mergeTableHTML += '<tr><td>Max</td>';
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    mergeTableHTML += `<td>${{{system_data.get('merge_time_max', [])}[idx].toFixed(2)}}</td>`;
                 }} else {{
                     mergeTableHTML += '<td>-</td>';
                 }}
