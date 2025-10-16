@@ -451,6 +451,38 @@ def generate_html(data_dir):
             font-size: 2.5em; 
             font-weight: 300;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }}
+        .controls {{
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }}
+        .control-group {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .control-label {{
+            font-size: 1rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.9);
+        }}
+        .control-select {{
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+        }}
+        .control-select option {{
+            background: #2c3e50;
+            color: white;
         }}
         .content {{ padding: 30px; }}
         .chart-container {{ margin: 40px 0; }}
@@ -556,6 +588,16 @@ def generate_html(data_dir):
     <div class="container">
         <div class="header">
             <h1>OpenSearch Benchmark Performance Dashboard</h1>
+            <div class="controls">
+                <div class="control-group">
+                    <label class="control-label" for="percentile-select">Percentile:</label>
+                    <select id="percentile-select" class="control-select" onchange="updatePercentileView()">
+                        <option value="p90">P90</option>
+                        <option value="p50">P50</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
         </div>
         
         <div class="content">
@@ -622,22 +664,19 @@ def generate_html(data_dir):
 
         const systemData = {system_data};
 
-        function getMetricUnit(metric) {{
-            if (metric.includes('time')) return metric.includes('gc') ? 'Time (seconds)' : 'Time (minutes)';
-            if (metric.includes('count')) return 'Count';
-            if (metric.includes('size')) return metric.includes('store') || metric.includes('translog') ? 'Size (GB)' : 'Size (MB)';
-            if (metric.includes('memory')) return 'Memory (MB)';
-            return 'Value';
+        // Set default percentile view to P90
+        let currentPercentile = 'p90';
+
+        function updatePercentileView() {{
+            currentPercentile = document.getElementById('percentile-select').value;
+            
+            // Re-render all charts with new percentile setting
+            systemMetrics.forEach(metric => {{
+                renderMetricChart(metric);
+            }});
         }}
 
-        function formatMetricValue(value, metric) {{
-            if (metric.includes('time')) return value.toFixed(metric.includes('gc') ? 1 : 2);
-            if (metric.includes('count')) return Math.round(value);
-            if (metric.includes('size') || metric.includes('memory')) return value.toFixed(2);
-            return value.toFixed(2);
-        }}
-
-        systemMetrics.forEach(metric => {{
+        function renderMetricChart(metric) {{
             const metricData = [];
             for (let rep = 1; rep <= 4; rep++) {{
                 const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
@@ -680,6 +719,25 @@ def generate_html(data_dir):
             if (tableElement) {{
                 tableElement.innerHTML = tableHTML;
             }}
+        }}
+
+        function getMetricUnit(metric) {{
+            if (metric.includes('time')) return metric.includes('gc') ? 'Time (seconds)' : 'Time (minutes)';
+            if (metric.includes('count')) return 'Count';
+            if (metric.includes('size')) return metric.includes('store') || metric.includes('translog') ? 'Size (GB)' : 'Size (MB)';
+            if (metric.includes('memory')) return 'Memory (MB)';
+            return 'Value';
+        }}
+
+        function formatMetricValue(value, metric) {{
+            if (metric.includes('time')) return value.toFixed(metric.includes('gc') ? 1 : 2);
+            if (metric.includes('count')) return Math.round(value);
+            if (metric.includes('size') || metric.includes('memory')) return value.toFixed(2);
+            return value.toFixed(2);
+        }}
+
+        systemMetrics.forEach(metric => {{
+            renderMetricChart(metric);
         }});
 
         {task_scripts}
