@@ -246,21 +246,25 @@ def generate_html(data_dir):
             const p50Values = configIndices.map(idx => {task_data.get('latency_p50', [])}[idx]);
             const p90Values = configIndices.map(idx => {task_data.get('latency_p90', [])}[idx]);
             
-            {task_name.replace('-', '_')}LatencyData.push({{
-                y: p50Values,
-                type: 'box',
-                name: uniqueConfigs[i] + ' P50',
-                boxpoints: 'all',
-                marker: {{ color: '#3498db' }}
-            }});
+            if (shouldShowTrace('P50')) {{
+                {task_name.replace('-', '_')}LatencyData.push({{
+                    y: p50Values,
+                    type: 'box',
+                    name: uniqueConfigs[i] + ' P50',
+                    boxpoints: 'all',
+                    marker: {{ color: '#3498db' }}
+                }});
+            }}
             
-            {task_name.replace('-', '_')}LatencyData.push({{
-                y: p90Values,
-                type: 'box',
-                name: uniqueConfigs[i] + ' P90',
-                boxpoints: 'all',
-                marker: {{ color: '#e74c3c' }}
-            }});
+            if (shouldShowTrace('P90')) {{
+                {task_name.replace('-', '_')}LatencyData.push({{
+                    y: p90Values,
+                    type: 'box',
+                    name: uniqueConfigs[i] + ' P90',
+                    boxpoints: 'all',
+                    marker: {{ color: '#e74c3c' }}
+                }});
+            }}
         }}
 
         Plotly.newPlot('{task_name}-latency-chart', {task_name.replace('-', '_')}LatencyData, {{
@@ -674,6 +678,17 @@ def generate_html(data_dir):
             systemMetrics.forEach(metric => {{
                 renderMetricChart(metric);
             }});
+            
+            // Re-render task charts with percentile filtering
+            {task_scripts}
+        }}
+
+        function shouldShowTrace(traceName) {{
+            if (currentPercentile === 'all') return true;
+            if (currentPercentile === 'p90' && traceName.includes('P90')) return true;
+            if (currentPercentile === 'p50' && traceName.includes('P50')) return true;
+            if (currentPercentile === 'p90' && !traceName.includes('P50') && !traceName.includes('P90')) return true;
+            return false;
         }}
 
         function renderMetricChart(metric) {{
