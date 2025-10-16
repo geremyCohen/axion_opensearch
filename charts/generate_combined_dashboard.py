@@ -826,8 +826,8 @@ def generate_html(data_dir):
             for (let rep = 1; rep <= 4; rep++) {{
                 const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
                 metricData.push({{
-                    x: repIndices.map(idx => configs[configIdx]),
-                    y: repIndices.map(idx => systemData[metric][configIdx] || 0),
+                    x: repIndices.map(idx => configs[idx]),
+                    y: repIndices.map(idx => systemData[metric][idx] || 0),
                     type: 'bar',
                     name: `Rep ${{rep}}`,
                     marker: {{ color: repColors[rep - 1] }}
