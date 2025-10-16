@@ -219,6 +219,14 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Throughput (docs/s)' }}
         }});
 
+        // {task_name} - Throughput table
+        let {task_name.replace('-', '_')}ThroughputTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Mean</th><th>Max</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            {task_name.replace('-', '_')}ThroughputTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('throughput_min', [])}[i].toFixed(0)}}</td><td>${{{task_data.get('throughput_median', [])}[i].toFixed(0)}}</td><td>${{{task_data.get('throughput_mean', [])}[i].toFixed(0)}}</td><td>${{{task_data.get('throughput_max', [])}[i].toFixed(0)}}</td></tr>`;
+        }}
+        {task_name.replace('-', '_')}ThroughputTableHTML += '</tbody></table>';
+        document.getElementById('{task_name}-throughput-table').innerHTML = {task_name.replace('-', '_')}ThroughputTableHTML;
+
         // {task_name} - Latency percentiles
         const {task_name.replace('-', '_')}LatencyData = [];
         for (let i = 0; i < uniqueConfigs.length; i++) {{
@@ -249,6 +257,52 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Latency (ms)' }}
         }});
 
+        // {task_name} - Latency table
+        let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>P50</th><th>P90</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            {task_name.replace('-', '_')}LatencyTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('latency_p50', [])}[i].toFixed(1)}}</td><td>${{{task_data.get('latency_p90', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        {task_name.replace('-', '_')}LatencyTableHTML += '</tbody></table>';
+        document.getElementById('{task_name}-latency-table').innerHTML = {task_name.replace('-', '_')}LatencyTableHTML;
+
+        // {task_name} - Service time
+        const {task_name.replace('-', '_')}ServiceTimeData = [];
+        for (let i = 0; i < uniqueConfigs.length; i++) {{
+            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
+            const p50Values = configIndices.map(idx => {task_data.get('service_time_p50', [])}[idx]);
+            const p90Values = configIndices.map(idx => {task_data.get('service_time_p90', [])}[idx]);
+            
+            {task_name.replace('-', '_')}ServiceTimeData.push({{
+                y: p50Values,
+                type: 'box',
+                name: uniqueConfigs[i] + ' P50',
+                boxpoints: 'all',
+                marker: {{ color: '#9b59b6' }}
+            }});
+            
+            {task_name.replace('-', '_')}ServiceTimeData.push({{
+                y: p90Values,
+                type: 'box',
+                name: uniqueConfigs[i] + ' P90',
+                boxpoints: 'all',
+                marker: {{ color: '#6c3483' }}
+            }});
+        }}
+
+        Plotly.newPlot('{task_name}-service-time-chart', {task_name.replace('-', '_')}ServiceTimeData, {{
+            title: '{task_name.title()} Service Time Percentiles (ms)',
+            xaxis: {{ title: 'Configuration & Percentile' }},
+            yaxis: {{ title: 'Service Time (ms)' }}
+        }});
+
+        // {task_name} - Service time table
+        let {task_name.replace('-', '_')}ServiceTimeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>P50</th><th>P90</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            {task_name.replace('-', '_')}ServiceTimeTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('service_time_p50', [])}[i].toFixed(1)}}</td><td>${{{task_data.get('service_time_p90', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        {task_name.replace('-', '_')}ServiceTimeTableHTML += '</tbody></table>';
+        document.getElementById('{task_name}-service-time-table').innerHTML = {task_name.replace('-', '_')}ServiceTimeTableHTML;
+
         // {task_name} - Duration
         const {task_name.replace('-', '_')}DurationData = [];
         for (let rep = 1; rep <= 4; rep++) {{
@@ -268,6 +322,14 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Duration (seconds)' }},
             barmode: 'group'
         }});
+
+        // {task_name} - Duration table
+        let {task_name.replace('-', '_')}DurationTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Duration (s)</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            {task_name.replace('-', '_')}DurationTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('duration', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        {task_name.replace('-', '_')}DurationTableHTML += '</tbody></table>';
+        document.getElementById('{task_name}-duration-table').innerHTML = {task_name.replace('-', '_')}DurationTableHTML;
         '''
     
     html_content = f'''<!DOCTYPE html>
@@ -356,11 +418,45 @@ def generate_html(data_dir):
             }});
         }}
 
-        Plotly.newPlot('indexing-time-chart', indexingTimeData, {{
-            title: 'Indexing Time Distribution (minutes)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Time (minutes)' }}
-        }});
+        // Indexing time table
+        let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            indexingTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('total_time_min', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('total_time_median', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('total_time_max', [])}[i].toFixed(2)}}</td></tr>`;
+        }}
+        indexingTableHTML += '</tbody></table>';
+        document.getElementById('indexing-time-table').innerHTML = indexingTableHTML;
+
+        // Merge time table
+        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            mergeTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_time_min', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_median', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_max', [])}[i].toFixed(2)}}</td></tr>`;
+        }}
+        mergeTableHTML += '</tbody></table>';
+        document.getElementById('merge-time-table').innerHTML = mergeTableHTML;
+
+        // Refresh table
+        let refreshTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Refresh Time</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            refreshTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('refresh_time', [])}[i].toFixed(3)}}</td></tr>`;
+        }}
+        refreshTableHTML += '</tbody></table>';
+        document.getElementById('refresh-flush-table').innerHTML = refreshTableHTML;
+
+        // GC table
+        let gcTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Young GC</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            gcTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('young_gc_time', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        gcTableHTML += '</tbody></table>';
+        document.getElementById('gc-table').innerHTML = gcTableHTML;
+
+        // Storage table
+        let storageTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Store Size (GB)</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            storageTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('store_size', [])}[i].toFixed(2)}}</td></tr>`;
+        }}
+        storageTableHTML += '</tbody></table>';
+        document.getElementById('storage-table').innerHTML = storageTableHTML;
 
         // Merge time
         const mergeTimeData = [];
