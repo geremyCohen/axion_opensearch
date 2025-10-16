@@ -421,9 +421,9 @@ def generate_html(data_dir):
             gap: 30px; 
             margin-bottom: 30px;
         }}
-        .chart-triple {{ 
+        .chart-grid {{ 
             display: grid; 
-            grid-template-columns: 1fr 1fr 1fr; 
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
             gap: 20px; 
             margin-bottom: 30px;
         }}
@@ -529,46 +529,35 @@ def generate_html(data_dir):
             <div class="section" id="system-metrics">
                 <h2 class="section-header">System-Wide Metrics</h2>
                 <div class="section-content">
-                    <div class="chart-row">
-                        <div class="chart-item">
-                            <div id="indexing-time-chart"></div>
-                            <div id="indexing-time-table"></div>
-                        </div>
-                        <div class="chart-item">
-                            <div id="merge-time-chart"></div>
-                            <div id="merge-time-table"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-row">
-                        <div class="chart-item">
-                            <div id="refresh-flush-chart"></div>
-                            <div id="refresh-flush-table"></div>
-                        </div>
-                        <div class="chart-item">
-                            <div id="throttle-chart"></div>
-                            <div id="throttle-table"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-triple">
-                        <div class="chart-item">
-                            <div id="gc-chart"></div>
-                            <div id="gc-table"></div>
-                        </div>
-                        <div class="chart-item">
-                            <div id="storage-chart"></div>
-                            <div id="storage-table"></div>
-                        </div>
-                        <div class="chart-item">
-                            <div id="memory-chart"></div>
-                            <div id="memory-table"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-full">
-                        <div id="counts-chart"></div>
-                        <div id="counts-table"></div>
+                    <div class="chart-grid">
+                        <div class="chart-item"><div id="total_time-chart"></div><div id="total_time-table"></div></div>
+                        <div class="chart-item"><div id="total_time_min-chart"></div><div id="total_time_min-table"></div></div>
+                        <div class="chart-item"><div id="total_time_median-chart"></div><div id="total_time_median-table"></div></div>
+                        <div class="chart-item"><div id="total_time_max-chart"></div><div id="total_time_max-table"></div></div>
+                        <div class="chart-item"><div id="indexing_throttle_time-chart"></div><div id="indexing_throttle_time-table"></div></div>
+                        <div class="chart-item"><div id="merge_throttle_time-chart"></div><div id="merge_throttle_time-table"></div></div>
+                        <div class="chart-item"><div id="merge_time-chart"></div><div id="merge_time-table"></div></div>
+                        <div class="chart-item"><div id="merge_time_min-chart"></div><div id="merge_time_min-table"></div></div>
+                        <div class="chart-item"><div id="merge_time_median-chart"></div><div id="merge_time_median-table"></div></div>
+                        <div class="chart-item"><div id="merge_time_max-chart"></div><div id="merge_time_max-table"></div></div>
+                        <div class="chart-item"><div id="merge_count-chart"></div><div id="merge_count-table"></div></div>
+                        <div class="chart-item"><div id="refresh_time-chart"></div><div id="refresh_time-table"></div></div>
+                        <div class="chart-item"><div id="refresh_count-chart"></div><div id="refresh_count-table"></div></div>
+                        <div class="chart-item"><div id="flush_time-chart"></div><div id="flush_time-table"></div></div>
+                        <div class="chart-item"><div id="flush_count-chart"></div><div id="flush_count-table"></div></div>
+                        <div class="chart-item"><div id="young_gc_time-chart"></div><div id="young_gc_time-table"></div></div>
+                        <div class="chart-item"><div id="young_gc_count-chart"></div><div id="young_gc_count-table"></div></div>
+                        <div class="chart-item"><div id="old_gc_time-chart"></div><div id="old_gc_time-table"></div></div>
+                        <div class="chart-item"><div id="old_gc_count-chart"></div><div id="old_gc_count-table"></div></div>
+                        <div class="chart-item"><div id="store_size-chart"></div><div id="store_size-table"></div></div>
+                        <div class="chart-item"><div id="translog_size-chart"></div><div id="translog_size-table"></div></div>
+                        <div class="chart-item"><div id="segment_count-chart"></div><div id="segment_count-table"></div></div>
+                        <div class="chart-item"><div id="memory_segments-chart"></div><div id="memory_segments-table"></div></div>
+                        <div class="chart-item"><div id="memory_doc_values-chart"></div><div id="memory_doc_values-table"></div></div>
+                        <div class="chart-item"><div id="memory_terms-chart"></div><div id="memory_terms-table"></div></div>
+                        <div class="chart-item"><div id="memory_norms-chart"></div><div id="memory_norms-table"></div></div>
+                        <div class="chart-item"><div id="memory_points-chart"></div><div id="memory_points-table"></div></div>
+                        <div class="chart-item"><div id="memory_stored_fields-chart"></div><div id="memory_stored_fields-table"></div></div>
                     </div>
                 </div>
             </div>
@@ -581,419 +570,76 @@ def generate_html(data_dir):
         const configs = {configs};
         const uniqueConfigs = [...new Set(configs)];
         
-        // System-wide charts (existing code)
-        const indexingTimeData = [];
-        for (let i = 0; i < uniqueConfigs.length; i++) {{
-            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
-            const values = configIndices.map(idx => [{system_data.get('total_time_min', [])}[idx], {system_data.get('total_time_median', [])}[idx], {system_data.get('total_time_max', [])}[idx]]).flat();
-            indexingTimeData.push({{
-                y: values,
-                type: 'box',
-                name: uniqueConfigs[i],
-                boxpoints: false
-            }});
-        }}
-
-        Plotly.newPlot('indexing-time-chart', indexingTimeData, {{
-            title: 'Indexing Time Distribution (minutes)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Time (minutes)' }}
-        }});
-
-        // Indexing time table
-        let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            
-            // Min row
-            indexingTableHTML += `<tr><td rowspan="3">${{config}}</td><td>Min</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    indexingTableHTML += `<td>${{{system_data.get('total_time_min', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    indexingTableHTML += '<td>-</td>';
-                }}
-            }}
-            indexingTableHTML += '</tr>';
-            
-            // Median row
-            indexingTableHTML += '<tr><td>Median</td>';
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    indexingTableHTML += `<td>${{{system_data.get('total_time_median', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    indexingTableHTML += '<td>-</td>';
-                }}
-            }}
-            indexingTableHTML += '</tr>';
-            
-            // Max row
-            indexingTableHTML += '<tr><td>Max</td>';
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    indexingTableHTML += `<td>${{{system_data.get('total_time_max', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    indexingTableHTML += '<td>-</td>';
-                }}
-            }}
-            indexingTableHTML += '</tr>';
-        }}
-        indexingTableHTML += '</tbody></table>';
-        document.getElementById('indexing-time-table').innerHTML = indexingTableHTML;
-
-        // Merge time
-        const mergeTimeData = [];
-        for (let i = 0; i < uniqueConfigs.length; i++) {{
-            const configIndices = configs.map((c, idx) => c === uniqueConfigs[i] ? idx : -1).filter(idx => idx !== -1);
-            const values = configIndices.map(idx => [{system_data.get('merge_time_min', [])}[idx], {system_data.get('merge_time_median', [])}[idx], {system_data.get('merge_time_max', [])}[idx]]).flat();
-            mergeTimeData.push({{
-                y: values,
-                type: 'box',
-                name: uniqueConfigs[i],
-                boxpoints: false
-            }});
-        }}
-
-        Plotly.newPlot('merge-time-chart', mergeTimeData, {{
-            title: 'Merge Time Distribution (minutes)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Time (minutes)' }}
-        }});
-
-        // Merge time table
-        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            
-            // Min row
-            mergeTableHTML += `<tr><td rowspan="3">${{config}}</td><td>Min</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    mergeTableHTML += `<td>${{{system_data.get('merge_time_min', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    mergeTableHTML += '<td>-</td>';
-                }}
-            }}
-            mergeTableHTML += '</tr>';
-            
-            // Median row
-            mergeTableHTML += '<tr><td>Median</td>';
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    mergeTableHTML += `<td>${{{system_data.get('merge_time_median', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    mergeTableHTML += '<td>-</td>';
-                }}
-            }}
-            mergeTableHTML += '</tr>';
-            
-            // Max row
-            mergeTableHTML += '<tr><td>Max</td>';
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    mergeTableHTML += `<td>${{{system_data.get('merge_time_max', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    mergeTableHTML += '<td>-</td>';
-                }}
-            }}
-            mergeTableHTML += '</tr>';
-        }}
-        mergeTableHTML += '</tbody></table>';
-        document.getElementById('merge-time-table').innerHTML = mergeTableHTML;
-
-        // Refresh time
-        const refreshData = [];
-        for (let rep = 1; rep <= 4; rep++) {{
-            const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
-            refreshData.push({{
-                x: repIndices.map(idx => configs[idx]),
-                y: repIndices.map(idx => {system_data.get('refresh_time', [])}[idx]),
-                type: 'bar',
-                name: `Rep ${{rep}}`,
-                marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
-            }});
-        }}
-
-        Plotly.newPlot('refresh-flush-chart', refreshData, {{
-            title: 'Refresh Time by Rep (minutes)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Time (minutes)' }},
-            barmode: 'group'
-        }});
-
-        // Refresh table
-        let refreshTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            refreshTableHTML += `<tr><td>${{config}}</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    refreshTableHTML += `<td>${{{system_data.get('refresh_time', [])}[idx].toFixed(3)}}</td>`;
-                }} else {{
-                    refreshTableHTML += '<td>-</td>';
-                }}
-            }}
-            refreshTableHTML += '</tr>';
-        }}
-        refreshTableHTML += '</tbody></table>';
-        document.getElementById('refresh-flush-table').innerHTML = refreshTableHTML;
-
-        // Throttle times
-        const throttleData = [
-            {{
-                x: configs,
-                y: {system_data.get('indexing_throttle_time', [])},
-                type: 'bar',
-                name: 'Indexing Throttle',
-                marker: {{ color: '#e74c3c' }}
-            }},
-            {{
-                x: configs,
-                y: {system_data.get('merge_throttle_time', [])},
-                type: 'bar',
-                name: 'Merge Throttle',
-                marker: {{ color: '#c0392b' }}
-            }}
+        // System-wide charts - individual metrics
+        const systemMetrics = [
+            'total_time', 'total_time_min', 'total_time_median', 'total_time_max',
+            'indexing_throttle_time', 'merge_throttle_time',
+            'merge_time', 'merge_time_min', 'merge_time_median', 'merge_time_max', 'merge_count',
+            'refresh_time', 'refresh_count', 'flush_time', 'flush_count',
+            'young_gc_time', 'young_gc_count', 'old_gc_time', 'old_gc_count',
+            'store_size', 'translog_size', 'segment_count',
+            'memory_segments', 'memory_doc_values', 'memory_terms', 'memory_norms', 'memory_points', 'memory_stored_fields'
         ];
 
-        Plotly.newPlot('throttle-chart', throttleData, {{
-            title: 'Throttle Times (minutes)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Time (minutes)' }},
-            barmode: 'group'
-        }});
-
-        // Throttle table
-        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Metric</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            
-            // Indexing Throttle row
-            throttleTableHTML += `<tr><td rowspan="2">${{config}}</td><td>Indexing</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    throttleTableHTML += `<td>${{{system_data.get('indexing_throttle_time', [])}[idx].toFixed(3)}}</td>`;
-                }} else {{
-                    throttleTableHTML += '<td>-</td>';
-                }}
-            }}
-            throttleTableHTML += '</tr>';
-            
-            // Merge Throttle row
-            throttleTableHTML += '<tr><td>Merge</td>';
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    throttleTableHTML += `<td>${{{system_data.get('merge_throttle_time', [])}[idx].toFixed(3)}}</td>`;
-                }} else {{
-                    throttleTableHTML += '<td>-</td>';
-                }}
-            }}
-            throttleTableHTML += '</tr>';
+        function getMetricUnit(metric) {{
+            if (metric.includes('time')) return metric.includes('gc') ? 'Time (seconds)' : 'Time (minutes)';
+            if (metric.includes('count')) return 'Count';
+            if (metric.includes('size')) return metric.includes('store') || metric.includes('translog') ? 'Size (GB)' : 'Size (MB)';
+            if (metric.includes('memory')) return 'Memory (MB)';
+            return 'Value';
         }}
-        throttleTableHTML += '</tbody></table>';
-        document.getElementById('throttle-table').innerHTML = throttleTableHTML;
 
-        // GC time
-        const gcData = [];
-        for (let rep = 1; rep <= 4; rep++) {{
-            const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
-            gcData.push({{
-                x: repIndices.map(idx => configs[idx]),
-                y: repIndices.map(idx => {system_data.get('young_gc_time', [])}[idx]),
-                type: 'bar',
-                name: `Rep ${{rep}}`,
-                marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
+        function formatMetricValue(value, metric) {{
+            if (metric.includes('time')) return value.toFixed(metric.includes('gc') ? 1 : 2);
+            if (metric.includes('count')) return Math.round(value);
+            if (metric.includes('size') || metric.includes('memory')) return value.toFixed(2);
+            return value.toFixed(2);
+        }}
+
+        systemMetrics.forEach(metric => {{
+            const metricData = [];
+            for (let rep = 1; rep <= 4; rep++) {{
+                const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
+                metricData.push({{
+                    x: repIndices.map(idx => configs[idx]),
+                    y: repIndices.map(idx => {system_data}[metric][idx] || 0),
+                    type: 'bar',
+                    name: `Rep ${{rep}}`,
+                    marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
+                }});
+            }}
+
+            Plotly.newPlot(`${{metric}}-chart`, metricData, {{
+                title: `${{metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}}`,
+                xaxis: {{ title: 'Configuration' }},
+                yaxis: {{ title: getMetricUnit(metric) }},
+                barmode: 'group'
             }});
-        }}
 
-        Plotly.newPlot('gc-chart', gcData, {{
-            title: 'Young GC Time by Rep (seconds)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Time (seconds)' }},
-            barmode: 'group'
-        }});
-
-        // GC table
-        let gcTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            gcTableHTML += `<tr><td>${{config}}</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    gcTableHTML += `<td>${{{system_data.get('young_gc_time', [])}[idx].toFixed(1)}}</td>`;
-                }} else {{
-                    gcTableHTML += '<td>-</td>';
+            // Generate table for this metric
+            let tableHTML = `<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>`;
+            for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+                const config = uniqueConfigs[configIdx];
+                const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+                tableHTML += `<tr><td>${{config}}</td>`;
+                for (let rep = 0; rep < 4; rep++) {{
+                    const idx = configIndices[rep];
+                    if (idx !== undefined) {{
+                        const value = {system_data}[metric][idx] || 0;
+                        tableHTML += `<td>${{formatMetricValue(value, metric)}}</td>`;
+                    }} else {{
+                        tableHTML += '<td>-</td>';
+                    }}
                 }}
+                tableHTML += '</tr>';
             }}
-            gcTableHTML += '</tr>';
-        }}
-        gcTableHTML += '</tbody></table>';
-        document.getElementById('gc-table').innerHTML = gcTableHTML;
-
-        // Storage
-        const storageData = [];
-        for (let rep = 1; rep <= 4; rep++) {{
-            const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
-            storageData.push({{
-                x: repIndices.map(idx => configs[idx]),
-                y: repIndices.map(idx => {system_data.get('store_size', [])}[idx]),
-                type: 'bar',
-                name: `Rep ${{rep}}`,
-                marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
-            }});
-        }}
-
-        Plotly.newPlot('storage-chart', storageData, {{
-            title: 'Store Size by Rep (GB)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Store Size (GB)' }},
-            barmode: 'group'
+            tableHTML += '</tbody></table>';
+            
+            const tableElement = document.getElementById(`${{metric}}-table`);
+            if (tableElement) {{
+                tableElement.innerHTML = tableHTML;
+            }}
         }});
-
-        // Storage table
-        let storageTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            storageTableHTML += `<tr><td>${{config}}</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    storageTableHTML += `<td>${{{system_data.get('store_size', [])}[idx].toFixed(2)}}</td>`;
-                }} else {{
-                    storageTableHTML += '<td>-</td>';
-                }}
-            }}
-            storageTableHTML += '</tr>';
-        }}
-        storageTableHTML += '</tbody></table>';
-        document.getElementById('storage-table').innerHTML = storageTableHTML;
-
-        // Memory usage
-        const memoryData = [
-            {{
-                x: configs,
-                y: {system_data.get('memory_segments', [])},
-                type: 'bar',
-                name: 'Segments',
-                marker: {{ color: '#34495e' }}
-            }},
-            {{
-                x: configs,
-                y: {system_data.get('memory_terms', [])},
-                type: 'bar',
-                name: 'Terms',
-                marker: {{ color: '#2c3e50' }}
-            }},
-            {{
-                x: configs,
-                y: {system_data.get('memory_doc_values', [])},
-                type: 'bar',
-                name: 'Doc Values',
-                marker: {{ color: '#7f8c8d' }}
-            }}
-        ];
-
-        Plotly.newPlot('memory-chart', memoryData, {{
-            title: 'Memory Usage (MB)',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Memory (MB)' }},
-            barmode: 'group'
-        }});
-
-        // Memory table
-        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            memoryTableHTML += `<tr><td>${{config}}</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    memoryTableHTML += `<td>${{{system_data.get('memory_segments', [])}[idx].toFixed(1)}}</td>`;
-                }} else {{
-                    memoryTableHTML += '<td>-</td>';
-                }}
-            }}
-            memoryTableHTML += '</tr>';
-        }}
-        memoryTableHTML += '</tbody></table>';
-        document.getElementById('memory-table').innerHTML = memoryTableHTML;
-
-        // Counts
-        const countsData = [
-            {{
-                x: configs,
-                y: {system_data.get('merge_count', [])},
-                type: 'bar',
-                name: 'Merge Count',
-                marker: {{ color: '#9b59b6' }}
-            }},
-            {{
-                x: configs,
-                y: {system_data.get('refresh_count', [])},
-                type: 'bar',
-                name: 'Refresh Count',
-                marker: {{ color: '#f39c12' }}
-            }},
-            {{
-                x: configs,
-                y: {system_data.get('flush_count', [])},
-                type: 'bar',
-                name: 'Flush Count',
-                marker: {{ color: '#e67e22' }}
-            }},
-            {{
-                x: configs,
-                y: {system_data.get('segment_count', [])},
-                type: 'bar',
-                name: 'Segment Count',
-                marker: {{ color: '#1abc9c' }},
-                yaxis: 'y2'
-            }}
-        ];
-
-        Plotly.newPlot('counts-chart', countsData, {{
-            title: 'Operation & Segment Counts',
-            xaxis: {{ title: 'Configuration' }},
-            yaxis: {{ title: 'Operation Count', side: 'left' }},
-            yaxis2: {{ title: 'Segment Count', side: 'right', overlaying: 'y' }},
-            barmode: 'group'
-        }});
-
-        // Counts table
-        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
-        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
-            const config = uniqueConfigs[configIdx];
-            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
-            countsTableHTML += `<tr><td>${{config}}</td>`;
-            for (let rep = 0; rep < 4; rep++) {{
-                const idx = configIndices[rep];
-                if (idx !== undefined) {{
-                    countsTableHTML += `<td>${{{system_data.get('merge_count', [])}[idx]}}</td>`;
-                }} else {{
-                    countsTableHTML += '<td>-</td>';
-                }}
-            }}
-            countsTableHTML += '</tr>';
-        }}
-        countsTableHTML += '</tbody></table>';
-        document.getElementById('counts-table').innerHTML = countsTableHTML;
 
         {task_scripts}
     </script>
