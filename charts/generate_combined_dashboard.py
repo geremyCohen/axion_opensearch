@@ -407,7 +407,6 @@ def generate_html(data_dir):
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            overflow: hidden;
         }}
         .content {{ padding: 20px; }}
         .chart-grid {{ 
@@ -597,21 +596,21 @@ def generate_html(data_dir):
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>OpenSearch Benchmark Performance Dashboard</h1>
-            <div class="controls">
-                <div class="control-group">
-                    <label class="control-label" for="percentile-select">Percentile:</label>
-                    <select id="percentile-select" class="control-select" onchange="updatePercentileView()">
-                        <option value="p90">P90</option>
-                        <option value="p50">P50</option>
-                        <option value="all">All</option>
-                    </select>
-                </div>
+    <div class="header">
+        <h1>OpenSearch Benchmark Performance Dashboard</h1>
+        <div class="controls">
+            <div class="control-group">
+                <label class="control-label" for="percentile-select">Percentile:</label>
+                <select id="percentile-select" class="control-select" onchange="updatePercentileView()">
+                    <option value="p90">P90</option>
+                    <option value="p50">P50</option>
+                    <option value="all">All</option>
+                </select>
             </div>
         </div>
-        
+    </div>
+    
+    <div class="container">
         <div class="content">
             <div class="task-nav">
                 <strong>Quick Navigation:</strong>
