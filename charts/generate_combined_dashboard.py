@@ -793,13 +793,6 @@ def generate_html(data_dir):
         }}
         countsTableHTML += '</tbody></table>';
         document.getElementById('counts-table').innerHTML = countsTableHTML;
-        // Throttle table
-        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Indexing Throttle</th><th>Merge Throttle</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            throttleTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('indexing_throttle_time', [])}[i].toFixed(3)}}</td><td>${{{system_data.get('merge_throttle_time', [])}[i].toFixed(3)}}</td></tr>`;
-        }}
-        throttleTableHTML += '</tbody></table>';
-        document.getElementById('throttle-table').innerHTML = throttleTableHTML;
 
         {task_scripts}
     </script>
