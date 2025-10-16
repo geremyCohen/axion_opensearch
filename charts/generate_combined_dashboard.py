@@ -221,9 +221,20 @@ def generate_html(data_dir):
         }});
 
         // {task_name} - Throughput table
-        let {task_name.replace('-', '_')}ThroughputTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Mean</th><th>Max</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            {task_name.replace('-', '_')}ThroughputTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('throughput_min', [])}[i].toFixed(0)}}</td><td>${{{task_data.get('throughput_median', [])}[i].toFixed(0)}}</td><td>${{{task_data.get('throughput_mean', [])}[i].toFixed(0)}}</td><td>${{{task_data.get('throughput_max', [])}[i].toFixed(0)}}</td></tr>`;
+        let {task_name.replace('-', '_')}ThroughputTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            {task_name.replace('-', '_')}ThroughputTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    {task_name.replace('-', '_')}ThroughputTableHTML += `<td>${{{task_data.get('throughput_mean', [])}[idx].toFixed(0)}}</td>`;
+                }} else {{
+                    {task_name.replace('-', '_')}ThroughputTableHTML += '<td>-</td>';
+                }}
+            }}
+            {task_name.replace('-', '_')}ThroughputTableHTML += '</tr>';
         }}
         {task_name.replace('-', '_')}ThroughputTableHTML += '</tbody></table>';
         document.getElementById('{task_name}-throughput-table').innerHTML = {task_name.replace('-', '_')}ThroughputTableHTML;
@@ -259,9 +270,20 @@ def generate_html(data_dir):
         }});
 
         // {task_name} - Latency table
-        let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>P50</th><th>P90</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            {task_name.replace('-', '_')}LatencyTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('latency_p50', [])}[i].toFixed(1)}}</td><td>${{{task_data.get('latency_p90', [])}[i].toFixed(1)}}</td></tr>`;
+        let {task_name.replace('-', '_')}LatencyTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            {task_name.replace('-', '_')}LatencyTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    {task_name.replace('-', '_')}LatencyTableHTML += `<td>${{{task_data.get('latency_p50', [])}[idx].toFixed(1)}}</td>`;
+                }} else {{
+                    {task_name.replace('-', '_')}LatencyTableHTML += '<td>-</td>';
+                }}
+            }}
+            {task_name.replace('-', '_')}LatencyTableHTML += '</tr>';
         }}
         {task_name.replace('-', '_')}LatencyTableHTML += '</tbody></table>';
         document.getElementById('{task_name}-latency-table').innerHTML = {task_name.replace('-', '_')}LatencyTableHTML;
@@ -325,9 +347,20 @@ def generate_html(data_dir):
         }});
 
         // {task_name} - Duration table
-        let {task_name.replace('-', '_')}DurationTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Duration (s)</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            {task_name.replace('-', '_')}DurationTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{task_data.get('duration', [])}[i].toFixed(1)}}</td></tr>`;
+        let {task_name.replace('-', '_')}DurationTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            {task_name.replace('-', '_')}DurationTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    {task_name.replace('-', '_')}DurationTableHTML += `<td>${{{task_data.get('duration', [])}[idx].toFixed(1)}}</td>`;
+                }} else {{
+                    {task_name.replace('-', '_')}DurationTableHTML += '<td>-</td>';
+                }}
+            }}
+            {task_name.replace('-', '_')}DurationTableHTML += '</tr>';
         }}
         {task_name.replace('-', '_')}DurationTableHTML += '</tbody></table>';
         document.getElementById('{task_name}-duration-table').innerHTML = {task_name.replace('-', '_')}DurationTableHTML;
@@ -554,9 +587,21 @@ def generate_html(data_dir):
         }});
 
         // Indexing time table
-        let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            indexingTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('total_time_min', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('total_time_median', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('total_time_max', [])}[i].toFixed(2)}}</td></tr>`;
+        let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        const uniqueConfigs = [...new Set(configs)];
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            indexingTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    indexingTableHTML += `<td>${{{system_data.get('total_time_median', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    indexingTableHTML += '<td>-</td>';
+                }}
+            }}
+            indexingTableHTML += '</tr>';
         }}
         indexingTableHTML += '</tbody></table>';
         document.getElementById('indexing-time-table').innerHTML = indexingTableHTML;
@@ -581,9 +626,20 @@ def generate_html(data_dir):
         }});
 
         // Merge time table
-        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            mergeTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_time_min', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_median', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_max', [])}[i].toFixed(2)}}</td></tr>`;
+        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            mergeTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    mergeTableHTML += `<td>${{{system_data.get('merge_time_median', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    mergeTableHTML += '<td>-</td>';
+                }}
+            }}
+            mergeTableHTML += '</tr>';
         }}
         mergeTableHTML += '</tbody></table>';
         document.getElementById('merge-time-table').innerHTML = mergeTableHTML;
@@ -609,9 +665,20 @@ def generate_html(data_dir):
         }});
 
         // Refresh table
-        let refreshTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Refresh Time</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            refreshTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('refresh_time', [])}[i].toFixed(3)}}</td></tr>`;
+        let refreshTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            refreshTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    refreshTableHTML += `<td>${{{system_data.get('refresh_time', [])}[idx].toFixed(3)}}</td>`;
+                }} else {{
+                    refreshTableHTML += '<td>-</td>';
+                }}
+            }}
+            refreshTableHTML += '</tr>';
         }}
         refreshTableHTML += '</tbody></table>';
         document.getElementById('refresh-flush-table').innerHTML = refreshTableHTML;
@@ -642,9 +709,20 @@ def generate_html(data_dir):
         }});
 
         // Throttle table
-        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Indexing Throttle</th><th>Merge Throttle</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            throttleTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('indexing_throttle_time', [])}[i].toFixed(3)}}</td><td>${{{system_data.get('merge_throttle_time', [])}[i].toFixed(3)}}</td></tr>`;
+        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            throttleTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    throttleTableHTML += `<td>${{{system_data.get('indexing_throttle_time', [])}[idx].toFixed(3)}}</td>`;
+                }} else {{
+                    throttleTableHTML += '<td>-</td>';
+                }}
+            }}
+            throttleTableHTML += '</tr>';
         }}
         throttleTableHTML += '</tbody></table>';
         document.getElementById('throttle-table').innerHTML = throttleTableHTML;
@@ -670,9 +748,20 @@ def generate_html(data_dir):
         }});
 
         // GC table
-        let gcTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Young GC</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            gcTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('young_gc_time', [])}[i].toFixed(1)}}</td></tr>`;
+        let gcTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            gcTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    gcTableHTML += `<td>${{{system_data.get('young_gc_time', [])}[idx].toFixed(1)}}</td>`;
+                }} else {{
+                    gcTableHTML += '<td>-</td>';
+                }}
+            }}
+            gcTableHTML += '</tr>';
         }}
         gcTableHTML += '</tbody></table>';
         document.getElementById('gc-table').innerHTML = gcTableHTML;
@@ -698,9 +787,20 @@ def generate_html(data_dir):
         }});
 
         // Storage table
-        let storageTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Store Size (GB)</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            storageTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('store_size', [])}[i].toFixed(2)}}</td></tr>`;
+        let storageTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            storageTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    storageTableHTML += `<td>${{{system_data.get('store_size', [])}[idx].toFixed(2)}}</td>`;
+                }} else {{
+                    storageTableHTML += '<td>-</td>';
+                }}
+            }}
+            storageTableHTML += '</tr>';
         }}
         storageTableHTML += '</tbody></table>';
         document.getElementById('storage-table').innerHTML = storageTableHTML;
@@ -738,9 +838,20 @@ def generate_html(data_dir):
         }});
 
         // Memory table
-        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Segments (MB)</th><th>Terms (MB)</th><th>Doc Values (MB)</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            memoryTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('memory_segments', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_terms', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_doc_values', [])}[i].toFixed(1)}}</td></tr>`;
+        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            memoryTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    memoryTableHTML += `<td>${{{system_data.get('memory_segments', [])}[idx].toFixed(1)}}</td>`;
+                }} else {{
+                    memoryTableHTML += '<td>-</td>';
+                }}
+            }}
+            memoryTableHTML += '</tr>';
         }}
         memoryTableHTML += '</tbody></table>';
         document.getElementById('memory-table').innerHTML = memoryTableHTML;
@@ -787,9 +898,20 @@ def generate_html(data_dir):
         }});
 
         // Counts table
-        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Merge Count</th><th>Refresh Count</th><th>Flush Count</th><th>Segment Count</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            countsTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_count', [])}[i]}}</td><td>${{{system_data.get('refresh_count', [])}[i]}}</td><td>${{{system_data.get('flush_count', [])}[i]}}</td><td>${{{system_data.get('segment_count', [])}[i]}}</td></tr>`;
+        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep 1</th><th>Rep 2</th><th>Rep 3</th><th>Rep 4</th></tr></thead><tbody>';
+        for (let configIdx = 0; configIdx < uniqueConfigs.length; configIdx++) {{
+            const config = uniqueConfigs[configIdx];
+            const configIndices = configs.map((c, idx) => c === config ? idx : -1).filter(idx => idx !== -1);
+            countsTableHTML += `<tr><td>${{config}}</td>`;
+            for (let rep = 0; rep < 4; rep++) {{
+                const idx = configIndices[rep];
+                if (idx !== undefined) {{
+                    countsTableHTML += `<td>${{{system_data.get('merge_count', [])}[idx]}}</td>`;
+                }} else {{
+                    countsTableHTML += '<td>-</td>';
+                }}
+            }}
+            countsTableHTML += '</tr>';
         }}
         countsTableHTML += '</tbody></table>';
         document.getElementById('counts-table').innerHTML = countsTableHTML;
