@@ -252,7 +252,7 @@ def generate_html(data_dir):
                     type: 'box',
                     name: uniqueConfigs[i] + ' P50',
                     boxpoints: 'all',
-                    marker: {{ color: '#3498db' }}
+                    marker: {{ color: configColors[i % configColors.length] }}
                 }});
             }}
             
@@ -262,7 +262,7 @@ def generate_html(data_dir):
                     type: 'box',
                     name: uniqueConfigs[i] + ' P90',
                     boxpoints: 'all',
-                    marker: {{ color: '#e74c3c' }}
+                    marker: {{ color: configColors[i % configColors.length], opacity: 0.7 }}
                 }});
             }}
         }}
@@ -319,7 +319,7 @@ def generate_html(data_dir):
                     type: 'box',
                     name: uniqueConfigs[i] + ' P50',
                     boxpoints: 'all',
-                    marker: {{ color: '#9b59b6' }}
+                    marker: {{ color: configColors[i % configColors.length] }}
                 }});
             }}
             
@@ -329,7 +329,7 @@ def generate_html(data_dir):
                     type: 'box',
                     name: uniqueConfigs[i] + ' P90',
                     boxpoints: 'all',
-                    marker: {{ color: '#6c3483' }}
+                    marker: {{ color: configColors[i % configColors.length], opacity: 0.7 }}
                 }});
             }}
         }}
@@ -750,6 +750,9 @@ def generate_html(data_dir):
 
         // Professional color palette for repetitions
         const repColors = ['#2563eb', '#059669', '#dc2626', '#7c3aed']; // Blue, Green, Red, Purple
+        
+        // Professional color palette for configurations
+        const configColors = ['#1e40af', '#047857', '#b91c1c', '#6d28d9']; // Darker variants for configs
 
         function renderMetricChart(metric) {{
             const metricData = [];
