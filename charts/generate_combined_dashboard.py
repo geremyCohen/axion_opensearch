@@ -581,6 +581,8 @@ def generate_html(data_dir):
             'memory_segments', 'memory_doc_values', 'memory_terms', 'memory_norms', 'memory_points', 'memory_stored_fields'
         ];
 
+        const systemData = {system_data};
+
         function getMetricUnit(metric) {{
             if (metric.includes('time')) return metric.includes('gc') ? 'Time (seconds)' : 'Time (minutes)';
             if (metric.includes('count')) return 'Count';
@@ -602,7 +604,7 @@ def generate_html(data_dir):
                 const repIndices = configs.map((c, idx) => (idx % 4) === (rep - 1) ? idx : -1).filter(idx => idx !== -1);
                 metricData.push({{
                     x: repIndices.map(idx => configs[idx]),
-                    y: repIndices.map(idx => {system_data}[metric][idx] || 0),
+                    y: repIndices.map(idx => systemData[metric][idx] || 0),
                     type: 'bar',
                     name: `Rep ${{rep}}`,
                     marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
@@ -625,7 +627,7 @@ def generate_html(data_dir):
                 for (let rep = 0; rep < 4; rep++) {{
                     const idx = configIndices[rep];
                     if (idx !== undefined) {{
-                        const value = {system_data}[metric][idx] || 0;
+                        const value = systemData[metric][idx] || 0;
                         tableHTML += `<td>${{formatMetricValue(value, metric)}}</td>`;
                     }} else {{
                         tableHTML += '<td>-</td>';
