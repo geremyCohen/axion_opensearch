@@ -547,6 +547,12 @@ def generate_html(data_dir):
             }});
         }}
 
+        Plotly.newPlot('indexing-time-chart', indexingTimeData, {{
+            title: 'Indexing Time Distribution (minutes)',
+            xaxis: {{ title: 'Configuration' }},
+            yaxis: {{ title: 'Time (minutes)' }}
+        }});
+
         // Indexing time table
         let indexingTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
         for (let i = 0; i < configs.length; i++) {{
@@ -554,60 +560,6 @@ def generate_html(data_dir):
         }}
         indexingTableHTML += '</tbody></table>';
         document.getElementById('indexing-time-table').innerHTML = indexingTableHTML;
-
-        // Merge time table
-        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            mergeTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_time_min', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_median', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_max', [])}[i].toFixed(2)}}</td></tr>`;
-        }}
-        mergeTableHTML += '</tbody></table>';
-        document.getElementById('merge-time-table').innerHTML = mergeTableHTML;
-
-        // Refresh table
-        let refreshTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Refresh Time</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            refreshTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('refresh_time', [])}[i].toFixed(3)}}</td></tr>`;
-        }}
-        refreshTableHTML += '</tbody></table>';
-        document.getElementById('refresh-flush-table').innerHTML = refreshTableHTML;
-
-        // GC table
-        let gcTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Young GC</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            gcTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('young_gc_time', [])}[i].toFixed(1)}}</td></tr>`;
-        }}
-        gcTableHTML += '</tbody></table>';
-        document.getElementById('gc-table').innerHTML = gcTableHTML;
-
-        // Storage table
-        let storageTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Store Size (GB)</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            storageTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('store_size', [])}[i].toFixed(2)}}</td></tr>`;
-        }}
-        storageTableHTML += '</tbody></table>';
-        // Throttle table
-        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Indexing Throttle</th><th>Merge Throttle</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            throttleTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('indexing_throttle_time', [])}[i].toFixed(3)}}</td><td>${{{system_data.get('merge_throttle_time', [])}[i].toFixed(3)}}</td></tr>`;
-        }}
-        throttleTableHTML += '</tbody></table>';
-        document.getElementById('throttle-table').innerHTML = throttleTableHTML;
-
-        // Memory table
-        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Segments (MB)</th><th>Terms (MB)</th><th>Doc Values (MB)</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            memoryTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('memory_segments', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_terms', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_doc_values', [])}[i].toFixed(1)}}</td></tr>`;
-        }}
-        memoryTableHTML += '</tbody></table>';
-        document.getElementById('memory-table').innerHTML = memoryTableHTML;
-
-        // Counts table
-        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Merge Count</th><th>Refresh Count</th><th>Flush Count</th><th>Segment Count</th></tr></thead><tbody>';
-        for (let i = 0; i < configs.length; i++) {{
-            countsTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_count', [])}[i]}}</td><td>${{{system_data.get('refresh_count', [])}[i]}}</td><td>${{{system_data.get('flush_count', [])}[i]}}</td><td>${{{system_data.get('segment_count', [])}[i]}}</td></tr>`;
-        }}
-        countsTableHTML += '</tbody></table>';
-        document.getElementById('counts-table').innerHTML = countsTableHTML;
 
         // Merge time
         const mergeTimeData = [];
@@ -628,6 +580,14 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Time (minutes)' }}
         }});
 
+        // Merge time table
+        let mergeTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Min</th><th>Median</th><th>Max</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            mergeTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_time_min', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_median', [])}[i].toFixed(2)}}</td><td>${{{system_data.get('merge_time_max', [])}[i].toFixed(2)}}</td></tr>`;
+        }}
+        mergeTableHTML += '</tbody></table>';
+        document.getElementById('merge-time-table').innerHTML = mergeTableHTML;
+
         // Refresh time
         const refreshData = [];
         for (let rep = 1; rep <= 4; rep++) {{
@@ -647,6 +607,14 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Time (minutes)' }},
             barmode: 'group'
         }});
+
+        // Refresh table
+        let refreshTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Refresh Time</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            refreshTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('refresh_time', [])}[i].toFixed(3)}}</td></tr>`;
+        }}
+        refreshTableHTML += '</tbody></table>';
+        document.getElementById('refresh-flush-table').innerHTML = refreshTableHTML;
 
         // Throttle times
         const throttleData = [
@@ -673,6 +641,14 @@ def generate_html(data_dir):
             barmode: 'group'
         }});
 
+        // Throttle table
+        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Indexing Throttle</th><th>Merge Throttle</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            throttleTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('indexing_throttle_time', [])}[i].toFixed(3)}}</td><td>${{{system_data.get('merge_throttle_time', [])}[i].toFixed(3)}}</td></tr>`;
+        }}
+        throttleTableHTML += '</tbody></table>';
+        document.getElementById('throttle-table').innerHTML = throttleTableHTML;
+
         // GC time
         const gcData = [];
         for (let rep = 1; rep <= 4; rep++) {{
@@ -693,6 +669,14 @@ def generate_html(data_dir):
             barmode: 'group'
         }});
 
+        // GC table
+        let gcTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Young GC</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            gcTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('young_gc_time', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        gcTableHTML += '</tbody></table>';
+        document.getElementById('gc-table').innerHTML = gcTableHTML;
+
         // Storage
         const storageData = [];
         for (let rep = 1; rep <= 4; rep++) {{
@@ -712,6 +696,14 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Store Size (GB)' }},
             barmode: 'group'
         }});
+
+        // Storage table
+        let storageTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Store Size (GB)</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            storageTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('store_size', [])}[i].toFixed(2)}}</td></tr>`;
+        }}
+        storageTableHTML += '</tbody></table>';
+        document.getElementById('storage-table').innerHTML = storageTableHTML;
 
         // Memory usage
         const memoryData = [
@@ -744,6 +736,14 @@ def generate_html(data_dir):
             yaxis: {{ title: 'Memory (MB)' }},
             barmode: 'group'
         }});
+
+        // Memory table
+        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Segments (MB)</th><th>Terms (MB)</th><th>Doc Values (MB)</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            memoryTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('memory_segments', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_terms', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_doc_values', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        memoryTableHTML += '</tbody></table>';
+        document.getElementById('memory-table').innerHTML = memoryTableHTML;
 
         // Counts
         const countsData = [
@@ -785,6 +785,37 @@ def generate_html(data_dir):
             yaxis2: {{ title: 'Segment Count', side: 'right', overlaying: 'y' }},
             barmode: 'group'
         }});
+
+        // Counts table
+        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Merge Count</th><th>Refresh Count</th><th>Flush Count</th><th>Segment Count</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            countsTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_count', [])}[i]}}</td><td>${{{system_data.get('refresh_count', [])}[i]}}</td><td>${{{system_data.get('flush_count', [])}[i]}}</td><td>${{{system_data.get('segment_count', [])}[i]}}</td></tr>`;
+        }}
+        countsTableHTML += '</tbody></table>';
+        document.getElementById('counts-table').innerHTML = countsTableHTML;
+        // Throttle table
+        let throttleTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Indexing Throttle</th><th>Merge Throttle</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            throttleTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('indexing_throttle_time', [])}[i].toFixed(3)}}</td><td>${{{system_data.get('merge_throttle_time', [])}[i].toFixed(3)}}</td></tr>`;
+        }}
+        throttleTableHTML += '</tbody></table>';
+        document.getElementById('throttle-table').innerHTML = throttleTableHTML;
+
+        // Memory table
+        let memoryTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Segments (MB)</th><th>Terms (MB)</th><th>Doc Values (MB)</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            memoryTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('memory_segments', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_terms', [])}[i].toFixed(1)}}</td><td>${{{system_data.get('memory_doc_values', [])}[i].toFixed(1)}}</td></tr>`;
+        }}
+        memoryTableHTML += '</tbody></table>';
+        document.getElementById('memory-table').innerHTML = memoryTableHTML;
+
+        // Counts table
+        let countsTableHTML = '<table class="data-table"><thead><tr><th>Config</th><th>Rep</th><th>Merge Count</th><th>Refresh Count</th><th>Flush Count</th><th>Segment Count</th></tr></thead><tbody>';
+        for (let i = 0; i < configs.length; i++) {{
+            countsTableHTML += `<tr><td>${{configs[i]}}</td><td>Rep ${{(i % 4) + 1}}</td><td>${{{system_data.get('merge_count', [])}[i]}}</td><td>${{{system_data.get('refresh_count', [])}[i]}}</td><td>${{{system_data.get('flush_count', [])}[i]}}</td><td>${{{system_data.get('segment_count', [])}[i]}}</td></tr>`;
+        }}
+        countsTableHTML += '</tbody></table>';
+        document.getElementById('counts-table').innerHTML = countsTableHTML;
 
         {task_scripts}
     </script>
