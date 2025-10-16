@@ -357,7 +357,7 @@ def generate_html(data_dir):
                 y: repIndices.map(idx => {task_data.get('duration', [])}[idx]),
                 type: 'bar',
                 name: `Rep ${{rep}}`,
-                marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
+                marker: {{ color: repColors[rep - 1] }}
             }});
         }}
 
@@ -748,6 +748,9 @@ def generate_html(data_dir):
             return false;
         }}
 
+        // Professional color palette for repetitions
+        const repColors = ['#2563eb', '#059669', '#dc2626', '#7c3aed']; // Blue, Green, Red, Purple
+
         function renderMetricChart(metric) {{
             const metricData = [];
             for (let rep = 1; rep <= 4; rep++) {{
@@ -757,7 +760,7 @@ def generate_html(data_dir):
                     y: repIndices.map(idx => systemData[metric][idx] || 0),
                     type: 'bar',
                     name: `Rep ${{rep}}`,
-                    marker: {{ color: `hsl(${{rep * 80}}, 70%, 50%)` }}
+                    marker: {{ color: repColors[rep - 1] }}
                 }});
             }}
 
