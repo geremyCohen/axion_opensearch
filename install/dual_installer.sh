@@ -25,6 +25,7 @@ Options:
 
 Environment Variables:
   IP               Remote host IP (optional, defaults to localhost)
+  CLUSTER_SUFFIX   Cluster name suffix (e.g., -intel, -arm for single-node)
 
 Examples:
   $0 create --nodes 4 --shards 8 --heap 90    # Create 4-node cluster
@@ -170,9 +171,37 @@ build_cluster_manager_nodes() {
 render_opensearch_yml() {
     local node_index="$1"
     local total_nodes="$2"
-    local http_port=$((9199 + node_index))
-    local transport_port=$((9299 + node_index))
-    cat > "/opt/opensearch-node${node_index}/config/opensearch.yml" <<EOF
+    local cluster_suffix="${CLUSTER_SUFFIX:-}"
+    
+    if [[ "$total_nodes" -eq 1 ]]; then
+        # Single-node configuration
+        cat > "/opt/opensearch-node${node_index}/config/opensearch.yml" <<EOF
+cluster.name: osb-nyct${cluster_suffix}
+node.name: os-node
+path.data: /opt/opensearch-node${node_index}/data
+path.logs: /opt/opensearch-node${node_index}/logs
+network.host: 0.0.0.0
+http.port: 9200
+discovery.type: single-node
+plugins.security.disabled: true
+bootstrap.memory_lock: true
+action.auto_create_index: false
+
+# Index defaults
+index.number_of_shards: 6
+index.number_of_replicas: 0
+index.refresh_interval: 30s
+
+# Disk watermarks
+cluster.routing.allocation.disk.watermark.low: 85%
+cluster.routing.allocation.disk.watermark.high: 90%
+cluster.routing.allocation.disk.watermark.flood_stage: 95%
+EOF
+    else
+        # Multi-node configuration (existing)
+        local http_port=$((9199 + node_index))
+        local transport_port=$((9299 + node_index))
+        cat > "/opt/opensearch-node${node_index}/config/opensearch.yml" <<EOF
 cluster.name: axion-cluster
 node.name: node-${node_index}
 path.data: /opt/opensearch-node${node_index}/data
@@ -185,6 +214,7 @@ cluster.initial_cluster_manager_nodes: [$(build_cluster_manager_nodes "${total_n
 plugins.security.disabled: true
 bootstrap.memory_lock: true
 EOF
+    fi
 }
 
 # Create systemd service for a node (uses $JAVA_HOME_PATH like original)
