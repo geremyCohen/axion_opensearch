@@ -1,18 +1,23 @@
 #!/bin/bash
 
-# Test parameters
-TIMESTAMP="nyc_taxi_1015_index_0"
-CLIENT_LOADS=(60)
-REPETITIONS=4
+set -euo pipefail
+
+# Initialize parameters - all must be provided via command line
+TIMESTAMP=""
+CLIENT_LOADS=()
+REPETITIONS=""
+WORKLOAD_PARAM=""
+INCLUDE_TASKS_PARAM=""
+DRY_RUN=false
 
 # Detect instance type and page size from remote host
 # Detect instance type on remote host
-INSTANCE_TYPE_RAW=$(ssh "$TARGET_HOST" "curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/machine-type 2>/dev/null | awk -F'/' '{print \$NF}'" 2>/dev/null || echo "c4a-standard-64")
+INSTANCE_TYPE_RAW=$(ssh "$IP" "curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/machine-type 2>/dev/null | awk -F'/' '{print \$NF}'" 2>/dev/null || echo "c4a-standard-64")
 # Remove "standard" from the instance type (e.g., c4a-standard-16 -> c4a-16)
 INSTANCE_TYPE=$(echo "$INSTANCE_TYPE_RAW" | sed 's/-standard-/-/')
 
 # Detect page size on remote host
-PAGE_SIZE=$(ssh "$TARGET_HOST" "getconf PAGESIZE" 2>/dev/null || echo "4096")
+PAGE_SIZE=$(ssh "$IP" "getconf PAGESIZE" 2>/dev/null || echo "4096")
 if [[ "$PAGE_SIZE" == "65536" ]]; then
     PAGE_SIZE_DIR="64k"
 else
@@ -28,24 +33,21 @@ DRY_RUN=false
 CLIENTS_PARAM=""
 
 usage() {
-    echo "Usage: $0 --workload <workload> [options]"
+    echo "Usage: $0 --workload <workload> --timestamp <name> --clients <list> --repetitions <num> [options]"
     echo ""
-    echo "Required parameter:"
+    echo "Required parameters:"
     echo "  --workload <name>      Workload name (nyc_taxis, big5, vectorsearch)"
+    echo "  --timestamp <name>     Results folder timestamp"
+    echo "  --clients <list>       Comma-separated client counts (e.g., 24,60,90)"
+    echo "  --repetitions <num>    Number of repetitions per config"
     echo ""
     echo "Optional parameters:"
     echo "  --include-tasks <list> Tasks to include in OSB benchmark (e.g., index, search)"
-    echo "  --clients <count>      Client count (default: 60)"
-    echo "  --repetitions <num>    Number of repetitions per config (default: 4)"
-    echo "  --timestamp <name>     Results folder timestamp (default: $TIMESTAMP)"
-    echo "  --instance-type <type> Instance type (default: auto-detected as $INSTANCE_TYPE)"
-    echo "  --page-size <size>     Page size (default: $PAGE_SIZE)"
     echo "  --dry-run              Show commands without executing them"
     echo ""
     echo "Examples:"
-    echo "  $0 --workload nyc_taxis"
-    echo "  $0 --workload nyc_taxis --include-tasks index"
-    echo "  $0 --workload nyc_taxis --clients 60 --timestamp my_test_run"
+    echo "  $0 --workload nyc_taxis --timestamp test_run_001 --clients 60 --repetitions 4"
+    echo "  $0 --workload nyc_taxis --timestamp test_run_001 --clients 24,60,90 --repetitions 3 --include-tasks index"
     exit 1
 }
 
@@ -61,7 +63,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --clients)
-            CLIENTS_PARAM="$2"
+            IFS=',' read -ra CLIENT_LOADS <<< "$2"
             shift 2
             ;;
         --repetitions)
@@ -70,14 +72,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --timestamp)
             TIMESTAMP="$2"
-            shift 2
-            ;;
-        --instance-type)
-            INSTANCE_TYPE="$2"
-            shift 2
-            ;;
-        --page-size)
-            PAGE_SIZE="$2"
             shift 2
             ;;
         --dry-run)
@@ -107,14 +101,24 @@ if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
     exit 1
 fi
 
-# Convert parameters to single values
-if [[ -n "$CLIENTS_PARAM" ]]; then
-    CLIENT_LOADS=($CLIENTS_PARAM)
+# Validate required parameters
+if [[ -z "$TIMESTAMP" ]]; then
+    echo "ERROR: --timestamp is required"
+    usage
+fi
+
+if [[ ${#CLIENT_LOADS[@]} -eq 0 ]]; then
+    echo "ERROR: --clients is required"
+    usage
+fi
+
+if [[ -z "$REPETITIONS" ]]; then
+    echo "ERROR: --repetitions is required"
+    usage
 fi
 
 # Set required variables
 WORKLOAD_NAME="$WORKLOAD_PARAM"
-TARGET_HOST="${IP:-localhost}"
 
 log() {
     echo "[$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")] $*"
@@ -125,8 +129,8 @@ run_benchmark() {
     local rep=$2
     
     # Get cluster info for folder structure
-    local node_count=$(IP="$TARGET_HOST" ./install/dual_installer.sh read | grep "Nodes:" | awk '{print $2}')
-    local shard_count=$(IP="$TARGET_HOST" ./install/dual_installer.sh read | grep "shards:" | awk '{print $3}')
+    local node_count=$(IP="$IP" ./install/dual_installer.sh read | grep "Nodes:" | awk '{print $2}')
+    local shard_count=$(IP="$IP" ./install/dual_installer.sh read | grep "shards:" | awk '{print $3}')
     
     # Create detailed folder structure: TIMESTAMP/INSTANCE_TYPE/PAGE_SIZE/WORKLOAD_NAME/
     local results_dir="results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE_DIR/$WORKLOAD_NAME"
@@ -140,7 +144,7 @@ run_benchmark() {
     # Prepare cluster before OSB execution
     log "Preparing cluster for benchmark..."
     
-    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
+    if ! IP="$IP" ./install/dual_installer.sh drop; then
         log "Failed to drop indices"
         return 1
     fi
@@ -152,7 +156,7 @@ run_benchmark() {
     fi
     
     local osb_cmd
-    if ! osb_cmd=$(IP="$TARGET_HOST" ./install/dual_installer.sh osb_command $osb_cmd_args); then
+    if ! osb_cmd=$(IP="$IP" ./install/dual_installer.sh osb_command $osb_cmd_args); then
         log "Failed to generate OSB command"
         return 1
     fi
@@ -166,7 +170,7 @@ run_benchmark() {
     
     # Create nyc_taxis index
     log "Creating nyc_taxis index..."
-    if ! ssh "$TARGET_HOST" "curl -X PUT 'localhost:9200/nyc_taxis' -H 'Content-Type: application/json' >/dev/null 2>&1"; then
+    if ! ssh "$IP" "curl -X PUT 'localhost:9200/nyc_taxis' -H 'Content-Type: application/json' >/dev/null 2>&1"; then
         log "Failed to create nyc_taxis index"
         return 1
     fi
