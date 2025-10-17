@@ -144,18 +144,167 @@ log() {
     echo -e "\033[1;32m[install]\033[0m $*"
 }
 
+# ---------- Helpers for clearer, DRY behavior (no functional changes) ----------
+# Build discovery lists once
+build_seed_hosts() {
+    local total_nodes="$1"
+    local out=""
+    for j in $(seq 1 "$total_nodes"); do
+        out+="\"127.0.0.1:$((9299 + j))\""
+        [[ $j -lt $total_nodes ]] && out+=", "
+    done
+    printf "%s" "$out"
+}
+
+build_cluster_manager_nodes() {
+    local total_nodes="$1"
+    local out=""
+    for j in $(seq 1 "$total_nodes"); do
+        out+="\"node-$j\""
+        [[ $j -lt $total_nodes ]] && out+=", "
+    done
+    printf "%s" "$out"
+}
+
+# Render opensearch.yml for a node index and total node count
+render_opensearch_yml() {
+    local node_index="$1"
+    local total_nodes="$2"
+    local http_port=$((9199 + node_index))
+    local transport_port=$((9299 + node_index))
+    cat > "/opt/opensearch-node${node_index}/config/opensearch.yml" <<EOF
+cluster.name: axion-cluster
+node.name: node-${node_index}
+path.data: /opt/opensearch-node${node_index}/data
+path.logs: /opt/opensearch-node${node_index}/logs
+network.host: 0.0.0.0
+http.port: ${http_port}
+transport.port: ${transport_port}
+discovery.seed_hosts: [$(build_seed_hosts "${total_nodes}")]
+cluster.initial_cluster_manager_nodes: [$(build_cluster_manager_nodes "${total_nodes}")]
+plugins.security.disabled: true
+bootstrap.memory_lock: true
+EOF
+}
+
+# Create systemd service for a node (uses $JAVA_HOME_PATH like original)
+create_systemd_service() {
+    local node_index="$1"
+    cat > "/etc/systemd/system/opensearch-node${node_index}.service" <<EOF
+[Unit]
+Description=OpenSearch Node ${node_index}
+After=network.target
+
+[Service]
+Type=simple
+User=opensearch
+Group=opensearch
+ExecStart=/opt/opensearch-node${node_index}/bin/opensearch
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+LimitNPROC=65536
+LimitMEMLOCK=infinity
+Environment=OPENSEARCH_JAVA_HOME=$JAVA_HOME_PATH
+Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node${node_index}/config
+WorkingDirectory=/opt/opensearch-node${node_index}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+# Set JVM heap for a specific node directory
+set_heap_for_node() {
+    local node_index="$1"
+    local heap_mb="$2"
+    sed -i "s/-Xms.*/-Xms${heap_mb}m/" "/opt/opensearch-node${node_index}/config/jvm.options"
+    sed -i "s/-Xmx.*/-Xmx${heap_mb}m/" "/opt/opensearch-node${node_index}/config/jvm.options"
+}
+
+# Wait helpers (same semantics, clearer call sites)
+wait_for_cluster_ready() {
+    local max_attempts="${1:-30}"
+    local sleep_s="${2:-10}"
+    for attempt in $(seq 1 "$max_attempts"); do
+        if remote_exec "curl -s localhost:9200/_cluster/health >/dev/null 2>&1"; then
+            log "Cluster is ready!"
+            return 0
+        fi
+        log "Waiting for cluster... (attempt $attempt/$max_attempts)"
+        sleep "$sleep_s"
+    done
+    return 1
+}
+
+wait_for_cluster_recovery() {
+    local max_attempts="${1:-20}"
+    local sleep_s="${2:-15}"
+    for attempt in $(seq 1 "$max_attempts"); do
+        if remote_exec "curl -s localhost:9200/_cluster/health >/dev/null 2>&1"; then
+            log "Cluster recovered!"
+            return 0
+        fi
+        log "Waiting for cluster recovery... (attempt $attempt/$max_attempts)"
+        sleep "$sleep_s"
+    done
+    return 1
+}
+
+# Target hosts & IP helpers (used by read/osb_command)
+get_host_ip() {
+    if [[ -n "${IP:-}" ]]; then
+        printf "%s" "$IP"
+    else
+        hostname -I | awk '{print $1}' 2>/dev/null || printf "%s" "127.0.0.1"
+    fi
+}
+
+build_target_hosts() {
+    local nodes="$1"
+    local host_ip="$2"
+    local out=""
+    for i in $(seq 1 "$nodes"); do
+        local port=$((9199 + i))
+        if [[ $i -eq 1 ]]; then
+            out="${host_ip}:${port}"
+        else
+            out="${out},${host_ip}:${port}"
+        fi
+    done
+    printf "%s" "$out"
+}
+
+# Template update as a function so create/update share it
+put_nyc_taxis_template() {
+    local shards="$1"
+    curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' \
+         -H 'Content-Type: application/json' \
+         -d "{
+            \"index_patterns\": [\"nyc_taxis*\"],
+            \"template\": {
+                \"settings\": {
+                    \"number_of_shards\": ${shards},
+                    \"number_of_replicas\": 1,
+                    \"refresh_interval\": \"30s\"
+                }
+            }
+         }"
+}
+# -------------------------------------------------------------------------------
+
 # Memory monitoring for async operations
 check_memory_and_sleep() {
     local available_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$7}'")
     local total_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
     local available_percent=$(( available_mb * 100 / total_mb ))
-    
+
     if [[ $available_percent -le 10 ]]; then
         log "FATAL: Available memory critically low: ${available_percent}% (${available_mb}MB/${total_mb}MB)"
         log "Aborting operation to prevent system instability"
         exit 1
     fi
-    
+
     sleep 1.0
 }
 
@@ -163,10 +312,10 @@ check_memory_and_sleep() {
 calculate_heap_size() {
     local heap_percent="$1"
     local node_count="$2"
-    
+
     local total_memory_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
     local target_heap_mb
-    
+
     # Set to 8GB if node_count is 0, otherwise calculate normally
     if [[ "$node_count" -eq 0 ]]; then
         target_heap_mb=8192  # 8GB in MB
@@ -174,18 +323,18 @@ calculate_heap_size() {
         target_heap_mb=$(( total_memory_mb * heap_percent / 100 / node_count ))
     fi
     local max_heap_mb=8192  # 8GB in MB
-    
+
     # Never exceed 31GB per node
     if [[ $target_heap_mb -gt $max_heap_mb ]]; then
         target_heap_mb=$max_heap_mb
     fi
-    
+
     # Never exceed 80% of system memory total (safety check)
     local max_system_heap_mb=$(( total_memory_mb * 80 / 100 / node_count ))
     if [[ $target_heap_mb -gt $max_system_heap_mb ]]; then
         target_heap_mb=$max_system_heap_mb
     fi
-    
+
     echo "$target_heap_mb"
 }
 
@@ -208,23 +357,23 @@ remote_exec() {
 # Minimal create implementation
 create_cluster() {
     local nodes="$1"
-    local shards="$2" 
+    local shards="$2"
     local heap="$3"
-    
+
     log "Installing packages..."
     remote_exec "apt-get update -y && apt-get install -y curl jq openjdk-21-jre-headless"
-    
+
     log "Creating opensearch user..."
     remote_exec "getent group opensearch >/dev/null 2>&1 || groupadd --system opensearch"
     remote_exec "id -u opensearch >/dev/null 2>&1 || useradd --system --no-create-home --gid opensearch --shell /usr/sbin/nologin opensearch"
-    
+
     # Detect Java path
     JAVA_HOME_PATH=$(remote_exec "find /usr/lib/jvm -name 'java-21-openjdk-*' -type d | head -1")
     log "Detected Java path: $JAVA_HOME_PATH"
-    
+
     log "Setting system limits..."
     remote_exec "echo 'vm.max_map_count=262144' >/etc/sysctl.d/99-opensearch.conf && sysctl --system >/dev/null"
-    
+
     # Set user limits for opensearch user
     remote_exec "cat > /etc/security/limits.d/99-opensearch.conf" <<EOF
 opensearch soft nofile 65536
@@ -234,139 +383,78 @@ opensearch hard nproc 65536
 opensearch soft memlock unlimited
 opensearch hard memlock unlimited
 EOF
-    
+
     # Download and install OpenSearch
     log "Downloading OpenSearch $OPENSEARCH_VERSION..."
     remote_exec "cd /tmp && curl -L -o opensearch.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/$OPENSEARCH_VERSION/opensearch-$OPENSEARCH_VERSION-linux-x64.tar.gz"
     remote_exec "cd /opt && tar -xzf /tmp/opensearch.tar.gz && mv opensearch-$OPENSEARCH_VERSION opensearch"
-    
+
     # Create node directories and configs
     for i in $(seq 1 "$nodes"); do
         log "Setting up node $i..."
         remote_exec "cp -r /opt/opensearch /opt/opensearch-node$i"
         remote_exec "mkdir -p /opt/opensearch-node$i/data /opt/opensearch-node$i/logs"
         remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
-        
+
         # Create basic config
-        local http_port=$((9199 + i))
-        local transport_port=$((9299 + i))
-        
-        remote_exec "cat > /opt/opensearch-node$i/config/opensearch.yml" <<EOF
-cluster.name: axion-cluster
-node.name: node-$i
-path.data: /opt/opensearch-node$i/data
-path.logs: /opt/opensearch-node$i/logs
-network.host: 0.0.0.0
-http.port: $http_port
-transport.port: $transport_port
-discovery.seed_hosts: [$(for j in $(seq 1 "$nodes"); do echo -n "\"127.0.0.1:$((9299 + j))\""; [[ $j -lt $nodes ]] && echo -n ", "; done)]
-cluster.initial_cluster_manager_nodes: [$(for j in $(seq 1 "$nodes"); do echo -n "\"node-$j\""; [[ $j -lt $nodes ]] && echo -n ", "; done)]
-plugins.security.disabled: true
-bootstrap.memory_lock: true
-EOF
-        
+        remote_exec "bash -c 'render_opensearch_yml $i $nodes'"
+
         # Set heap size
         local heap_size=$(calculate_heap_size "$heap" "$nodes")
-        remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
-        remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
-        
+        remote_exec "bash -c 'set_heap_for_node $i $heap_size'"
+
         # Create systemd service
-        remote_exec "cat > /etc/systemd/system/opensearch-node$i.service" <<EOF
-[Unit]
-Description=OpenSearch Node $i
-After=network.target
-
-[Service]
-Type=simple
-User=opensearch
-Group=opensearch
-ExecStart=/opt/opensearch-node$i/bin/opensearch
-Restart=always
-RestartSec=10
-LimitNOFILE=65536
-LimitNPROC=65536
-LimitMEMLOCK=infinity
-Environment=OPENSEARCH_JAVA_HOME=$JAVA_HOME_PATH
-Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
-WorkingDirectory=/opt/opensearch-node$i
-
-[Install]
-WantedBy=multi-user.target
-EOF
+        remote_exec "bash -c 'create_systemd_service $i'"
     done
-    
+
     # Start services
     log "Starting OpenSearch services..."
     remote_exec "systemctl daemon-reload"
     for i in $(seq 1 "$nodes"); do
         remote_exec "systemctl enable opensearch-node$i && systemctl start opensearch-node$i"
     done
-    
+
     # Wait for cluster
     log "Waiting for cluster to be ready..."
-    for attempt in {1..30}; do
-        if remote_exec "curl -s localhost:9200/_cluster/health >/dev/null 2>&1"; then
-            log "Cluster is ready!"
-            break
-        fi
-        log "Waiting for cluster... (attempt $attempt/30)"
-        sleep 10
-    done
-    
+    wait_for_cluster_ready 30 10
+
     # Create index template
     log "Creating index template with $shards shards..."
-    remote_exec "curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' -H 'Content-Type: application/json' -d '{
-        \"index_patterns\": [\"nyc_taxis*\"],
-        \"template\": {
-            \"settings\": {
-                \"number_of_shards\": $shards,
-                \"number_of_replicas\": 1,
-                \"refresh_interval\": \"30s\"
-            }
-        }
-    }'"
-    
+    remote_exec "bash -c 'put_nyc_taxis_template $shards'"
+
     log "✅ Created $nodes-node cluster with $shards shards, ${heap}% heap"
 }
 
-# Minimal update implementation  
+# Minimal update implementation
 update_cluster() {
     local current_nodes=$(remote_exec "ls -d /opt/opensearch-node* 2>/dev/null | wc -l")
-    
+
     # Update heap if specified
     if [[ -n "$HEAP" ]]; then
         log "Updating heap to ${HEAP}%..."
         local heap_size=$(calculate_heap_size "$HEAP" "$current_nodes")
-        
+
         # Stop all services first
         for i in $(seq 1 "$current_nodes"); do
             remote_exec "systemctl stop opensearch-node$i"
         done
-        
+
         # Update heap settings
         for i in $(seq 1 "$current_nodes"); do
-            remote_exec "sed -i 's/-Xms.*/-Xms${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
-            remote_exec "sed -i 's/-Xmx.*/-Xmx${heap_size}m/' /opt/opensearch-node$i/config/jvm.options"
+            remote_exec "bash -c 'set_heap_for_node $i $heap_size'"
         done
-        
+
         # Start all services
         for i in $(seq 1 "$current_nodes"); do
             remote_exec "systemctl start opensearch-node$i"
             sleep 5  # Stagger startup
         done
-        
+
         # Wait for cluster to recover
         log "Waiting for cluster recovery after heap update..."
-        for attempt in {1..20}; do
-            if remote_exec "curl -s localhost:9200/_cluster/health >/dev/null 2>&1"; then
-                log "Cluster recovered!"
-                break
-            fi
-            log "Waiting for cluster recovery... (attempt $attempt/20)"
-            sleep 15
-        done
+        wait_for_cluster_recovery 20 15
     fi
-    
+
     # Scale nodes if specified
     if [[ -n "$NODES" && "$NODES" -ne "$current_nodes" ]]; then
         if [[ "$NODES" -gt "$current_nodes" ]]; then
@@ -377,81 +465,29 @@ update_cluster() {
                 remote_exec "cp -r /opt/opensearch /opt/opensearch-node$i"
                 remote_exec "mkdir -p /opt/opensearch-node$i/data /opt/opensearch-node$i/logs"
                 remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
-                
+
                 # Create config
-                local http_port=$((9199 + i))
-                local transport_port=$((9299 + i))
-                
-                remote_exec "cat > /opt/opensearch-node$i/config/opensearch.yml" <<EOF
-cluster.name: axion-cluster
-node.name: node-$i
-path.data: /opt/opensearch-node$i/data
-path.logs: /opt/opensearch-node$i/logs
-network.host: 0.0.0.0
-http.port: $http_port
-transport.port: $transport_port
-discovery.seed_hosts: [$(for j in $(seq 1 "$NODES"); do echo -n "\"127.0.0.1:$((9299 + j))\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
-cluster.initial_cluster_manager_nodes: [$(for j in $(seq 1 "$NODES"); do echo -n "\"node-$j\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
-plugins.security.disabled: true
-bootstrap.memory_lock: true
-EOF
-                
+                remote_exec "bash -c 'render_opensearch_yml $i $NODES'"
+
                 # Set default 8GB heap for new nodes
-                remote_exec "sed -i 's/-Xms.*/-Xms8192m/' /opt/opensearch-node$i/config/jvm.options"
-                remote_exec "sed -i 's/-Xmx.*/-Xmx8192m/' /opt/opensearch-node$i/config/jvm.options"
-                
+                remote_exec "bash -c 'set_heap_for_node $i 8192'"
+
                 # Create service
-                remote_exec "cat > /etc/systemd/system/opensearch-node$i.service" <<EOF
-[Unit]
-Description=OpenSearch Node $i
-After=network.target
+                remote_exec "bash -c 'create_systemd_service $i'"
 
-[Service]
-Type=simple
-User=opensearch
-Group=opensearch
-ExecStart=/opt/opensearch-node$i/bin/opensearch
-Restart=always
-RestartSec=10
-LimitNOFILE=65536
-LimitNPROC=65536
-LimitMEMLOCK=infinity
-Environment=OPENSEARCH_JAVA_HOME=$JAVA_HOME_PATH
-Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node$i/config
-WorkingDirectory=/opt/opensearch-node$i
-
-[Install]
-WantedBy=multi-user.target
-EOF
-                
                 remote_exec "systemctl daemon-reload"
                 remote_exec "systemctl enable opensearch-node$i && systemctl start opensearch-node$i"
             done
         else
             # Remove nodes
             log "Scaling down from $current_nodes to $NODES nodes..."
-            
+
             # First, update remaining nodes' configurations before removing nodes
             log "Updating remaining nodes' configurations..."
             for i in $(seq 1 "$NODES"); do
-                local http_port=$((9199 + i))
-                local transport_port=$((9299 + i))
-                
-                remote_exec "cat > /opt/opensearch-node$i/config/opensearch.yml" <<EOF
-cluster.name: axion-cluster
-node.name: node-$i
-path.data: /opt/opensearch-node$i/data
-path.logs: /opt/opensearch-node$i/logs
-network.host: 0.0.0.0
-http.port: $http_port
-transport.port: $transport_port
-discovery.seed_hosts: [$(for j in $(seq 1 "$NODES"); do echo -n "\"127.0.0.1:$((9299 + j))\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
-cluster.initial_cluster_manager_nodes: [$(for j in $(seq 1 "$NODES"); do echo -n "\"node-$j\""; [[ $j -lt $NODES ]] && echo -n ", "; done)]
-plugins.security.disabled: true
-bootstrap.memory_lock: true
-EOF
+                remote_exec "bash -c 'render_opensearch_yml $i $NODES'"
             done
-            
+
             # Then remove the excess nodes
             for i in $(seq $((NODES + 1)) "$current_nodes"); do
                 log "Removing node $i..."
@@ -462,16 +498,16 @@ EOF
             done
             remote_exec "systemctl daemon-reload"
         fi
-        
+
         # Monitor cluster stabilization with memory checks every 1s
         if [[ "$NODES" -gt 0 ]]; then
             log "Monitoring cluster stabilization with memory checks..."
             for attempt in {1..60}; do
                 check_memory_and_sleep
-                
+
                 local current_node_count=$(remote_exec "curl -s localhost:9200/_cat/nodes?h=name 2>/dev/null | wc -l" | tr -d '\n' || echo "0")
                 local cluster_status=$(remote_exec "curl -s localhost:9200/_cluster/health 2>/dev/null | jq -r '.status // \"unknown\"' 2>/dev/null" | tr -d '\n' || echo "unknown")
-                
+
                 if [[ "$current_node_count" -eq "$NODES" && "$cluster_status" == "green" ]]; then
                     log "Cluster stabilized: $current_node_count nodes, status: $cluster_status"
                     break
@@ -482,30 +518,21 @@ EOF
             log "Scaled to 0 nodes - no cluster to monitor"
         fi
     fi
-    
+
     # Update shards if specified
     if [[ -n "$SHARDS" ]]; then
         log "Updating nyc_taxis index to $SHARDS shards..."
-        
+
         # Start async operations
         log "Starting async shard operations..."
         remote_exec "curl -X DELETE 'localhost:9200/nyc_taxis*' >/dev/null 2>&1 &"
-        remote_exec "curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' -H 'Content-Type: application/json' -d '{
-            \"index_patterns\": [\"nyc_taxis*\"],
-            \"template\": {
-                \"settings\": {
-                    \"number_of_shards\": $SHARDS,
-                    \"number_of_replicas\": 1,
-                    \"refresh_interval\": \"30s\"
-                }
-            }
-        }' >/dev/null 2>&1 &"
-        
+        remote_exec "put_nyc_taxis_template '$SHARDS'" >/dev/null 2>&1 &
+
         # Monitor with memory checks every 1s
         log "Monitoring template update with memory checks..."
         for attempt in {1..30}; do
             check_memory_and_sleep
-            
+
             local current_shards=$(remote_exec "curl -s 'localhost:9200/_index_template/nyc_taxis_template' 2>/dev/null | jq -r '.index_templates[0].index_template.template.settings.index.number_of_shards // \"0\"' 2>/dev/null || echo '0'")
             if [[ "$current_shards" == "$SHARDS" ]]; then
                 log "Template updated successfully to $SHARDS shards"
@@ -514,28 +541,28 @@ EOF
             log "Waiting for template update... (attempt $attempt/30, current: $current_shards, target: $SHARDS)"
         done
     fi
-    
+
     log "✅ Update completed"
 }
 
 remove_install() {
     log "Stopping and removing all OpenSearch services..."
-    
+
     # Stop all opensearch services
     for service in $(remote_exec "systemctl list-units --type=service --state=active | grep opensearch-node | awk '{print \$1}'"); do
         log "Stopping $service"
         remote_exec "systemctl stop $service || true"
         remote_exec "systemctl disable $service || true"
     done
-    
+
     # Remove service files
     remote_exec "rm -f /etc/systemd/system/opensearch-node*.service"
     remote_exec "systemctl daemon-reload"
-    
+
     # Remove installation directories
     remote_exec "rm -rf /opt/opensearch-node*"
     remote_exec "rm -rf /opt/opensearch"
-    
+
     log "All OpenSearch installations removed"
 }
 
@@ -547,7 +574,7 @@ generate_osb_command() {
     local include_tasks="$2"
     local clients="${3:-20}"
     local osb_shards="${4:-8}"
-    
+
     # Get node count (use remote_exec if in remote context, otherwise direct curl)
     local node_response
     if [[ -n "${REMOTE_HOST_IP:-}" ]]; then
@@ -555,31 +582,16 @@ generate_osb_command() {
     else
         node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
     fi
-    
+
     if [[ -z "$node_response" ]]; then
         echo "ERROR: No OpenSearch nodes found" >&2
         exit 1
     fi
     actual_nodes=$(echo "$node_response" | wc -l)
-    
-    # Determine host IP
-    if [[ -n "${IP:-}" ]]; then
-        host_ip="$IP"
-    else
-        host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
-    fi
-    
-    # Build target-hosts string
-    target_hosts=""
-    for ((i=1; i<=actual_nodes; i++)); do
-        port=$((9199 + i))
-        if [[ $i -eq 1 ]]; then
-            target_hosts="${host_ip}:${port}"
-        else
-            target_hosts="${target_hosts},${host_ip}:${port}"
-        fi
-    done
-    
+
+    host_ip="$(get_host_ip)"
+    target_hosts="$(build_target_hosts "$actual_nodes" "$host_ip")"
+
     # Build OSB command
     if [[ "$workload" == "nyc_taxis" ]]; then
         local osb_cmd="opensearch-benchmark run --workload-path=\"./osb_local_workloads/nyc_taxis_clean\""
@@ -589,19 +601,19 @@ generate_osb_command() {
     osb_cmd="${osb_cmd} --target-hosts=${target_hosts}"
     osb_cmd="${osb_cmd} --client-options=use_ssl:false,verify_certs:false,timeout:60"
     osb_cmd="${osb_cmd} --kill-running-processes"
-    
+
     if [[ -n "$include_tasks" ]]; then
         osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
     else
         osb_cmd="${osb_cmd} --include-tasks=\"delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count\""
     fi
-    
+
     if [[ "$workload" == "nyc_taxis" ]]; then
         osb_cmd="${osb_cmd} --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
     else
         osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
     fi
-    
+
     echo "$osb_cmd"
 }
 
@@ -611,10 +623,10 @@ case "$ACTION" in
     require_root
     create_cluster "$NODES" "$SHARDS" "$HEAP"
     ;;
-    
+
   read)
     echo "=== Current Cluster Configuration ==="
-    
+
     # Get node count
     node_response=$(timeout 10 curl -s "localhost:9200/_cat/nodes?h=name" 2>/dev/null || echo "")
     if [[ -z "$node_response" ]]; then
@@ -623,7 +635,7 @@ case "$ACTION" in
         actual_nodes=$(echo "$node_response" | wc -l)
     fi
     echo "Nodes: $actual_nodes"
-    
+
     # Get shard count for nyc_taxis
     index_name="nyc_taxis"
     shard_response=$(timeout 10 curl -s "localhost:9200/_cat/shards/${index_name}?h=shard,prirep" 2>/dev/null || echo "")
@@ -635,18 +647,18 @@ case "$ACTION" in
         actual_shards=$(echo "$shard_response" | grep "p" | wc -l)
         echo "${index_name} shards: $actual_shards (active index)"
     fi
-    
+
     # Get heap settings (from first node)
     if [[ -f "/opt/opensearch-node1/config/jvm.options" ]]; then
       heap_mb=$(grep "^-Xmx" /opt/opensearch-node1/config/jvm.options | sed 's/-Xmx\|m//g')
       heap_gb=$(( heap_mb / 1024 ))
       echo "Heap Size: ${heap_gb}GB (${heap_mb}MB)"
     fi
-    
+
     # Get cluster health
     health=$(timeout 10 curl -s "localhost:9200/_cluster/health" 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unknown")
     echo "Health: $health"
-    
+
     # Generate OSB connection string if nodes exist
     if [[ "$actual_nodes" -gt 0 ]]; then
         echo ""
@@ -659,25 +671,9 @@ case "$ACTION" in
         echo "./dual_installer.sh drop_all && \\"
         echo "./dual_installer.sh update --shards 16 && \\"
         echo "./dual_installer.sh drop && \\"
-        
-        # Determine host IP
-        if [[ -n "${IP:-}" ]]; then
-            host_ip="$IP"
-        else
-            # Get the actual IP of the current machine
-            host_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
-        fi
-        
-        # Build target-hosts string
-        target_hosts=""
-        for ((i=1; i<=actual_nodes; i++)); do
-            port=$((9199 + i))
-            if [[ $i -eq 1 ]]; then
-                target_hosts="${host_ip}:${port}"
-            else
-                target_hosts="${target_hosts},${host_ip}:${port}"
-            fi
-        done
+
+        host_ip="$(get_host_ip)"
+        target_hosts="$(build_target_hosts "$actual_nodes" "$host_ip")"
         
         # Calculate bulk_indexing_clients (nodes * 4 + 20, capped at 150)
         bulk_clients=$((actual_nodes * 4 + 20))
