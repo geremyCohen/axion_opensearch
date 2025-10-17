@@ -2,61 +2,141 @@
 
 # Test parameters
 TIMESTAMP="nyc_taxi_1015_index_0"
-
-#CLIENT_LOADS=(20 40 60 80)
 CLIENT_LOADS=(60)
-NODE_SHARD_CONFIGS=(16)  # nodes=shards for each value
-#NODE_SHARD_CONFIGS=(16 20 24 28 32)  # nodes=shards for each value
 REPETITIONS=4
-#REPETITIONS=4
-#
-#
+
 set -euo pipefail
 
-# Command line parameter validation
-if [[ $# -lt 1 || $# -gt 3 ]]; then
-    echo "Usage: $0 <workload> [include_tasks] [--dry-run]"
+# Initialize parameters
+WORKLOAD_PARAM=""
+INCLUDE_TASKS_PARAM=""
+DRY_RUN=false
+NODES_PARAM=""
+SHARDS_PARAM=""
+HEAP_PARAM=""
+CLIENTS_PARAM=""
+
+usage() {
+    echo "Usage: $0 --workload <workload> [options]"
     echo ""
     echo "Required parameter:"
-    echo "  workload       Must be one of: nyc_taxis, big5, vectorsearch"
+    echo "  --workload <name>      Workload name (nyc_taxis, big5, vectorsearch)"
     echo ""
     echo "Optional parameters:"
-    echo "  include_tasks  Tasks to include in OSB benchmark (e.g., index, search)"
-    echo "  --dry-run      Show commands without executing them"
+    echo "  --include-tasks <list> Tasks to include in OSB benchmark (e.g., index, search)"
+    echo "  --nodes <list>         Comma-separated node counts (e.g., 8,16,24)"
+    echo "  --shards <list>        Comma-separated shard counts (e.g., 16,32,64)"
+    echo "  --clients <list>       Comma-separated client counts (default: 60)"
+    echo "  --heap <percent>       Heap memory percentage (default: cluster default)"
+    echo "  --repetitions <num>    Number of repetitions per config (default: 4)"
+    echo "  --dry-run              Show commands without executing them"
     echo ""
     echo "Examples:"
-    echo "  $0 nyc_taxis"
-    echo "  $0 nyc_taxis index"
-    echo "  $0 nyc_taxis index --dry-run"
+    echo "  $0 --workload nyc_taxis"
+    echo "  $0 --workload nyc_taxis --include-tasks index"
+    echo "  $0 --workload nyc_taxis --nodes 8,16,24 --clients 40,60,80"
+    echo "  $0 --workload nyc_taxis --shards 16,32 --clients 60"
+    echo "  $0 --workload nyc_taxis --nodes 16 --shards 32 --heap 80"
     exit 1
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --workload)
+            WORKLOAD_PARAM="$2"
+            shift 2
+            ;;
+        --include-tasks)
+            INCLUDE_TASKS_PARAM="$2"
+            shift 2
+            ;;
+        --nodes)
+            NODES_PARAM="$2"
+            shift 2
+            ;;
+        --shards)
+            SHARDS_PARAM="$2"
+            shift 2
+            ;;
+        --clients)
+            CLIENTS_PARAM="$2"
+            shift 2
+            ;;
+        --heap)
+            HEAP_PARAM="$2"
+            shift 2
+            ;;
+        --repetitions)
+            REPETITIONS="$2"
+            shift 2
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "ERROR: Unknown parameter '$1'"
+            usage
+            ;;
+    esac
+done
+
+# Validate required parameters
+if [[ -z "$WORKLOAD_PARAM" ]]; then
+    echo "ERROR: --workload parameter is required"
+    usage
 fi
 
-WORKLOAD_PARAM="$1"
-INCLUDE_TASKS_PARAM="${2:-}"
-DRY_RUN=false
-
-# Check for --dry-run flag
-if [[ "${2:-}" == "--dry-run" ]]; then
-    INCLUDE_TASKS_PARAM=""
-    DRY_RUN=true
-elif [[ "${3:-}" == "--dry-run" ]]; then
-    DRY_RUN=true
-fi
 ALLOWED_WORKLOADS=("nyc_taxis" "big5" "vectorsearch")
-
-# Validate workload parameter
 if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
     echo "ERROR: Invalid workload '$WORKLOAD_PARAM'"
-    echo ""
-    echo "Usage: $0 <workload>"
-    echo ""
-    echo "Allowed workloads:"
-    for workload in "${ALLOWED_WORKLOADS[@]}"; do
-        echo "  - $workload"
-    done
-    echo ""
-    echo "Example: $0 nyc_taxis"
+    echo "Allowed workloads: ${ALLOWED_WORKLOADS[*]}"
     exit 1
+fi
+
+# Convert comma-separated lists to arrays
+if [[ -n "$NODES_PARAM" ]]; then
+    IFS=',' read -ra NODE_CONFIGS <<< "$NODES_PARAM"
+else
+    NODE_CONFIGS=()
+fi
+
+if [[ -n "$SHARDS_PARAM" ]]; then
+    IFS=',' read -ra SHARD_CONFIGS <<< "$SHARDS_PARAM"
+else
+    SHARD_CONFIGS=()
+fi
+
+if [[ -n "$CLIENTS_PARAM" ]]; then
+    IFS=',' read -ra CLIENT_LOADS <<< "$CLIENTS_PARAM"
+fi
+
+# Create combined configurations for iteration
+COMBINED_CONFIGS=()
+if [[ ${#NODE_CONFIGS[@]} -gt 0 && ${#SHARD_CONFIGS[@]} -gt 0 ]]; then
+    # Both nodes and shards specified - create all combinations
+    for node in "${NODE_CONFIGS[@]}"; do
+        for shard in "${SHARD_CONFIGS[@]}"; do
+            COMBINED_CONFIGS+=("${node}:${shard}")
+        done
+    done
+elif [[ ${#NODE_CONFIGS[@]} -gt 0 ]]; then
+    # Only nodes specified
+    for node in "${NODE_CONFIGS[@]}"; do
+        COMBINED_CONFIGS+=("${node}:")
+    done
+elif [[ ${#SHARD_CONFIGS[@]} -gt 0 ]]; then
+    # Only shards specified
+    for shard in "${SHARD_CONFIGS[@]}"; do
+        COMBINED_CONFIGS+=(":${shard}")
+    done
+else
+    # Neither specified - use default
+    COMBINED_CONFIGS+=(":")
 fi
 
 echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
@@ -387,16 +467,32 @@ configure_cluster() {
     local nodes=$1
     local shards=$2
     
-    # Validate shard count doesn't exceed node count
-    if [[ $shards -gt $nodes ]]; then
+    # Build update command with only specified parameters
+    local update_cmd="IP=\"$TARGET_HOST\" ./install/dual_installer.sh update"
+    
+    if [[ -n "$nodes" ]]; then
+        update_cmd="$update_cmd --nodes \"$nodes\""
+        log "Configuring cluster: $nodes nodes"
+    fi
+    
+    if [[ -n "$shards" ]]; then
+        update_cmd="$update_cmd --shards \"$shards\""
+        log "Configuring cluster: $shards shards"
+    fi
+    
+    if [[ -n "$HEAP_PARAM" ]]; then
+        update_cmd="$update_cmd --heap \"$HEAP_PARAM\""
+        log "Using heap: ${HEAP_PARAM}%"
+    fi
+    
+    # Validate shard count doesn't exceed node count (only if both specified)
+    if [[ -n "$nodes" && -n "$shards" && $shards -gt $nodes ]]; then
         log "Skipping configuration: $shards shards > $nodes nodes (would cause unassigned shards)"
         return 1
     fi
     
-    log "Configuring cluster: $nodes nodes, $shards shards"
-    
     log "Attempting cluster configuration update..."
-    if IP="$TARGET_HOST" ./install/dual_installer.sh update --nodes "$nodes" --shards "$shards"; then
+    if eval "$update_cmd"; then
         log "Cluster configuration completed"
     else
         log "WARNING: Cluster configuration may have failed"
@@ -484,9 +580,11 @@ run_benchmark() {
         return 1
     fi
     
-    if ! IP="$TARGET_HOST" ./install/dual_installer.sh update --shards $shards; then
-        log "Failed to update shards to $shards"
-        return 1
+    if [[ -n "$shards" ]]; then
+        if ! IP="$TARGET_HOST" ./install/dual_installer.sh update --shards $shards; then
+            log "Failed to update shards to $shards"
+            return 1
+        fi
     fi
     
     if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
@@ -558,12 +656,12 @@ main() {
     log "Starting OpenSearch performance test suite"
     
     # Calculate total configurations and runs
-    local total_configs=$((${#CLIENT_LOADS[@]} * ${#NODE_SHARD_CONFIGS[@]}))
+    local total_configs=$((${#CLIENT_LOADS[@]} * ${#COMBINED_CONFIGS[@]}))
     local total_runs=$((total_configs * REPETITIONS))
     log "Total configurations: $total_configs, Total runs: $total_runs"
     log "CLIENT_LOADS: ${CLIENT_LOADS[*]}"
-    log "NODE_SHARD_CONFIGS: ${NODE_SHARD_CONFIGS[*]}"
-    log "Optimized execution order: cluster will be reconfigured only ${#NODE_SHARD_CONFIGS[@]} times instead of $total_configs times"
+    log "COMBINED_CONFIGS: ${COMBINED_CONFIGS[*]}"
+    log "Optimized execution order: cluster will be reconfigured only ${#COMBINED_CONFIGS[@]} times instead of $total_configs times"
 
     load_checkpoint
     
@@ -572,9 +670,8 @@ main() {
     
     # OPTIMIZED LOOP ORDER: node/shard configs outer, client loads inner
     # This reduces cluster reconfigurations from 25 to 5
-    for node_shard in "${NODE_SHARD_CONFIGS[@]}"; do
-        local nodes=$node_shard
-        local shards=$node_shard
+    for config in "${COMBINED_CONFIGS[@]}"; do
+        IFS=':' read -r nodes shards <<< "$config"
 
         # Skip entire node configurations that are already complete
         if [[ $nodes -lt $CURRENT_NODES ]]; then
@@ -594,7 +691,7 @@ main() {
         fi
 
         # Configure cluster once per node/shard combination
-        log "About to configure cluster: $nodes nodes, $shards shards"
+        log "About to configure cluster"
         configure_cluster "$nodes" "$shards"
         log "Cluster configured, checking for issues..."
         
