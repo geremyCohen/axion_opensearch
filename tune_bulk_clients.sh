@@ -40,6 +40,12 @@ _RAW_HOST="${HOST#http://}"
 _RAW_HOST="${_RAW_HOST#https://}"
 SSH_HOST="${_RAW_HOST%%:*}"
 
+# Final-report mode defaults
+FINAL="false"          # when true, run fixed-config repetitions instead of a sweep
+FINAL_REPS="4"         # number of repetitions
+FINAL_CLIENTS="16"     # bulk_indexing_clients to use in final mode
+RESULTS_DIR="./test_run_results"  # where to copy test_run.json files
+
 # Parse args
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -56,6 +62,10 @@ while [[ $# -gt 0 ]]; do
     --single-seconds) SINGLE_SECONDS="$2"; shift 2;;
     --verbose) VERBOSE="$2"; shift 2;;
     --ssh-host) SSH_HOST="$2"; shift 2;;
+    --final) FINAL="$2"; shift 2;;
+    --final-reps) FINAL_REPS="$2"; shift 2;;
+    --final-clients) FINAL_CLIENTS="$2"; shift 2;;
+    --results-dir) RESULTS_DIR="$2"; shift 2;;
     *) echo "Unknown arg: $1" >&2; exit 1;;
   esac
 done
@@ -72,6 +82,59 @@ fi
 # Require deps
 command -v jq >/dev/null || { echo "jq is required"; exit 1; }
 command -v opensearch-benchmark >/dev/null || { echo "opensearch-benchmark not found in PATH"; exit 1; }
+
+# -----------------------------
+# Final-report mode (fixed config, repeated runs copying test_run.json)
+# -----------------------------
+if [[ "$FINAL" == "true" ]]; then
+  mkdir -p "$RESULTS_DIR"
+  echo "[final] Running $FINAL_REPS repetitions with bulk_indexing_clients=$FINAL_CLIENTS" >&2
+
+  # Helper: count docs
+  docs_count() {
+    curl -s "$HOST/nyc_taxis/_count" | jq -r '.count // 0' 2>/dev/null
+  }
+
+  for rep in $(seq 1 "$FINAL_REPS"); do
+    echo "=== final rep $rep/$FINAL_REPS (clients=$FINAL_CLIENTS) ===" >&2
+
+    # Reset index cleanly (no mid-run changes)
+    echo "[prep] reset nyc_taxis index" >&2
+    curl -s -X DELETE "$HOST/nyc_taxis" >/dev/null || true
+    curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{"settings":{}}' >/dev/null
+
+    # Build and run OSB (full run, no timeout)
+    OSB_CMD=(opensearch-benchmark run
+      --workload-path="$WORKLOAD_PATH"
+      --target-hosts="${HOST#http://}"
+      --client-options=use_ssl:false,verify_certs:false,timeout:60
+      --kill-running-processes
+      --include-tasks="index"
+      --workload-params="index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:${WARMUP_ITER},bulk_indexing_clients:${FINAL_CLIENTS},bulk_size:${BULK_SIZE}"
+    )
+    echo "[cmd] ${OSB_CMD[*]}" >&2
+    "${OSB_CMD[@]}" 2>&1 | tee /dev/stderr || true
+
+    # Locate latest test run and copy JSON
+    BASE_DIR="$HOME/.benchmark/benchmarks/test-runs"
+    if [[ -d "$BASE_DIR" ]]; then
+      LAST_TEST_RUN=$(ls -1t "$BASE_DIR" | head -1)
+      SRC_JSON="$BASE_DIR/$LAST_TEST_RUN/test_run.json"
+      DEST_JSON="$RESULTS_DIR/test_run_${rep}.json"
+      if [[ -f "$SRC_JSON" ]]; then
+        cp -f "$SRC_JSON" "$DEST_JSON"
+        echo "[final] copied $SRC_JSON -> $DEST_JSON" >&2
+      else
+        echo "[final][warn] test_run.json not found under $BASE_DIR/$LAST_TEST_RUN" >&2
+      fi
+    else
+      echo "[final][warn] $BASE_DIR not found; no results copied" >&2
+    fi
+  done
+
+  echo "[final] Completed $FINAL_REPS repetitions. Results in $RESULTS_DIR" >&2
+  exit 0
+fi
 
 # Prepare CSV
 echo "arch,clients,docs_per_s,p50_ms,p99_ms,cpu_user_pct,cpu_sys_pct,cpu_iowait_pct,rejections_write,rejections_bulk,docs_after_run" > "$RESULTS_CSV"
