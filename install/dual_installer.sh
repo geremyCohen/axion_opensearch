@@ -710,8 +710,14 @@ case "$ACTION" in
 
     # Get heap settings (from first node)
     if [[ -f "/opt/opensearch-node1/config/jvm.options" ]]; then
-      heap_mb=$(grep "^-Xmx" /opt/opensearch-node1/config/jvm.options | sed 's/-Xmx\|m//g')
-      heap_gb=$(( heap_mb / 1024 ))
+      heap_setting=$(grep "^-Xmx" /opt/opensearch-node1/config/jvm.options | sed 's/-Xmx//')
+      if [[ "$heap_setting" =~ g$ ]]; then
+        heap_gb=$(echo "$heap_setting" | sed 's/g//')
+        heap_mb=$((heap_gb * 1024))
+      else
+        heap_mb=$(echo "$heap_setting" | sed 's/m//')
+        heap_gb=$((heap_mb / 1024))
+      fi
       echo "Heap Size: ${heap_gb}GB (${heap_mb}MB)"
     fi
 
