@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
-# tune_bulk_clients.sh
+# tune_bulk_clients.sh  (v2)
 # Sweep bulk_indexing_clients for OpenSearch Benchmark ingest and recommend a client count.
+# Adds: --single to run just one trial, --verbose to echo commands and show OSB output clearly,
+#       and extra sanity prints (docs count after run).
 #
-# Usage:
+# Usage (sweep):
 #   ./tune_bulk_clients.sh \
 #     --host http://10.0.0.59:9200 \
 #     --workload-path ./osb_local_workloads/nyc_taxis_clean \
@@ -13,10 +15,10 @@
 #     --mpstat true \
 #     --threshold 0.97
 #
-# Notes:
-# - Assumes nyc_taxis index template already enforces 6 shards, 0 replicas, refresh=30s.
-# - No mid-run cluster changes are made; per-trial index is created before the run.
-# - Produces tune_results.csv and a summary recommendation at the end.
+# Usage (single run for smoke test at clients=24):
+#   ./tune_bulk_clients.sh --host http://10.0.0.59:9200 \
+#     --workload-path ./osb_local_workloads/nyc_taxis_clean \
+#     --counts 24 --single true --verbose true
 #
 set -euo pipefail
 
@@ -30,6 +32,8 @@ MPSTAT="true"
 THRESHOLD="0.97"   # choose minimal clients achieving >= 97% of peak throughput
 CPU_MAX_WAIT="10.0" # quality gate: avg iowait <= 10%
 RESULTS_CSV="tune_results.csv"
+SINGLE="false"
+VERBOSE="false"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -43,18 +47,26 @@ while [[ $# -gt 0 ]]; do
     --threshold) THRESHOLD="$2"; shift 2;;
     --cpu-max-wait) CPU_MAX_WAIT="$2"; shift 2;;
     --out) RESULTS_CSV="$2"; shift 2;;
+    --single) SINGLE="$2"; shift 2;;
+    --verbose) VERBOSE="$2"; shift 2;;
     *) echo "Unknown arg: $1" >&2; exit 1;;
   esac
 done
+
+[[ "$VERBOSE" == "true" ]] && set -x
 
 # Require deps
 command -v jq >/dev/null || { echo "jq is required"; exit 1; }
 command -v opensearch-benchmark >/dev/null || { echo "opensearch-benchmark not found in PATH"; exit 1; }
 
 # Prepare CSV
-echo "arch,clients,docs_per_s,p50_ms,p99_ms,cpu_user_pct,cpu_sys_pct,cpu_iowait_pct,rejections_write,rejections_bulk" > "$RESULTS_CSV"
+echo "arch,clients,docs_per_s,p50_ms,p99_ms,cpu_user_pct,cpu_sys_pct,cpu_iowait_pct,rejections_write,rejections_bulk,docs_after_run" > "$RESULTS_CSV"
 
 IFS=, read -r -a CLIENTS_ARR <<< "$COUNTS"
+if [[ "$SINGLE" == "true" ]]; then
+  # Just use the first element of CLIENTS_ARR
+  CLIENTS_ARR=("${CLIENTS_ARR[0]}")
+fi
 
 get_arch() {
   curl -s "$HOST/_nodes" | jq -r '.nodes[]?.os.arch' | head -1
@@ -62,15 +74,18 @@ get_arch() {
 
 avg_from_mpstat() {
   local file="$1"
-  # mpstat output has a header every interval; average over lines with "all"
-  # Field positions: %usr at $3, %sys at $5, %iowait at $6
   awk '/all/ {usr+=$3; sys+=$5; wai+=$6; n++} END{ if(n==0){print "NA,NA,NA"} else {printf "%.1f,%.1f,%.1f\n", usr/n, sys/n, wai/n}}' "$file"
+}
+
+docs_count() {
+  curl -s "$HOST/nyc_taxis/_count" | jq -r '.count // 0' 2>/dev/null
 }
 
 for C in "${CLIENTS_ARR[@]}"; do
   echo "=== clients=$C ===" >&2
 
   # Clean/create index (no mid-run changes)
+  echo "[prep] reset nyc_taxis index" >&2
   curl -s -X DELETE "$HOST/nyc_taxis" >/dev/null || true
   curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{"settings":{}}' >/dev/null
 
@@ -87,16 +102,20 @@ for C in "${CLIENTS_ARR[@]}"; do
     fi
   fi
 
-  # Run OSB ingest-only
-  # Capture stdout to parse docs/s and (if present) latency percentiles
-  OUT="$(opensearch-benchmark run \
-    --workload-path="$WORKLOAD_PATH" \
-    --target-hosts="${HOST#http://}" \
-    --client-options=use_ssl:false,verify_certs:false,timeout:60 \
-    --kill-running-processes \
-    --include-tasks="index" \
-    --workload-params="index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${C},bulk_size:${BULK_SIZE}" \
-    2>&1 | tee /dev/stderr)" || true
+  # Build OSB command
+  OSB_CMD=(opensearch-benchmark run
+    --workload-path="$WORKLOAD_PATH"
+    --target-hosts="${HOST#http://}"
+    --client-options=use_ssl:false,verify_certs:false,timeout:60
+    --kill-running-processes
+    --include-tasks="index"
+    --workload-params="index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:${WARMUP_ITER},bulk_indexing_clients:${C},bulk_size:${BULK_SIZE}"
+  )
+
+  echo "[cmd] ${OSB_CMD[*]}" >&2
+
+  # Run OSB ingest-only and keep full output (stdout+stderr)
+  OUT="$("${OSB_CMD[@]}" 2>&1 | tee /dev/stderr)" || true
 
   # Stop mpstat
   if [[ "${MPSTAT}" == "true" && -n "${MPPID:-}" ]]; then
@@ -104,9 +123,9 @@ for C in "${CLIENTS_ARR[@]}"; do
     sleep 0.2
   fi
 
-  # Parse OSB output for docs/s and p50/p99 if present
-  # Try common patterns; fall back gracefully.
-  DOCS=$(echo "$OUT" | awk '/docs\/s|Throughput/ {v=$NF} END{print v}')
+  # Parse OSB output for docs/s and latency percentiles if present
+  # Try multiple patterns
+  DOCS=$(echo "$OUT" | awk '/docs\/s|Throughput|Indexing throughput/ {last=$0} END{print last}' | awk '{print $NF}')
   [[ -z "$DOCS" ]] && DOCS=0
 
   P50=$(echo "$OUT" | awk '/p50|50.0 percentile/ {v=$NF} END{print v}')
@@ -127,9 +146,20 @@ for C in "${CLIENTS_ARR[@]}"; do
   fi
   rm -f "$MPFILE"
 
-  ARCH="$(get_arch)"
-  echo "$ARCH,$C,$DOCS,$P50,$P99,$CPU_USER,$CPU_SYS,$CPU_WAIT,$RJ_WRITE,$RJ_BULK" | tee -a "$RESULTS_CSV" >/dev/null
+  # Docs in index after run (sanity)
+  DOCS_AFTER="$(docs_count)"
+  echo "[post] docs_after_run=$DOCS_AFTER  (docs/s parsed=$DOCS)" >&2
+
+  ARCH="$(curl -s "$HOST/_nodes" | jq -r '.nodes[]?.os.arch' | head -1)"
+  echo "$ARCH,$C,$DOCS,$P50,$P99,$CPU_USER,$CPU_SYS,$CPU_WAIT,$RJ_WRITE,$RJ_BULK,$DOCS_AFTER" | tee -a "$RESULTS_CSV" >/dev/null
 done
+
+# If SINGLE mode, skip recommendation and just show CSV path
+if [[ "$SINGLE" == "true" ]]; then
+  echo "Single run complete."
+  echo "CSV written to: $RESULTS_CSV"
+  exit 0
+fi
 
 # Compute recommendation
 python3 - "$RESULTS_CSV" "$THRESHOLD" "$CPU_MAX_WAIT" <<'PYCODE'
@@ -143,6 +173,7 @@ with open(csv_path) as f:
         try:
             row['clients'] = int(row['clients'])
             row['docs_per_s'] = float(row['docs_per_s'])
+            row['docs_after_run'] = int(float(row.get('docs_after_run','0')))
         except:
             continue
         # normalize fields
@@ -153,10 +184,15 @@ with open(csv_path) as f:
 if not rows:
     print("No data collected.", file=sys.stderr); sys.exit(1)
 
+# filter out runs that didn't ingest any docs
+rows = [r for r in rows if r['docs_after_run'] > 0]
+
+if not rows:
+    print("No successful ingest detected (docs_after_run==0 for all trials).", file=sys.stderr); sys.exit(2)
+
 peak = max(rows, key=lambda x: x['docs_per_s'])['docs_per_s']
 target = peak * thresh
 
-# Quality gates: no rejections, iowait <= max_wait (if present)
 def ok(q):
     if q['rejections_write'] > 0 or q['rejections_bulk'] > 0:
         return False
@@ -173,7 +209,6 @@ if candidates:
     print(f"  threshold: {thresh*100:.0f}% -> target_docs_per_s >= {target:.2f}")
     print(f"  chosen_clients: {rec['clients']}  docs/s={rec['docs_per_s']:.2f}  iowait={rec['cpu_iowait_pct']:.1f}%  rej(write/bulk)={int(rec['rejections_write'])}/{int(rec['rejections_bulk'])}")
 else:
-    # fallback: choose clients at peak even if quality gates failed
     best = max(rows, key=lambda x: x['docs_per_s'])
     print("RECOMMENDATION (peak only; quality gates failed)")
     print(f"  peak_docs_per_s: {peak:.2f}")
