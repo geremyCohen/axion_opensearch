@@ -171,7 +171,7 @@ build_cluster_manager_nodes() {
 render_opensearch_yml() {
     local node_index="$1"
     local total_nodes="$2"
-    local cluster_suffix="${CLUSTER_SUFFIX:-}"
+    local cluster_suffix="${3:-}"
     
     if [[ "$total_nodes" -eq 1 ]]; then
         # Single-node configuration
@@ -186,11 +186,6 @@ discovery.type: single-node
 plugins.security.disabled: true
 bootstrap.memory_lock: true
 action.auto_create_index: false
-
-# Index defaults
-index.number_of_shards: 6
-index.number_of_replicas: 0
-index.refresh_interval: 30s
 
 # Disk watermarks
 cluster.routing.allocation.disk.watermark.low: 85%
@@ -439,7 +434,7 @@ EOF
         remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
 
         # Create basic config
-        remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $nodes'"
+        remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $nodes \"${CLUSTER_SUFFIX:-}\"'"
 
         # Set heap size
         local heap_size=$(calculate_heap_size "$heap" "$nodes")
@@ -458,7 +453,7 @@ EOF
 
     # Wait for cluster
     log "Waiting for cluster to be ready..."
-    wait_for_cluster_ready 30 10
+    wait_for_cluster_ready 5 10
 
     # Create index template
     log "Creating index template with $shards shards..."
@@ -509,7 +504,7 @@ update_cluster() {
                 remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
 
                 # Create config
-                remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $NODES'"
+                remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $NODES \"${CLUSTER_SUFFIX:-}\"'"
 
                 # Set default 8GB heap for new nodes
                 remote_exec "bash -c '$(declare -f set_heap_for_node); set_heap_for_node $i 8192'"
@@ -527,7 +522,7 @@ update_cluster() {
             # First, update remaining nodes' configurations before removing nodes
             log "Updating remaining nodes' configurations..."
             for i in $(seq 1 "$NODES"); do
-                remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $NODES'"
+                remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $NODES \"${CLUSTER_SUFFIX:-}\"'"
             done
 
             # Then remove the excess nodes
