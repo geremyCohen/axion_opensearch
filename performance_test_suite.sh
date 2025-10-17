@@ -5,56 +5,19 @@ TIMESTAMP="nyc_taxi_1015_index_0"
 CLIENT_LOADS=(60)
 REPETITIONS=4
 
-# Auto-detect instance type and page size
-detect_instance_type() {
-    local cpu_count=$(nproc)
-    local mem_gb=$(free -g | awk '/^Mem:/ {print $2}')
-    
-    # Common GCP instance patterns
-    if [[ $cpu_count -eq 16 && $mem_gb -ge 60 ]]; then
-        if uname -m | grep -q aarch64; then
-            echo "c4a-standard-16"
-        else
-            echo "c4-standard-16"
-        fi
-    elif [[ $cpu_count -eq 8 && $mem_gb -ge 30 ]]; then
-        if uname -m | grep -q aarch64; then
-            echo "c4a-standard-8"
-        else
-            echo "c4-standard-8"
-        fi
-    else
-        echo "unknown-${cpu_count}cpu-${mem_gb}gb"
-    fi
-}
+# Detect instance type and page size from remote host
+# Detect instance type on remote host
+INSTANCE_TYPE_RAW=$(ssh "$TARGET_HOST" "curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/machine-type 2>/dev/null | awk -F'/' '{print \$NF}'" 2>/dev/null || echo "c4a-standard-64")
+# Remove "standard" from the instance type (e.g., c4a-standard-16 -> c4a-16)
+INSTANCE_TYPE=$(echo "$INSTANCE_TYPE_RAW" | sed 's/-standard-/-/')
 
-detect_page_size() {
-    if [[ -n "${TARGET_HOST:-}" ]]; then
-        ssh "$TARGET_HOST" "getconf PAGESIZE"
-    else
-        getconf PAGESIZE
-    fi
-}
-
-format_page_size() {
-    local size="$1"
-    if [[ $size -eq 4096 ]]; then
-        echo "4k"
-    elif [[ $size -eq 65536 ]]; then
-        echo "64k"
-    else
-        echo "$size"
-    fi
-}
-
-format_instance_type() {
-    local instance="$1"
-    # Drop the middle portion (e.g., c4a-standard-16 -> c4a-16)
-    echo "$instance" | sed 's/-[^-]*-/-/'
-}
-
-INSTANCE_TYPE=$(format_instance_type "$(detect_instance_type)")
-PAGE_SIZE=$(format_page_size "$(detect_page_size)")
+# Detect page size on remote host
+PAGE_SIZE=$(ssh "$TARGET_HOST" "getconf PAGESIZE" 2>/dev/null || echo "4096")
+if [[ "$PAGE_SIZE" == "65536" ]]; then
+    PAGE_SIZE_DIR="64k"
+else
+    PAGE_SIZE_DIR="4k"
+fi
 
 set -euo pipefail
 
@@ -166,7 +129,7 @@ run_benchmark() {
     local shard_count=$(IP="$TARGET_HOST" ./install/dual_installer.sh read | grep "shards:" | awk '{print $3}')
     
     # Create detailed folder structure: TIMESTAMP/INSTANCE_TYPE/PAGE_SIZE/WORKLOAD_NAME/
-    local results_dir="results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE/$WORKLOAD_NAME"
+    local results_dir="results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE_DIR/$WORKLOAD_NAME"
     local result_file="$results_dir/${clients}_${node_count}_${shard_count}_${rep}.json"
     
     local test_name="${clients}_${rep}"
@@ -256,7 +219,7 @@ main() {
     fi
     
     log "Starting OpenSearch performance test suite"
-    log "Results structure: results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE/$WORKLOAD_NAME/"
+    log "Results structure: results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE_DIR/$WORKLOAD_NAME/"
     
     # Calculate total runs
     local total_runs=$((${#CLIENT_LOADS[@]} * REPETITIONS))
