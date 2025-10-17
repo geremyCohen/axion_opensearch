@@ -9,3 +9,4 @@ performance_test.log
 ._.DS_Store
 **/.DS_Store
 **/._.DS_Store
+/mocks/combined_dashboard.html
