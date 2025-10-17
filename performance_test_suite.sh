@@ -404,9 +404,7 @@ wait_for_cluster_with_timeout() {
 save_checkpoint() {
     cat > "$CHECKPOINT_FILE" << EOF
 CURRENT_CLIENTS=$1
-CURRENT_NODES=$2
-CURRENT_SHARDS=$3
-CURRENT_REP=$4
+CURRENT_REP=$2
 EOF
 }
 
