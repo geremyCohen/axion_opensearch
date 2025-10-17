@@ -144,10 +144,20 @@ run_benchmark() {
     # Prepare cluster before OSB execution
     log "Preparing cluster for benchmark..."
     
+    # Kill any remaining python3 processes locally
+    log "Killing local python3 processes..."
+    sudo pkill -9 -f python3 || true
+    sleep 5
+    
     if ! IP="$IP" ./install/dual_installer.sh drop; then
         log "Failed to drop indices"
         return 1
     fi
+    
+    # Kill any remaining python3 processes locally
+    log "Killing local python3 processes..."
+    sudo pkill -9 -f python3 || true
+    sleep 5
     
     # Generate OSB command using dual_installer.sh
     local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients"
@@ -248,6 +258,11 @@ main() {
             log "Progress: $completed_runs/$total_runs runs completed"
         done
     done
+    
+    # Kill any remaining python3 processes after all repetitions
+    log "Killing local python3 processes after completion..."
+    sudo pkill -9 -f python3 || true
+    sleep 5
     
     log "Performance test suite completed successfully"
 }
