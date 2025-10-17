@@ -329,7 +329,7 @@ put_nyc_taxis_template() {
             \"template\": {
                 \"settings\": {
                     \"number_of_shards\": ${shards},
-                    \"number_of_replicas\": 1,
+                    \"number_of_replicas\": 0,
                     \"refresh_interval\": \"30s\"
                 }
             }
