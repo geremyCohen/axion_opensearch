@@ -108,8 +108,8 @@ fi
 
 # Validate required parameters for create
 if [[ "$ACTION" == "create" ]]; then
-    if [[ -z "$NODES" || -z "$SHARDS" || -z "$HEAP" ]]; then
-        echo "ERROR: create requires --nodes, --shards, and --heap"
+    if [[ -z "$NODES" || -z "$SHARDS" ]]; then
+        echo "ERROR: create requires --nodes and --shards"
         usage
         exit 1
     fi
@@ -333,31 +333,30 @@ check_memory_and_sleep() {
     sleep 1.0
 }
 
-# Calculate heap size with safety limits
+# Calculate heap size with automatic sizing: min(50% RAM per node, 32GB), floor 4GB
 calculate_heap_size() {
-    local heap_percent="$1"
+    local heap_percent="${1:-}"
     local node_count="$2"
 
     local total_memory_mb=$(remote_exec "free -m | awk '/^Mem:/ {print \$2}'")
     local target_heap_mb
 
-    # Set to 8GB if node_count is 0, otherwise calculate normally
-    if [[ "$node_count" -eq 0 ]]; then
-        target_heap_mb=8192  # 8GB in MB
-    else
+    if [[ -n "$heap_percent" ]]; then
+        # Legacy: explicit percentage specified
         target_heap_mb=$(( total_memory_mb * heap_percent / 100 / node_count ))
-    fi
-    local max_heap_mb=8192  # 8GB in MB
-
-    # Never exceed 31GB per node
-    if [[ $target_heap_mb -gt $max_heap_mb ]]; then
-        target_heap_mb=$max_heap_mb
-    fi
-
-    # Never exceed 80% of system memory total (safety check)
-    local max_system_heap_mb=$(( total_memory_mb * 80 / 100 / node_count ))
-    if [[ $target_heap_mb -gt $max_system_heap_mb ]]; then
-        target_heap_mb=$max_system_heap_mb
+    else
+        # Automatic: 50% of RAM per node, max 32GB, min 4GB
+        target_heap_mb=$(( total_memory_mb * 50 / 100 / node_count ))
+        
+        # Cap at 32GB (32768 MB)
+        if [[ $target_heap_mb -gt 32768 ]]; then
+            target_heap_mb=32768
+        fi
+        
+        # Floor at 4GB (4096 MB)
+        if [[ $target_heap_mb -lt 4096 ]]; then
+            target_heap_mb=4096
+        fi
     fi
 
     echo "$target_heap_mb"
@@ -459,7 +458,14 @@ EOF
     log "Creating index template with $shards shards..."
     remote_exec "bash -c '$(declare -f put_nyc_taxis_template); put_nyc_taxis_template $shards'"
 
-    log "✅ Created $nodes-node cluster with $shards shards, ${heap}% heap"
+    # Show final configuration
+    local heap_size=$(calculate_heap_size "$heap" "$nodes")
+    local heap_gb=$((heap_size / 1024))
+    if [[ -n "$heap" ]]; then
+        log "✅ Created $nodes-node cluster with $shards shards, ${heap}% heap (${heap_gb}GB per node)"
+    else
+        log "✅ Created $nodes-node cluster with $shards shards, ${heap_gb}GB heap per node (auto-sized)"
+    fi
 }
 
 # Minimal update implementation
