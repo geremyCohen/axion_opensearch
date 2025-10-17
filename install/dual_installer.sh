@@ -854,7 +854,8 @@ case "$ACTION" in
     
   drop)
     log "Dropping all data except index templates..."
-    remote_exec "curl -X DELETE 'localhost:9200/*' >/dev/null 2>&1"
+    remote_exec "curl -X DELETE 'localhost:9200/_data_stream/*' >/dev/null 2>&1"
+    remote_exec "curl -X DELETE 'localhost:9200/*,-.*' >/dev/null 2>&1"
     log "✅ All data dropped, index templates preserved"
     ;;
     
