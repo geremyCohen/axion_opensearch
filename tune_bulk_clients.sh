@@ -101,7 +101,26 @@ if [[ "$FINAL" == "true" ]]; then
     # Reset index cleanly (no mid-run changes)
     echo "[prep] reset nyc_taxis index" >&2
     curl -s -X DELETE "$HOST/nyc_taxis" >/dev/null || true
-    curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{"settings":{}}' >/dev/null
+    # Ensure template exists so any re-creations inherit desired settings
+    curl -s -X PUT "$HOST/_index_template/nyc_taxis_template" \
+      -H 'Content-Type: application/json' -d '{
+        "index_patterns": ["nyc_taxis*"],
+        "template": {
+          "settings": {
+            "number_of_shards": 6,
+            "number_of_replicas": 0,
+            "refresh_interval": "30s"
+          }
+        }
+      }' >/dev/null
+    # Create index with explicit settings for this run
+    curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{
+      "settings": {
+        "number_of_shards": 6,
+        "number_of_replicas": 0,
+        "refresh_interval": "30s"
+      }
+    }' >/dev/null
 
     # Build and run OSB (full run, no timeout)
     OSB_CMD=(opensearch-benchmark run
@@ -164,7 +183,26 @@ for C in "${CLIENTS_ARR[@]}"; do
   # Clean/create index (no mid-run changes)
   echo "[prep] reset nyc_taxis index" >&2
   curl -s -X DELETE "$HOST/nyc_taxis" >/dev/null || true
-  curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{"settings":{}}' >/dev/null
+  # Ensure template exists so any re-creations inherit desired settings
+  curl -s -X PUT "$HOST/_index_template/nyc_taxis_template" \
+    -H 'Content-Type: application/json' -d '{
+      "index_patterns": ["nyc_taxis*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 6,
+          "number_of_replicas": 0,
+          "refresh_interval": "30s"
+        }
+      }
+    }' >/dev/null
+  # Create index with explicit settings for this run
+  curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{
+    "settings": {
+      "number_of_shards": 6,
+      "number_of_replicas": 0,
+      "refresh_interval": "30s"
+    }
+  }' >/dev/null
 
   # Start mpstat sampler if enabled
   MPFILE="$(mktemp)"
