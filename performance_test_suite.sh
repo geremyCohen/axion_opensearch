@@ -101,10 +101,6 @@ run_benchmark() {
     
     # Prepare cluster before OSB execution
     log "Preparing cluster for benchmark..."
-    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop_all; then
-        log "Failed to drop all data"
-        return 1
-    fi
     
     if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
         log "Failed to drop indices"
