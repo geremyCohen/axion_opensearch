@@ -146,13 +146,13 @@ error_exit() {
 load_checkpoint() {
     if [[ -f "$CHECKPOINT_FILE" ]]; then
         source "$CHECKPOINT_FILE"
-        log "Checkpoint found: resuming from clients=$CURRENT_CLIENTS, nodes=$CURRENT_NODES, shards=$CURRENT_SHARDS, rep=$CURRENT_REP"
+        log "Checkpoint found: resuming from clients=$CURRENT_CLIENTS, rep=$CURRENT_REP"
         
         # Checkpoint loaded successfully
         
         # Clean up incomplete run files from the next run that would have been attempted
         local next_rep=$((CURRENT_REP + 1))
-        local incomplete_run="${CURRENT_CLIENTS}_${CURRENT_NODES}-${CURRENT_SHARDS}_${next_rep}"
+        local incomplete_run="${CURRENT_CLIENTS}_${next_rep}"
         if [[ -f "$RESULTS_DIR/${incomplete_run}.json" ]]; then
             log "Removing incomplete run file: ${incomplete_run}.json"
             rm -f "$RESULTS_DIR/${incomplete_run}.json"
@@ -160,8 +160,6 @@ load_checkpoint() {
         fi
     else
         CURRENT_CLIENTS=0
-        CURRENT_NODES=0
-        CURRENT_SHARDS=0
         CURRENT_REP=0
         log "No checkpoint found - starting fresh"
     fi
