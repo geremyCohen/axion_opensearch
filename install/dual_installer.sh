@@ -497,7 +497,19 @@ EOF
       else
         echo \"[install] Downloading OpenSearch $OPENSEARCH_VERSION...\"
         cd /tmp
-        curl -L -o opensearch.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/$OPENSEARCH_VERSION/opensearch-$OPENSEARCH_VERSION-linux-x64.tar.gz
+        
+        # Detect architecture and set download URL
+        ARCH=\$(uname -m)
+        if [[ \"\$ARCH\" == \"aarch64\" ]]; then
+          OPENSEARCH_ARCH=\"arm64\"
+        elif [[ \"\$ARCH\" == \"x86_64\" ]]; then
+          OPENSEARCH_ARCH=\"x64\"
+        else
+          echo \"ERROR: Unsupported architecture: \$ARCH\"
+          exit 1
+        fi
+        
+        curl -L -o opensearch.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/$OPENSEARCH_VERSION/opensearch-$OPENSEARCH_VERSION-linux-\$OPENSEARCH_ARCH.tar.gz
         echo \"[install] Extracting to /opt...\"
         cd /opt
         tar -xzf /tmp/opensearch.tar.gz
