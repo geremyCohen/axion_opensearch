@@ -24,9 +24,9 @@ usage() {
     echo ""
     echo "Optional parameters:"
     echo "  --include-tasks <list> Tasks to include in OSB benchmark (e.g., index, search)"
-    echo "  --nodes <list>         Comma-separated node counts (e.g., 8,16,24)"
-    echo "  --shards <list>        Comma-separated shard counts (e.g., 16,32,64)"
-    echo "  --clients <list>       Comma-separated client counts (default: 60)"
+    echo "  --nodes <count>        Node count (e.g., 16)"
+    echo "  --shards <count>       Shard count (e.g., 32)"
+    echo "  --clients <count>      Client count (default: 60)"
     echo "  --heap <percent>       Heap memory percentage (default: cluster default)"
     echo "  --repetitions <num>    Number of repetitions per config (default: 4)"
     echo "  --dry-run              Show commands without executing them"
@@ -34,8 +34,8 @@ usage() {
     echo "Examples:"
     echo "  $0 --workload nyc_taxis"
     echo "  $0 --workload nyc_taxis --include-tasks index"
-    echo "  $0 --workload nyc_taxis --nodes 8,16,24 --clients 40,60,80"
-    echo "  $0 --workload nyc_taxis --shards 16,32 --clients 60"
+    echo "  $0 --workload nyc_taxis --nodes 16 --clients 60"
+    echo "  $0 --workload nyc_taxis --shards 32 --clients 60"
     echo "  $0 --workload nyc_taxis --nodes 16 --shards 32 --heap 80"
     exit 1
 }
@@ -98,44 +98,22 @@ if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
     exit 1
 fi
 
-# Convert comma-separated lists to arrays
-if [[ -n "$NODES_PARAM" ]]; then
-    IFS=',' read -ra NODE_CONFIGS <<< "$NODES_PARAM"
-else
-    NODE_CONFIGS=()
-fi
-
-if [[ -n "$SHARDS_PARAM" ]]; then
-    IFS=',' read -ra SHARD_CONFIGS <<< "$SHARDS_PARAM"
-else
-    SHARD_CONFIGS=()
-fi
+# Convert parameters to single values
+NODE_CONFIG="$NODES_PARAM"
+SHARD_CONFIG="$SHARDS_PARAM"
 
 if [[ -n "$CLIENTS_PARAM" ]]; then
-    IFS=',' read -ra CLIENT_LOADS <<< "$CLIENTS_PARAM"
+    CLIENT_LOADS=($CLIENTS_PARAM)
 fi
 
-# Create combined configurations for iteration
-COMBINED_CONFIGS=()
-if [[ ${#NODE_CONFIGS[@]} -gt 0 && ${#SHARD_CONFIGS[@]} -gt 0 ]]; then
-    # Both nodes and shards specified - create all combinations
-    for node in "${NODE_CONFIGS[@]}"; do
-        for shard in "${SHARD_CONFIGS[@]}"; do
-            COMBINED_CONFIGS+=("${node}:${shard}")
-        done
-    done
-elif [[ ${#NODE_CONFIGS[@]} -gt 0 ]]; then
-    # Only nodes specified
-    for node in "${NODE_CONFIGS[@]}"; do
-        COMBINED_CONFIGS+=("${node}:")
-    done
-elif [[ ${#SHARD_CONFIGS[@]} -gt 0 ]]; then
-    # Only shards specified
-    for shard in "${SHARD_CONFIGS[@]}"; do
-        COMBINED_CONFIGS+=(":${shard}")
-    done
+# Create single configuration
+if [[ -n "$NODE_CONFIG" && -n "$SHARD_CONFIG" ]]; then
+    COMBINED_CONFIGS=("${NODE_CONFIG}:${SHARD_CONFIG}")
+elif [[ -n "$NODE_CONFIG" ]]; then
+    COMBINED_CONFIGS=("${NODE_CONFIG}:")
+elif [[ -n "$SHARD_CONFIG" ]]; then
+    COMBINED_CONFIGS=(":${SHARD_CONFIG}")
 else
-    # Neither specified - use default
     COMBINED_CONFIGS+=(":")
 fi
 
