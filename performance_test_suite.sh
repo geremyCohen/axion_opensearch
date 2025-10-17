@@ -11,9 +11,6 @@ set -euo pipefail
 WORKLOAD_PARAM=""
 INCLUDE_TASKS_PARAM=""
 DRY_RUN=false
-NODES_PARAM=""
-SHARDS_PARAM=""
-HEAP_PARAM=""
 CLIENTS_PARAM=""
 
 usage() {
@@ -24,19 +21,14 @@ usage() {
     echo ""
     echo "Optional parameters:"
     echo "  --include-tasks <list> Tasks to include in OSB benchmark (e.g., index, search)"
-    echo "  --nodes <count>        Node count (e.g., 16)"
-    echo "  --shards <count>       Shard count (e.g., 32)"
     echo "  --clients <count>      Client count (default: 60)"
-    echo "  --heap <percent>       Heap memory percentage (default: cluster default)"
     echo "  --repetitions <num>    Number of repetitions per config (default: 4)"
     echo "  --dry-run              Show commands without executing them"
     echo ""
     echo "Examples:"
     echo "  $0 --workload nyc_taxis"
     echo "  $0 --workload nyc_taxis --include-tasks index"
-    echo "  $0 --workload nyc_taxis --nodes 16 --clients 60"
-    echo "  $0 --workload nyc_taxis --shards 32 --clients 60"
-    echo "  $0 --workload nyc_taxis --nodes 16 --shards 32 --heap 80"
+    echo "  $0 --workload nyc_taxis --clients 60"
     exit 1
 }
 
@@ -51,20 +43,8 @@ while [[ $# -gt 0 ]]; do
             INCLUDE_TASKS_PARAM="$2"
             shift 2
             ;;
-        --nodes)
-            NODES_PARAM="$2"
-            shift 2
-            ;;
-        --shards)
-            SHARDS_PARAM="$2"
-            shift 2
-            ;;
         --clients)
             CLIENTS_PARAM="$2"
-            shift 2
-            ;;
-        --heap)
-            HEAP_PARAM="$2"
             shift 2
             ;;
         --repetitions)
@@ -99,23 +79,12 @@ if [[ ! " ${ALLOWED_WORKLOADS[*]} " =~ " ${WORKLOAD_PARAM} " ]]; then
 fi
 
 # Convert parameters to single values
-NODE_CONFIG="$NODES_PARAM"
-SHARD_CONFIG="$SHARDS_PARAM"
-
 if [[ -n "$CLIENTS_PARAM" ]]; then
     CLIENT_LOADS=($CLIENTS_PARAM)
 fi
 
-# Create single configuration
-if [[ -n "$NODE_CONFIG" && -n "$SHARD_CONFIG" ]]; then
-    COMBINED_CONFIGS=("${NODE_CONFIG}:${SHARD_CONFIG}")
-elif [[ -n "$NODE_CONFIG" ]]; then
-    COMBINED_CONFIGS=("${NODE_CONFIG}:")
-elif [[ -n "$SHARD_CONFIG" ]]; then
-    COMBINED_CONFIGS=(":${SHARD_CONFIG}")
-else
-    COMBINED_CONFIGS+=(":")
-fi
+# Use default configuration (no node/shard changes)
+COMBINED_CONFIGS=(":")  # Empty config means use current cluster as-is
 
 echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -441,54 +410,40 @@ CURRENT_REP=$4
 EOF
 }
 
-configure_cluster() {
-    local nodes=$1
-    local shards=$2
+verify_cluster() {
+    log "Verifying cluster is active..."
     
-    # Build update command with only specified parameters
-    local update_cmd="IP=\"$TARGET_HOST\" ./install/dual_installer.sh update"
+    # Basic cluster verification without configuration changes
+    log "Verifying cluster is ready for benchmarking..."
     
-    if [[ -n "$nodes" ]]; then
-        update_cmd="$update_cmd --nodes \"$nodes\""
-        log "Configuring cluster: $nodes nodes"
-    fi
+    # Wait for cluster health
+    log "Waiting for cluster health with timeout..."
+    local attempt=1
+    local max_attempts=10
     
-    if [[ -n "$shards" ]]; then
-        update_cmd="$update_cmd --shards \"$shards\""
-        log "Configuring cluster: $shards shards"
-    fi
+    while [[ $attempt -le $max_attempts ]]; do
+        local health_response
+        health_response=$(timeout 10 curl -s "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null || echo "")
+        
+        if [[ -n "$health_response" ]]; then
+            local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown")
+            local nodes=$(echo "$health_response" | jq -r '.number_of_nodes // 0' 2>/dev/null || echo "0")
+            local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null || echo "0")
+            
+            log "Cluster check: status=$status, nodes=$nodes, unassigned=$unassigned (attempt $attempt/$max_attempts)"
+            
+            if [[ "$status" == "green" ]]; then
+                log "Cluster is healthy"
+                return 0
+            fi
+        fi
+        
+        sleep 3
+        ((attempt++))
+    done
     
-    if [[ -n "$HEAP_PARAM" ]]; then
-        update_cmd="$update_cmd --heap \"$HEAP_PARAM\""
-        log "Using heap: ${HEAP_PARAM}%"
-    fi
-    
-    # Validate shard count doesn't exceed node count (only if both specified)
-    if [[ -n "$nodes" && -n "$shards" && $shards -gt $nodes ]]; then
-        log "Skipping configuration: $shards shards > $nodes nodes (would cause unassigned shards)"
-        return 1
-    fi
-    
-    log "Attempting cluster configuration update..."
-    if eval "$update_cmd"; then
-        log "Cluster configuration completed"
-    else
-        log "WARNING: Cluster configuration may have failed"
-        return 1
-    fi
-    
-    # Now perform aggressive index reset after cluster is properly configured
-    log "Performing aggressive index reset after cluster configuration..."
-    aggressive_index_reset "$shards"
-    
-    # Post-scaling validation with timeout
-    log "Post-scaling validation with timeout..."
-    
-    if ! wait_for_cluster_with_timeout; then
-        log "WARNING: Cluster not fully healthy after scaling, but continuing"
-    fi
-    
-    log "Cluster scaling completed"
+    log "WARNING: Cluster health check timed out"
+    return 1
 }
 
 verify_cluster_active() {
@@ -507,11 +462,9 @@ verify_cluster_active() {
 run_benchmark() {
     set +e  # Disable exit on error for debugging
     local clients=$1
-    local nodes=$2
-    local shards=$3
-    local rep=$4
+    local rep=$2
     
-    local test_name="${clients}_${nodes}-${shards}_${rep}"
+    local test_name="${clients}_${rep}"
     local osb_output="$RESULTS_DIR/${test_name}.json"
     
     log "Starting benchmark: $test_name"
@@ -530,7 +483,7 @@ run_benchmark() {
     log "Executing OSB for $test_name..."
     
     # Generate OSB command using dual_installer.sh
-    local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients --osb-shards $shards"
+    local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients"
     if [[ -n "$INCLUDE_TASKS_PARAM" ]]; then
         osb_cmd_args="$osb_cmd_args --include-tasks $INCLUDE_TASKS_PARAM"
     fi
@@ -556,13 +509,6 @@ run_benchmark() {
     if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop_all; then
         log "Failed to drop all data"
         return 1
-    fi
-    
-    if [[ -n "$shards" ]]; then
-        if ! IP="$TARGET_HOST" ./install/dual_installer.sh update --shards $shards; then
-            log "Failed to update shards to $shards"
-            return 1
-        fi
     fi
     
     if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
@@ -668,10 +614,10 @@ main() {
             fi
         fi
 
-        # Configure cluster once per node/shard combination
-        log "About to configure cluster"
-        configure_cluster "$nodes" "$shards"
-        log "Cluster configured, checking for issues..."
+        # Verify cluster is ready (no configuration changes)
+        log "Verifying cluster is ready for benchmarking"
+        verify_cluster
+        log "Cluster verified, starting benchmark runs for all client loads..."
         
         # Force recovery if cluster has issues after configuration
         if ! detect_cluster_issues; then
@@ -720,20 +666,20 @@ main() {
             fi
             
             for rep in $(seq 1 $REPETITIONS); do
-                log "Processing repetition $rep for $nodes nodes, $shards shards, $clients clients"
+                log "Processing repetition $rep for $clients clients"
 
                 # Skip completed repetitions in current config
-                if [[ $nodes -eq $CURRENT_NODES && $clients -eq $CURRENT_CLIENTS && $rep -le $CURRENT_REP ]]; then
-                    log "Skipping completed repetition: $nodes,$clients,$rep (completed up to $CURRENT_REP)"
+                if [[ $clients -eq $CURRENT_CLIENTS && $rep -le $CURRENT_REP ]]; then
+                    log "Skipping completed repetition: $clients,$rep (completed up to $CURRENT_REP)"
                     completed_runs=$((completed_runs + 1))
                     continue
                 fi
                 
-                log "Running new benchmark: $nodes,$clients,$rep"
+                log "Running new benchmark: $clients,$rep"
 
-                if run_benchmark "$clients" "$nodes" "$shards" "$rep"; then
+                if run_benchmark "$clients" "$rep"; then
                     log "run_benchmark completed successfully"
-                    save_checkpoint "$clients" "$nodes" "$shards" "$rep"
+                    save_checkpoint "$clients" "$rep"
                     
                     # Ensure cluster is idle before next run
                     ensure_cluster_idle
