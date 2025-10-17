@@ -35,7 +35,10 @@ RESULTS_CSV="tune_results.csv"
 SINGLE="false"
 VERBOSE="false"
 SINGLE_SECONDS="60"
-SSH_HOST="${HOST#http://}"
+# derive SSH_HOST from HOST (strip scheme and port)
+_RAW_HOST="${HOST#http://}"
+_RAW_HOST="${_RAW_HOST#https://}"
+SSH_HOST="${_RAW_HOST%%:*}"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -52,11 +55,17 @@ while [[ $# -gt 0 ]]; do
     --single) SINGLE="$2"; shift 2;;
     --single-seconds) SINGLE_SECONDS="$2"; shift 2;;
     --verbose) VERBOSE="$2"; shift 2;;
+    --ssh-host) SSH_HOST="$2"; shift 2;;
     *) echo "Unknown arg: $1" >&2; exit 1;;
   esac
 done
 
-SSH_HOST="${HOST#http://}"
+# re-derive SSH_HOST from HOST unless explicitly overridden via --ssh-host
+if [[ -z "${SSH_HOST:-}" || "$SSH_HOST" == "${HOST#http://}" ]]; then
+  _RAW_HOST="${HOST#http://}"
+  _RAW_HOST="${_RAW_HOST#https://}"
+  SSH_HOST="${_RAW_HOST%%:*}"
+fi
 
 [[ "$VERBOSE" == "true" ]] && set -x
 
