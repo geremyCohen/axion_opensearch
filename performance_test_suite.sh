@@ -523,16 +523,22 @@ run_benchmark() {
         return 1
     fi
     
-    log "Waiting for all $shards primary shards to be active..."
-    for attempt in {1..30}; do
-        active_primary_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=prirep,state' 2>/dev/null | grep -c '^p.*STARTED' || echo 0")
-        if [[ "$active_primary_shards" -eq "$shards" ]]; then
-            log "All $shards primary shards are active"
-            break
-        fi
-        log "Waiting for primary shards... ($active_primary_shards/$shards active, attempt $attempt/30)"
-        sleep 2
-    done
+    # Only wait for shards if a specific shard count was specified
+    if [[ -n "$shards" ]]; then
+        log "Waiting for all $shards primary shards to be active..."
+        for attempt in {1..30}; do
+            active_primary_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=prirep,state' 2>/dev/null | grep -c '^p.*STARTED' || echo 0")
+            if [[ "$active_primary_shards" -eq "$shards" ]]; then
+                log "All $shards primary shards are active"
+                break
+            fi
+            log "Waiting for primary shards... ($active_primary_shards/$shards active, attempt $attempt/30)"
+            sleep 2
+        done
+    else
+        log "No specific shard count specified, skipping shard validation"
+        sleep 2  # Brief wait for index to be ready
+    fi
     
     log "Starting OSB execution..."
     if ! bash -c "$osb_cmd"; then
