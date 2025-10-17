@@ -212,10 +212,71 @@ EOF
     fi
 }
 
-# Create systemd service for a node (uses $JAVA_HOME_PATH like original)
+# Helper functions for service management
+get_service_name() {
+    local node_index="$1"
+    local total_nodes="$2"
+    if [[ "$total_nodes" -eq 1 ]]; then
+        echo "opensearch"
+    else
+        echo "opensearch-node$node_index"
+    fi
+}
+
+start_opensearch_service() {
+    local node_index="$1"
+    local total_nodes="$2"
+    local service_name=$(get_service_name "$node_index" "$total_nodes")
+    remote_exec "systemctl enable $service_name && systemctl start $service_name"
+}
+
+stop_opensearch_service() {
+    local node_index="$1"
+    local total_nodes="$2"
+    local service_name=$(get_service_name "$node_index" "$total_nodes")
+    remote_exec "systemctl stop $service_name || true"
+}
+
+# Create systemd override for a node (uses bundled JDK)
 create_systemd_service() {
     local node_index="$1"
-    cat > "/etc/systemd/system/opensearch-node${node_index}.service" <<EOF
+    
+    if [[ "$node_index" -eq 1 ]]; then
+        # Single-node: create base service + override.conf with bundled JDK
+        cat > "/etc/systemd/system/opensearch.service" <<EOF
+[Unit]
+Description=OpenSearch
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/opensearch/bin/opensearch
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        mkdir -p "/etc/systemd/system/opensearch.service.d"
+        cat > "/etc/systemd/system/opensearch.service.d/override.conf" <<EOF
+[Service]
+User=opensearch
+Group=opensearch
+Type=simple
+Restart=always
+RestartSec=10
+WorkingDirectory=/opt/opensearch-node1
+ExecStart=
+ExecStart=/opt/opensearch-node1/bin/opensearch
+Environment=OPENSEARCH_JAVA_HOME=$JAVA_HOME_PATH
+Environment=OPENSEARCH_PATH_CONF=/opt/opensearch-node1/config
+LimitNOFILE=65536
+LimitNPROC=65536
+LimitMEMLOCK=infinity
+TasksMax=infinity
+EOF
+    else
+        # Multi-node: create individual service files
+        cat > "/etc/systemd/system/opensearch-node${node_index}.service" <<EOF
 [Unit]
 Description=OpenSearch Node ${node_index}
 After=network.target
@@ -237,6 +298,7 @@ WorkingDirectory=/opt/opensearch-node${node_index}
 [Install]
 WantedBy=multi-user.target
 EOF
+    fi
 }
 
 # Set JVM heap and GC options for a specific node directory
@@ -466,7 +528,7 @@ EOF
     log "Starting OpenSearch services..."
     remote_exec "systemctl daemon-reload"
     for i in $(seq 1 "$nodes"); do
-        remote_exec "systemctl enable opensearch-node$i && systemctl start opensearch-node$i"
+        start_opensearch_service "$i" "$nodes"
     done
 
     # Wait for cluster
@@ -611,14 +673,16 @@ remove_install() {
     log "Stopping and removing all OpenSearch services..."
 
     # Stop all opensearch services
-    for service in $(remote_exec "systemctl list-units --type=service --state=active | grep opensearch-node | awk '{print \$1}'"); do
+    for service in $(remote_exec "systemctl list-units --type=service --state=active | grep -E 'opensearch(-node[0-9]+)?\\.service' | awk '{print \$1}'"); do
         log "Stopping $service"
         remote_exec "systemctl stop $service || true"
         remote_exec "systemctl disable $service || true"
     done
 
-    # Remove service files
+    # Remove service files and override
     remote_exec "rm -f /etc/systemd/system/opensearch-node*.service"
+    remote_exec "rm -f /etc/systemd/system/opensearch.service"
+    remote_exec "rm -rf /etc/systemd/system/opensearch.service.d"
     remote_exec "systemctl daemon-reload"
 
     # Remove installation directories
