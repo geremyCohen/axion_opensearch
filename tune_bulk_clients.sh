@@ -35,6 +35,7 @@ RESULTS_CSV="tune_results.csv"
 SINGLE="false"
 VERBOSE="false"
 SINGLE_SECONDS="60"
+SSH_HOST="${HOST#http://}"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -54,6 +55,8 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown arg: $1" >&2; exit 1;;
   esac
 done
+
+SSH_HOST="${HOST#http://}"
 
 [[ "$VERBOSE" == "true" ]] && set -x
 
@@ -94,17 +97,21 @@ for C in "${CLIENTS_ARR[@]}"; do
   # Start mpstat sampler if enabled
   MPFILE="$(mktemp)"
   if [[ "$MPSTAT" == "true" ]]; then
-    if ! command -v mpstat >/dev/null; then
-      echo "mpstat not found; install sysstat for CPU sampling (continuing without CPU stats)" >&2
-      MPSTAT="false"
+    # run mpstat on the remote host via SSH; install sysstat if missing
+    if ! ssh -o BatchMode=yes "$SSH_HOST" "command -v mpstat >/dev/null"; then
+      echo "[warn] mpstat not found on remote; attempting to install sysstat" >&2
+      ssh "$SSH_HOST" "sudo apt-get update && sudo apt-get install -y sysstat" >/dev/null 2>&1 || true
     fi
-    if [[ "$MPSTAT" == "true" ]]; then
+    if ssh -o BatchMode=yes "$SSH_HOST" "command -v mpstat >/dev/null"; then
       if [[ "$SINGLE" == "true" ]]; then
-        (mpstat 1 "$SINGLE_SECONDS" > "$MPFILE") &
+        ssh "$SSH_HOST" "mpstat 1 $SINGLE_SECONDS" > "$MPFILE" 2>/dev/null &
       else
-        (mpstat 1 > "$MPFILE") &
+        ssh "$SSH_HOST" "mpstat 1" > "$MPFILE" 2>/dev/null &
       fi
       MPPID=$!
+    else
+      echo "[warn] mpstat unavailable on remote; CPU sampling disabled" >&2
+      MPSTAT="false"
     fi
   fi
 
@@ -120,6 +127,9 @@ for C in "${CLIENTS_ARR[@]}"; do
 
   echo "[cmd] ${OSB_CMD[*]}" >&2
 
+  START_TS=$(date +%s)
+  BASE_DOCS=$(docs_count)
+
   # Run OSB ingest-only and keep full output (stdout+stderr)
   if [[ "$SINGLE" == "true" ]]; then
     echo "[single] running with timeout ${SINGLE_SECONDS}s" >&2
@@ -128,8 +138,12 @@ for C in "${CLIENTS_ARR[@]}"; do
     OUT="$("${OSB_CMD[@]}" 2>&1 | tee /dev/stderr)" || true
   fi
 
+  END_TS=$(date +%s)
+  DURATION=$(( END_TS - START_TS ))
+  [[ $DURATION -le 0 ]] && DURATION=1
+
   # Stop mpstat
-  if [[ "${MPSTAT}" == "true" && -n "${MPPID:-}" ]]; then
+  if [[ "$MPSTAT" == "true" && -n "${MPPID:-}" ]]; then
     kill "$MPPID" >/dev/null 2>&1 || true
     sleep 0.2
   fi
@@ -159,7 +173,12 @@ for C in "${CLIENTS_ARR[@]}"; do
 
   # Docs in index after run (sanity)
   DOCS_AFTER="$(docs_count)"
-  echo "[post] docs_after_run=$DOCS_AFTER  (docs/s parsed=$DOCS)" >&2
+  DELTA_DOCS=$(( DOCS_AFTER - BASE_DOCS ))
+  if [[ -z "$DOCS" || "$DOCS" == "0" || "$DOCS" == "0.0" ]]; then
+    DOCS=$(awk -v d="$DELTA_DOCS" -v s="$DURATION" 'BEGIN { if (s<=0) s=1; printf "%.2f", d/s }')
+    echo "[post] using estimated docs/s from _count delta: $DOCS (delta=$DELTA_DOCS over ${DURATION}s)" >&2
+  fi
+  echo "[post] docs_after_run=$DOCS_AFTER  (docs/s=$DOCS over ${DURATION}s)" >&2
 
   ARCH="$(curl -s "$HOST/_nodes" | jq -r '.nodes[]?.os.arch' | head -1)"
   echo "$ARCH,$C,$DOCS,$P50,$P99,$CPU_USER,$CPU_SYS,$CPU_WAIT,$RJ_WRITE,$RJ_BULK,$DOCS_AFTER" | tee -a "$RESULTS_CSV" >/dev/null
