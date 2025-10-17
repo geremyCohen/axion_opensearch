@@ -619,9 +619,9 @@ generate_osb_command() {
     fi
 
     if [[ "$workload" == "nyc_taxis" ]]; then
-        osb_cmd="${osb_cmd} --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
+        osb_cmd="${osb_cmd} --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${clients},bulk_size:10000\""
     else
-        osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000,number_of_shards:${osb_shards}\""
+        osb_cmd="${osb_cmd} --workload-params=\"bulk_indexing_clients:${clients},bulk_size:10000\""
     fi
 
     echo "$osb_cmd"
@@ -702,7 +702,7 @@ case "$ACTION" in
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
-        echo "  --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${bulk_clients},bulk_size:10000,number_of_shards:${template_shards}\""
+        echo "  --workload-params=\"index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:10,bulk_indexing_clients:${bulk_clients},bulk_size:10000\""
     fi
     ;;
     
