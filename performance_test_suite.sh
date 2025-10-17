@@ -495,9 +495,6 @@ run_benchmark() {
     fi
     
     log "Executing OSB run, please wait for completion."
-    log "OSB Command: $osb_cmd"
-    log "DEBUG: Full command being executed:"
-    log "$osb_cmd"
     
     if [[ "$DRY_RUN" == "true" ]]; then
         log "DRY RUN: Skipping OSB execution"
@@ -541,6 +538,9 @@ run_benchmark() {
     fi
     
     log "Starting OSB execution..."
+    log ""
+    log "$osb_cmd"
+    log ""
     if ! bash -c "$osb_cmd"; then
         log "OSB execution failed for $test_name"
         log "Continuing despite OSB failure..."
