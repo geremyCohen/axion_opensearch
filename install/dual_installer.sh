@@ -616,8 +616,6 @@ generate_osb_command() {
 
     if [[ -n "$include_tasks" ]]; then
         osb_cmd="${osb_cmd} --include-tasks=\"${include_tasks}\""
-    else
-        osb_cmd="${osb_cmd} --include-tasks=\"delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count\""
     fi
 
     if [[ "$workload" == "nyc_taxis" ]]; then
@@ -698,7 +696,9 @@ case "$ACTION" in
         
         # Output the complete command sequence
         echo "opensearch-benchmark run --workload-path=\"./osb_local_workloads/nyc_taxis_clean\" \\"
-        echo "  --include-tasks=delete-index,create-index,check-cluster-health,index,refresh-after-index,force-merge,refresh-after-force-merge,match-all,range,distance_amount_agg,autohisto_agg,date_histogram_agg,desc_sort_tip_amount,asc_sort_tip_amount,desc_sort_passenger_count,asc_sort_passenger_count \\"
+        if [[ -n "$INCLUDE_TASKS" ]]; then
+            echo "  --include-tasks=${INCLUDE_TASKS} \\"
+        fi
         echo "  --target-hosts=${target_hosts} \\"
         echo "  --client-options=use_ssl:false,verify_certs:false,timeout:60 \\"
         echo "  --kill-running-processes \\"
