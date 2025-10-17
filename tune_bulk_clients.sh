@@ -34,6 +34,7 @@ CPU_MAX_WAIT="10.0" # quality gate: avg iowait <= 10%
 RESULTS_CSV="tune_results.csv"
 SINGLE="false"
 VERBOSE="false"
+SINGLE_SECONDS="60"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -48,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --cpu-max-wait) CPU_MAX_WAIT="$2"; shift 2;;
     --out) RESULTS_CSV="$2"; shift 2;;
     --single) SINGLE="$2"; shift 2;;
+    --single-seconds) SINGLE_SECONDS="$2"; shift 2;;
     --verbose) VERBOSE="$2"; shift 2;;
     *) echo "Unknown arg: $1" >&2; exit 1;;
   esac
@@ -97,7 +99,11 @@ for C in "${CLIENTS_ARR[@]}"; do
       MPSTAT="false"
     fi
     if [[ "$MPSTAT" == "true" ]]; then
-      (mpstat 1 > "$MPFILE") &
+      if [[ "$SINGLE" == "true" ]]; then
+        (mpstat 1 "$SINGLE_SECONDS" > "$MPFILE") &
+      else
+        (mpstat 1 > "$MPFILE") &
+      fi
       MPPID=$!
     fi
   fi
@@ -115,7 +121,12 @@ for C in "${CLIENTS_ARR[@]}"; do
   echo "[cmd] ${OSB_CMD[*]}" >&2
 
   # Run OSB ingest-only and keep full output (stdout+stderr)
-  OUT="$("${OSB_CMD[@]}" 2>&1 | tee /dev/stderr)" || true
+  if [[ "$SINGLE" == "true" ]]; then
+    echo "[single] running with timeout ${SINGLE_SECONDS}s" >&2
+    OUT="$(timeout -s INT ${SINGLE_SECONDS}s "${OSB_CMD[@]}" 2>&1 | tee /dev/stderr)" || true
+  else
+    OUT="$("${OSB_CMD[@]}" 2>&1 | tee /dev/stderr)" || true
+  fi
 
   # Stop mpstat
   if [[ "${MPSTAT}" == "true" && -n "${MPPID:-}" ]]; then
