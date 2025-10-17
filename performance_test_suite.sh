@@ -83,400 +83,33 @@ if [[ -n "$CLIENTS_PARAM" ]]; then
     CLIENT_LOADS=($CLIENTS_PARAM)
 fi
 
-# Use default configuration (no node/shard changes)
-COMBINED_CONFIGS=(":")  # Empty config means use current cluster as-is
-
-echo "Starting performance test suite with workload: $WORKLOAD_PARAM"
-if [[ "$DRY_RUN" == "true" ]]; then
-    echo "DRY RUN MODE: Commands will be shown but not executed"
-fi
-
-# Configuration
-TARGET_HOST="$IP"
-
-# Path configuration - consolidate all path components
+# Set required variables
 WORKLOAD_NAME="$WORKLOAD_PARAM"
-BASE_RESULTS_DIR="./results/optimization"
-
-# Detect instance type on remote host
-INSTANCE_TYPE_RAW=$(ssh "$TARGET_HOST" "curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/machine-type 2>/dev/null | awk -F'/' '{print \$NF}'" 2>/dev/null || echo "c4a-standard-64")
-# Remove "standard" from the instance type (e.g., c4a-standard-16 -> c4a-16)
-INSTANCE_TYPE=$(echo "$INSTANCE_TYPE_RAW" | sed 's/-standard-/-/')
-
-# Detect page size on remote host
-PAGE_SIZE=$(ssh "$TARGET_HOST" "getconf PAGESIZE" 2>/dev/null || echo "4096")
-if [[ "$PAGE_SIZE" == "65536" ]]; then
-    PAGE_SIZE_DIR="64k"
-else
-    PAGE_SIZE_DIR="4k"
-fi
-
-
-# Check if this timestamp already has a checkpoint
-if [[ -f "$BASE_RESULTS_DIR/$TIMESTAMP/test_progress.checkpoint" ]]; then
-    echo "Using existing run: $TIMESTAMP"
-else
-    echo "Starting new run: $TIMESTAMP"
-fi
-echo "Detected instance type: $INSTANCE_TYPE_RAW -> $INSTANCE_TYPE"
-echo "Detected page size: $PAGE_SIZE bytes -> using $PAGE_SIZE_DIR directory"
-
-# Consolidated path construction
-RUN_BASE_DIR="$BASE_RESULTS_DIR/$TIMESTAMP"
-INSTANCE_BASE_DIR="$RUN_BASE_DIR/$INSTANCE_TYPE/$PAGE_SIZE_DIR"
-RESULTS_DIR="$INSTANCE_BASE_DIR/$WORKLOAD_NAME"
-CHECKPOINT_FILE="$RUN_BASE_DIR/test_progress.checkpoint"
-LOG_FILE="$RUN_BASE_DIR/performance_test.log"
-
-
-# Initialize
-mkdir -p "$RESULTS_DIR"
-mkdir -p "$(dirname "$LOG_FILE")"
-touch "$LOG_FILE"
+TARGET_HOST="${IP:-localhost}"
 
 log() {
-    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
-}
-
-error_exit() {
-    log "ERROR: $*"
-    exit 1
-}
-
-load_checkpoint() {
-    if [[ -f "$CHECKPOINT_FILE" ]]; then
-        source "$CHECKPOINT_FILE"
-        log "Checkpoint found: resuming from clients=$CURRENT_CLIENTS, rep=$CURRENT_REP"
-        
-        # Checkpoint loaded successfully
-        
-        # Clean up incomplete run files from the next run that would have been attempted
-        local next_rep=$((CURRENT_REP + 1))
-        local incomplete_run="${CURRENT_CLIENTS}_${next_rep}"
-        if [[ -f "$RESULTS_DIR/${incomplete_run}.json" ]]; then
-            log "Removing incomplete run file: ${incomplete_run}.json"
-            rm -f "$RESULTS_DIR/${incomplete_run}.json"
-            rm -f "$RESULTS_DIR/metrics_${incomplete_run}"*
-        fi
-    else
-        CURRENT_CLIENTS=0
-        CURRENT_REP=0
-        log "No checkpoint found - starting fresh"
-    fi
-}
-
-aggressive_index_reset() {
-    local expected_shards=$1
-    log "Performing aggressive index reset for $expected_shards shards..."
-    
-    # Delete all indices multiple times to ensure cleanup
-    for attempt in {1..3}; do
-        log "Index deletion attempt $attempt/3"
-        curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-        curl -s -X DELETE "http://$TARGET_HOST:9200/${WORKLOAD_NAME}*" > /dev/null 2>&1 || true
-        curl -s -X DELETE "http://$TARGET_HOST:9200/_all" > /dev/null 2>&1 || true
-        sleep 3
-        
-        # Check if workload index still exists
-        local indices_exist=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null | wc -l)
-        if [[ $indices_exist -eq 0 ]]; then
-            log "Index deletion successful on attempt $attempt"
-            break
-        fi
-        log "Indices still exist, retrying deletion..."
-    done
-    
-    # Wait for deletion to propagate
-    sleep 10
-    
-    # Verify no workload indices remain
-    local remaining_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null | wc -l)
-    if [[ $remaining_indices -gt 0 ]]; then
-        log "WARNING: $remaining_indices $WORKLOAD_NAME indices still exist after aggressive cleanup"
-        curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null | while read line; do
-            log "Remaining index: $line"
-        done
-    else
-        log "All $WORKLOAD_NAME indices successfully deleted"
-    fi
-}
-
-verify_shard_configuration() {
-    local expected_shards=$1
-    log "Verifying shard configuration expects $expected_shards shards..."
-    
-    # Wait for any indices to be created and check shard count
-    local max_attempts=10
-    local attempt=1
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        local workload_indices=$(curl -s "http://$TARGET_HOST:9200/_cat/indices/${WORKLOAD_NAME}*" 2>/dev/null)
-
-        if [[ -n "$workload_indices" ]]; then
-            log "Found $WORKLOAD_NAME indices:"
-            echo "$workload_indices" | while read line; do
-                log "  $line"
-            done
-            
-            # Check primary shard count
-            local actual_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards/${WORKLOAD_NAME}*?h=shard,prirep" 2>/dev/null | grep "p" | wc -l)
-            log "Actual primary shards: $actual_shards, Expected: $expected_shards"
-            
-            if [[ $actual_shards -ne $expected_shards ]]; then
-                log "ERROR: Shard count mismatch! Deleting incorrect index..."
-                curl -s -X DELETE "http://$TARGET_HOST:9200/${WORKLOAD_NAME}*" > /dev/null 2>&1 || true
-                sleep 5
-            else
-                log "Shard configuration verified successfully"
-                return 0
-            fi
-        else
-            log "No $WORKLOAD_NAME indices found (attempt $attempt/$max_attempts)"
-        fi
-        
-        sleep 5
-        ((attempt++))
-    done
-    
-    log "Shard verification completed"
-    return 0
-}
-
-recover_cluster_from_split_brain() {
-    log "Attempting cluster recovery from split-brain/quorum failure..."
-    
-    # Check if we have cluster_master_not_discovered_exception
-    local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
-    if echo "$health_response" | grep -q "cluster_master_not_discovered_exception"; then
-        log "Detected cluster manager election failure - performing full cluster restart"
-        
-        # Stop all OpenSearch services
-        log "Stopping all OpenSearch services..."
-        ssh "$TARGET_HOST" "sudo systemctl stop opensearch-node*" 2>/dev/null || true
-        sleep 10
-        
-        # Clear cluster state data to force fresh election
-        log "Clearing cluster state data..."
-        ssh "$TARGET_HOST" "sudo rm -rf /opt/opensearch-node*/data/nodes/*/indices/*" 2>/dev/null || true
-        ssh "$TARGET_HOST" "sudo rm -rf /opt/opensearch-node*/data/nodes/*/node.lock" 2>/dev/null || true
-        
-        # Start services sequentially to ensure proper cluster formation
-        log "Starting OpenSearch services sequentially..."
-        for node in {1..16}; do
-            ssh "$TARGET_HOST" "sudo systemctl start opensearch-node$node" 2>/dev/null || true
-            sleep 2
-        done
-        
-        # Wait for cluster to form
-        log "Waiting for cluster formation..."
-        local attempts=0
-        while [[ $attempts -lt 30 ]]; do
-            local health=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
-            if echo "$health" | grep -q '"status"'; then
-                local status=$(echo "$health" | jq -r '.status // "unknown"' 2>/dev/null)
-                local nodes=$(echo "$health" | jq -r '.number_of_nodes // 0' 2>/dev/null)
-                log "Cluster recovery progress: status=$status, nodes=$nodes"
-                
-                if [[ "$status" != "unknown" && $nodes -gt 0 ]]; then
-                    log "Cluster recovery successful"
-                    return 0
-                fi
-            fi
-            sleep 10
-            ((attempts++))
-        done
-        
-        log "WARNING: Cluster recovery may have failed"
-        return 1
-    fi
-    
-    return 0
-}
-
-safe_delete_indices() {
-    curl -s -X DELETE "http://${TARGET_HOST}:9200/${WORKLOAD_NAME}*" >/dev/null 2>&1 || true
-}
-
-detect_cluster_issues() {
-    local health=$(curl -s "http://${TARGET_HOST}:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-    [[ "$health" == "green" ]]
-}
-
-ensure_cluster_idle() {
-    log "Ensuring cluster is completely idle before next run..."
-    
-    # Delete all indices to stop any ongoing operations
-    curl -s -X DELETE "http://$TARGET_HOST:9200/*" > /dev/null 2>&1 || true
-    sleep 5
-    
-    # Wait for all tasks to complete
-    local max_attempts=12
-    local attempt=1
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        local pending_tasks=$(curl -s "http://$TARGET_HOST:9200/_cat/tasks?h=action" 2>/dev/null | grep -v "cluster:monitor" | wc -l)
-        local active_shards=$(curl -s "http://$TARGET_HOST:9200/_cat/shards?h=state" 2>/dev/null | grep -v "STARTED" | wc -l)
-        
-        if [[ $pending_tasks -eq 0 && $active_shards -eq 0 ]]; then
-            log "Cluster is idle (no pending tasks or relocating shards)"
-            return 0
-        fi
-        
-        log "Waiting for cluster idle: $pending_tasks tasks, $active_shards non-started shards (attempt $attempt/$max_attempts)"
-        sleep 5
-        ((attempt++))
-    done
-    
-    log "WARNING: Cluster may not be fully idle, but continuing"
-    return 0
-}
-
-recover_cluster() {
-    log "Attempting cluster recovery..."
-    
-    # Force delete all indices to clear unassigned shards
-    safe_delete_indices
-    
-    # Wait for cluster to stabilize
-    sleep 10
-    
-    # Check if recovery worked
-    if detect_cluster_issues; then
-        log "Cluster recovery successful"
-        return 0
-    else
-        log "Cluster recovery failed"
-        return 1
-    fi
-}
-
-wait_for_cluster_with_timeout() {
-    local max_attempts=10
-    local attempt=1
-    
-    log "Waiting for cluster health with timeout..."
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        local health_response=$(curl -s --connect-timeout 10 "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null)
-        
-        if [[ -n "$health_response" ]]; then
-            # Check for cluster manager election failure
-            if echo "$health_response" | grep -q "cluster_master_not_discovered_exception"; then
-                log "Detected cluster manager election failure - attempting recovery"
-                if recover_cluster_from_split_brain; then
-                    continue  # Retry health check after recovery
-                else
-                    log "Cluster recovery failed, but continuing"
-                    return 1
-                fi
-            fi
-            
-            local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null)
-            local nodes=$(echo "$health_response" | jq -r '.number_of_nodes // 0' 2>/dev/null)
-            local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null)
-            
-            log "Cluster check: status=$status, nodes=$nodes, unassigned=$unassigned (attempt $attempt/$max_attempts)"
-            
-            if [[ "$status" == "green" || "$status" == "yellow" ]] && [[ $unassigned -eq 0 ]]; then
-                log "Cluster is healthy"
-                return 0
-            fi
-            
-            if [[ "$status" == "red" && $unassigned -gt 0 ]]; then
-                log "Red cluster with unassigned shards - attempting recovery"
-                curl -s -X DELETE "http://$TARGET_HOST:9200/${WORKLOAD_NAME}*" > /dev/null 2>&1 || true
-                sleep 5
-            fi
-        else
-            log "No cluster response (attempt $attempt/$max_attempts)"
-        fi
-        
-        sleep 15
-        ((attempt++))
-    done
-    
-    log "Cluster health check timed out after $max_attempts attempts"
-    return 1
-}
-
-save_checkpoint() {
-    cat > "$CHECKPOINT_FILE" << EOF
-CURRENT_CLIENTS=$1
-CURRENT_REP=$2
-EOF
-}
-
-verify_cluster() {
-    log "Verifying cluster is active..."
-    
-    # Basic cluster verification without configuration changes
-    log "Verifying cluster is ready for benchmarking..."
-    
-    # Wait for cluster health
-    log "Waiting for cluster health with timeout..."
-    local attempt=1
-    local max_attempts=10
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        local health_response
-        health_response=$(timeout 10 curl -s "http://$TARGET_HOST:9200/_cluster/health" 2>/dev/null || echo "")
-        
-        if [[ -n "$health_response" ]]; then
-            local status=$(echo "$health_response" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown")
-            local nodes=$(echo "$health_response" | jq -r '.number_of_nodes // 0' 2>/dev/null || echo "0")
-            local unassigned=$(echo "$health_response" | jq -r '.unassigned_shards // 0' 2>/dev/null || echo "0")
-            
-            log "Cluster check: status=$status, nodes=$nodes, unassigned=$unassigned (attempt $attempt/$max_attempts)"
-            
-            if [[ "$status" == "green" ]]; then
-                log "Cluster is healthy"
-                return 0
-            fi
-        fi
-        
-        sleep 3
-        ((attempt++))
-    done
-    
-    log "WARNING: Cluster health check timed out"
-    return 1
-}
-
-verify_cluster_active() {
-    log "Verifying cluster is ready for benchmarking..."
-    
-    # Use the timeout-based health check
-    if wait_for_cluster_with_timeout; then
-        log "Cluster verification successful"
-        return 0
-    else
-        log "WARNING: Cluster verification failed, but continuing with benchmark attempt"
-        return 0  # Don't fail - let the benchmark attempt proceed
-    fi
+    echo "[$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")] $*"
 }
 
 run_benchmark() {
-    set +e  # Disable exit on error for debugging
     local clients=$1
     local rep=$2
     
     local test_name="${clients}_${rep}"
-    local osb_output="$RESULTS_DIR/${test_name}.json"
     
     log "Starting benchmark: $test_name"
     
-    # Verify cluster is healthy before benchmark
-    if ! detect_cluster_issues; then
-        log "Cluster issues detected before benchmark - attempting recovery"
-        if ! recover_cluster; then
-            log "ERROR: Cannot recover cluster before benchmark"
-            set -e
-            return 1
-        fi
+    # Prepare cluster before OSB execution
+    log "Preparing cluster for benchmark..."
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop_all; then
+        log "Failed to drop all data"
+        return 1
     fi
     
-    # Run OSB
-    log "Executing OSB for $test_name..."
+    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
+        log "Failed to drop indices"
+        return 1
+    fi
     
     # Generate OSB command using dual_installer.sh
     local osb_cmd_args="--workload $WORKLOAD_NAME --clients $clients"
@@ -497,41 +130,16 @@ run_benchmark() {
         return 0
     fi
     
-    # Prepare cluster before OSB execution
-    log "Preparing cluster for benchmark..."
-    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop_all; then
-        log "Failed to drop all data"
-        return 1
-    fi
-    
-    if ! IP="$TARGET_HOST" ./install/dual_installer.sh drop; then
-        log "Failed to drop indices"
-        return 1
-    fi
-    
-    # Create index from template and wait for shards to be active
-    log "Creating nyc_taxis index with $shards shards..."
+    # Create nyc_taxis index
+    log "Creating nyc_taxis index..."
     if ! ssh "$TARGET_HOST" "curl -X PUT 'localhost:9200/nyc_taxis' -H 'Content-Type: application/json' >/dev/null 2>&1"; then
         log "Failed to create nyc_taxis index"
         return 1
     fi
     
-    # Only wait for shards if a specific shard count was specified
-    if [[ -n "$shards" ]]; then
-        log "Waiting for all $shards primary shards to be active..."
-        for attempt in {1..30}; do
-            active_primary_shards=$(ssh "$TARGET_HOST" "curl -s 'localhost:9200/_cat/shards/nyc_taxis?h=prirep,state' 2>/dev/null | grep -c '^p.*STARTED' || echo 0")
-            if [[ "$active_primary_shards" -eq "$shards" ]]; then
-                log "All $shards primary shards are active"
-                break
-            fi
-            log "Waiting for primary shards... ($active_primary_shards/$shards active, attempt $attempt/30)"
-            sleep 2
-        done
-    else
-        log "No specific shard count specified, skipping shard validation"
-        sleep 2  # Brief wait for index to be ready
-    fi
+    # Skip shard validation since we removed shard parameters
+    log "No specific shard count specified, skipping shard validation"
+    sleep 2  # Brief wait for index to be ready
     
     log "Starting OSB execution..."
     log ""
@@ -539,30 +147,11 @@ run_benchmark() {
     log ""
     if ! bash -c "$osb_cmd"; then
         log "OSB execution failed for $test_name"
-        log "Continuing despite OSB failure..."
-        set -e  # Re-enable exit on error
         return 1
     fi
     
     log "OSB execution completed for $test_name"
-    
-    # Copy JSON results from OSB data directory (find latest test run)
-    # Copy JSON results from OSB data directory (find latest test run)
-    local latest_test_run=$(ls -t "$HOME/.benchmark/benchmarks/test-runs/" | head -1)
-    if [[ -n "$latest_test_run" ]]; then
-        local osb_json_file="$HOME/.benchmark/benchmarks/test-runs/$latest_test_run/test_run.json"
-        if [[ -f "$osb_json_file" ]]; then
-            cp "$osb_json_file" "$osb_output"
-            log "Copied OSB JSON results to $osb_output"
-        else
-            log "Warning: OSB JSON results file not found: $osb_json_file"
-        fi
-    else
-        log "Warning: No test runs found in OSB directory"
-    fi
-    
-    log "Completed benchmark: $test_name"
-    set -e  # Re-enable exit on error
+    return 0
 }
 
 main() {
@@ -581,125 +170,32 @@ main() {
     
     log "Starting OpenSearch performance test suite"
     
-    # Calculate total configurations and runs
-    local total_configs=$((${#CLIENT_LOADS[@]} * ${#COMBINED_CONFIGS[@]}))
-    local total_runs=$((total_configs * REPETITIONS))
-    log "Total configurations: $total_configs, Total runs: $total_runs"
+    # Calculate total runs
+    local total_runs=$((${#CLIENT_LOADS[@]} * REPETITIONS))
+    log "Total runs: $total_runs"
     log "CLIENT_LOADS: ${CLIENT_LOADS[*]}"
-    log "COMBINED_CONFIGS: ${COMBINED_CONFIGS[*]}"
-    log "Optimized execution order: cluster will be reconfigured only ${#COMBINED_CONFIGS[@]} times instead of $total_configs times"
 
-    load_checkpoint
-    
     local completed_runs=0
-    local found_resume_point=false
     
-    # OPTIMIZED LOOP ORDER: node/shard configs outer, client loads inner
-    # This reduces cluster reconfigurations from 25 to 5
-    for config in "${COMBINED_CONFIGS[@]}"; do
-        IFS=':' read -r nodes shards <<< "$config"
+    # Simple loop without checkpoint logic
+    for clients in "${CLIENT_LOADS[@]}"; do
+        for rep in $(seq 1 $REPETITIONS); do
+            log "Processing repetition $rep for $clients clients"
+            log "Running benchmark: $clients,$rep"
 
-        # Skip entire node configurations that are already complete
-        if [[ $nodes -lt $CURRENT_NODES ]]; then
-            log "Skipping completed node config: $nodes nodes"
-            completed_runs=$((completed_runs + ${#CLIENT_LOADS[@]} * REPETITIONS))
-            continue
-        elif [[ $nodes -eq $CURRENT_NODES ]]; then
-            # For current node config, check if we're completely done with all client loads
-            # We're done if current_clients is the last client load AND current_rep equals REPETITIONS
-            local last_client_load=${CLIENT_LOADS[-1]}
-            log "DEBUG: nodes=$nodes, CURRENT_NODES=$CURRENT_NODES, CURRENT_CLIENTS=$CURRENT_CLIENTS, last_client_load=$last_client_load, CURRENT_REP=$CURRENT_REP, REPETITIONS=$REPETITIONS"
-            if [[ $CURRENT_CLIENTS -eq $last_client_load && $CURRENT_REP -eq $REPETITIONS ]]; then
-                log "Skipping completed node config: $nodes nodes (all client loads done)"
-                completed_runs=$((completed_runs + ${#CLIENT_LOADS[@]} * REPETITIONS))
-                continue
-            fi
-        fi
-
-        # Verify cluster is ready (no configuration changes)
-        log "Verifying cluster is ready for benchmarking"
-        verify_cluster
-        log "Cluster verified, starting benchmark runs for all client loads..."
-        
-        # Force recovery if cluster has issues after configuration
-        if ! detect_cluster_issues; then
-            log "Cluster issues detected after configuration - forcing recovery"
-            recover_cluster
-        fi
-        
-        log "Verifying cluster is active..."
-        verify_cluster_active
-        log "Cluster verified, starting benchmark runs for all client loads..."
-
-        for clients in "${CLIENT_LOADS[@]}"; do
-            # If we haven't found our resume point yet, check if this is it
-            if [[ $found_resume_point == false ]]; then
-                # Check if we should resume from this configuration
-                if [[ $nodes -gt $CURRENT_NODES ]]; then
-                    # Next node config - this is our resume point
-                    found_resume_point=true
-                    log "Found resume point: $nodes nodes, $clients clients (next node config)"
-                elif [[ $nodes -eq $CURRENT_NODES && $clients -gt $CURRENT_CLIENTS ]]; then
-                    # Same node config, next client load
-                    found_resume_point=true
-                    log "Found resume point: $nodes nodes, $clients clients (next client load)"
-                elif [[ $nodes -eq $CURRENT_NODES && $clients -eq $CURRENT_CLIENTS ]]; then
-                    # Same config - check if we need to resume mid-repetitions
-                    if [[ $CURRENT_REP -lt $REPETITIONS ]]; then
-                        found_resume_point=true
-                        log "Resuming within same config: $nodes nodes, $clients clients (rep $((CURRENT_REP + 1)))"
-                    else
-                        # All repetitions complete for this config, skip it
-                        log "Skipping completed config: $nodes nodes, $clients clients (all $REPETITIONS reps done)"
-                        completed_runs=$((completed_runs + REPETITIONS))
-                        continue
-                    fi
-                elif [[ $nodes -eq $CURRENT_NODES && $clients -lt $CURRENT_CLIENTS ]]; then
-                    # Earlier client load in same node config - skip it
-                    log "Skipping earlier client load: $nodes nodes, $clients clients"
-                    completed_runs=$((completed_runs + REPETITIONS))
-                    continue
-                else
-                    # Skip this entire configuration - it's already completed
-                    log "Skipping completed config: $nodes nodes, $clients clients"
-                    completed_runs=$((completed_runs + REPETITIONS))
-                    continue
-                fi
+            if run_benchmark "$clients" "$rep"; then
+                log "run_benchmark completed successfully"
+            else
+                log "run_benchmark failed, but continuing..."
             fi
             
-            for rep in $(seq 1 $REPETITIONS); do
-                log "Processing repetition $rep for $clients clients"
-
-                # Skip completed repetitions in current config
-                if [[ $clients -eq $CURRENT_CLIENTS && $rep -le $CURRENT_REP ]]; then
-                    log "Skipping completed repetition: $clients,$rep (completed up to $CURRENT_REP)"
-                    completed_runs=$((completed_runs + 1))
-                    continue
-                fi
-                
-                log "Running new benchmark: $clients,$rep"
-
-                if run_benchmark "$clients" "$rep"; then
-                    log "run_benchmark completed successfully"
-                    save_checkpoint "$clients" "$rep"
-                    
-                    # Ensure cluster is idle before next run
-                    ensure_cluster_idle
-                else
-                    log "run_benchmark failed, but continuing..."
-                fi
-                
-                completed_runs=$((completed_runs + 1))
-                
-                log "Progress: $completed_runs/$total_runs runs completed"
-            done
+            completed_runs=$((completed_runs + 1))
+            log "Progress: $completed_runs/$total_runs runs completed"
         done
     done
     
-    rm -f "$CHECKPOINT_FILE"
     log "Performance test suite completed successfully"
 }
 
 # Execute main function
 main
-
