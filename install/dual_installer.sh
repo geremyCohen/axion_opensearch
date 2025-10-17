@@ -239,12 +239,31 @@ WantedBy=multi-user.target
 EOF
 }
 
-# Set JVM heap for a specific node directory
+# Set JVM heap and GC options for a specific node directory
 set_heap_for_node() {
     local node_index="$1"
     local heap_mb="$2"
-    sed -i "s/-Xms.*/-Xms${heap_mb}m/" "/opt/opensearch-node${node_index}/config/jvm.options"
-    sed -i "s/-Xmx.*/-Xmx${heap_mb}m/" "/opt/opensearch-node${node_index}/config/jvm.options"
+    local heap_gb=$((heap_mb / 1024))
+    local jvm_file="/opt/opensearch-node${node_index}/config/jvm.options"
+    
+    # Set heap size (Xms = Xmx)
+    sed -i "s/-Xms.*/-Xms${heap_gb}g/" "$jvm_file"
+    sed -i "s/-Xmx.*/-Xmx${heap_gb}g/" "$jvm_file"
+    
+    # Update G1GC settings
+    sed -i "s/-XX:G1ReservePercent=.*/-XX:G1ReservePercent=15/" "$jvm_file"
+    
+    # Ensure required JVM options are present
+    if ! grep -q "ExitOnOutOfMemoryError" "$jvm_file"; then
+        echo "-XX:+ExitOnOutOfMemoryError" >> "$jvm_file"
+    fi
+    
+    # Update GC log path to /var/log/opensearch/
+    sed -i "s|logs/gc.log|/var/log/opensearch/gc.log|g" "$jvm_file"
+    
+    # Create log directory
+    mkdir -p "/var/log/opensearch"
+    chown opensearch:opensearch "/var/log/opensearch"
 }
 
 # Wait helpers (same semantics, clearer call sites)
