@@ -5,6 +5,57 @@ TIMESTAMP="nyc_taxi_1015_index_0"
 CLIENT_LOADS=(60)
 REPETITIONS=4
 
+# Auto-detect instance type and page size
+detect_instance_type() {
+    local cpu_count=$(nproc)
+    local mem_gb=$(free -g | awk '/^Mem:/ {print $2}')
+    
+    # Common GCP instance patterns
+    if [[ $cpu_count -eq 16 && $mem_gb -ge 60 ]]; then
+        if uname -m | grep -q aarch64; then
+            echo "c4a-standard-16"
+        else
+            echo "c4-standard-16"
+        fi
+    elif [[ $cpu_count -eq 8 && $mem_gb -ge 30 ]]; then
+        if uname -m | grep -q aarch64; then
+            echo "c4a-standard-8"
+        else
+            echo "c4-standard-8"
+        fi
+    else
+        echo "unknown-${cpu_count}cpu-${mem_gb}gb"
+    fi
+}
+
+detect_page_size() {
+    if [[ -n "${TARGET_HOST:-}" ]]; then
+        ssh "$TARGET_HOST" "getconf PAGESIZE"
+    else
+        getconf PAGESIZE
+    fi
+}
+
+format_page_size() {
+    local size="$1"
+    if [[ $size -eq 4096 ]]; then
+        echo "4k"
+    elif [[ $size -eq 65536 ]]; then
+        echo "64k"
+    else
+        echo "$size"
+    fi
+}
+
+format_instance_type() {
+    local instance="$1"
+    # Drop the middle portion (e.g., c4a-standard-16 -> c4a-16)
+    echo "$instance" | sed 's/-[^-]*-/-/'
+}
+
+INSTANCE_TYPE=$(format_instance_type "$(detect_instance_type)")
+PAGE_SIZE=$(format_page_size "$(detect_page_size)")
+
 set -euo pipefail
 
 # Initialize parameters
@@ -23,12 +74,15 @@ usage() {
     echo "  --include-tasks <list> Tasks to include in OSB benchmark (e.g., index, search)"
     echo "  --clients <count>      Client count (default: 60)"
     echo "  --repetitions <num>    Number of repetitions per config (default: 4)"
+    echo "  --timestamp <name>     Results folder timestamp (default: $TIMESTAMP)"
+    echo "  --instance-type <type> Instance type (default: auto-detected as $INSTANCE_TYPE)"
+    echo "  --page-size <size>     Page size (default: $PAGE_SIZE)"
     echo "  --dry-run              Show commands without executing them"
     echo ""
     echo "Examples:"
     echo "  $0 --workload nyc_taxis"
     echo "  $0 --workload nyc_taxis --include-tasks index"
-    echo "  $0 --workload nyc_taxis --clients 60"
+    echo "  $0 --workload nyc_taxis --clients 60 --timestamp my_test_run"
     exit 1
 }
 
@@ -49,6 +103,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --repetitions)
             REPETITIONS="$2"
+            shift 2
+            ;;
+        --timestamp)
+            TIMESTAMP="$2"
+            shift 2
+            ;;
+        --instance-type)
+            INSTANCE_TYPE="$2"
+            shift 2
+            ;;
+        --page-size)
+            PAGE_SIZE="$2"
             shift 2
             ;;
         --dry-run)
@@ -95,9 +161,18 @@ run_benchmark() {
     local clients=$1
     local rep=$2
     
+    # Get cluster info for folder structure
+    local node_count=$(IP="$TARGET_HOST" ./install/dual_installer.sh read | grep "Nodes:" | awk '{print $2}')
+    local shard_count=$(IP="$TARGET_HOST" ./install/dual_installer.sh read | grep "shards:" | awk '{print $3}')
+    
+    # Create detailed folder structure: TIMESTAMP/INSTANCE_TYPE/PAGE_SIZE/WORKLOAD_NAME/
+    local results_dir="results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE/$WORKLOAD_NAME"
+    local result_file="$results_dir/${clients}_${node_count}_${shard_count}_${rep}.json"
+    
     local test_name="${clients}_${rep}"
     
     log "Starting benchmark: $test_name"
+    log "Results will be saved to: $result_file"
     
     # Prepare cluster before OSB execution
     log "Preparing cluster for benchmark..."
@@ -141,9 +216,25 @@ run_benchmark() {
     log ""
     log "$osb_cmd"
     log ""
+    
+    # Create results directory
+    mkdir -p "$results_dir"
+    
+    # Execute OSB command
     if ! bash -c "$osb_cmd"; then
         log "OSB execution failed for $test_name"
         return 1
+    fi
+    
+    # Find and copy the OSB JSON result file
+    local osb_json_file=$(find ~/.benchmark/benchmarks/test-runs -name "test_run.json" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
+    
+    if [[ -f "$osb_json_file" ]]; then
+        cp "$osb_json_file" "$result_file"
+        log "Results copied to: $result_file"
+    else
+        log "Warning: OSB JSON result file not found in test-runs"
+        touch "$result_file"  # Create empty file to maintain structure
     fi
     
     log "OSB execution completed for $test_name"
@@ -165,6 +256,7 @@ main() {
     fi
     
     log "Starting OpenSearch performance test suite"
+    log "Results structure: results/optimizations/$TIMESTAMP/$INSTANCE_TYPE/$PAGE_SIZE/$WORKLOAD_NAME/"
     
     # Calculate total runs
     local total_runs=$((${#CLIENT_LOADS[@]} * REPETITIONS))
