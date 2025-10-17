@@ -278,8 +278,8 @@ build_target_hosts() {
 # Template update as a function so create/update share it
 put_nyc_taxis_template() {
     local shards="$1"
-    curl -X PUT 'localhost:9200/_index_template/nyc_taxis_template' \
-         -H 'Content-Type: application/json' \
+    curl -X PUT "localhost:9200/_index_template/nyc_taxis_template" \
+         -H "Content-Type: application/json" \
          -d "{
             \"index_patterns\": [\"nyc_taxis*\"],
             \"template\": {
@@ -385,9 +385,21 @@ opensearch hard memlock unlimited
 EOF
 
     # Download and install OpenSearch
-    log "Downloading OpenSearch $OPENSEARCH_VERSION..."
-    remote_exec "cd /tmp && curl -L -o opensearch.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/$OPENSEARCH_VERSION/opensearch-$OPENSEARCH_VERSION-linux-x64.tar.gz"
-    remote_exec "cd /opt && tar -xzf /tmp/opensearch.tar.gz && mv opensearch-$OPENSEARCH_VERSION opensearch"
+    remote_exec "bash -c '
+      set -euo pipefail
+      if [ -d /opt/opensearch ]; then
+        echo \"[install] Found existing /opt/opensearch — reusing it (no overwrite)\"
+      else
+        echo \"[install] Downloading OpenSearch $OPENSEARCH_VERSION...\"
+        cd /tmp
+        curl -L -o opensearch.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/$OPENSEARCH_VERSION/opensearch-$OPENSEARCH_VERSION-linux-x64.tar.gz
+        echo \"[install] Extracting to /opt...\"
+        cd /opt
+        tar -xzf /tmp/opensearch.tar.gz
+        mv \"opensearch-$OPENSEARCH_VERSION\" opensearch
+        rm -f /tmp/opensearch.tar.gz
+      fi
+    '"
 
     # Create node directories and configs
     for i in $(seq 1 "$nodes"); do
