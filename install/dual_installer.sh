@@ -397,14 +397,14 @@ EOF
         remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
 
         # Create basic config
-        remote_exec "bash -c 'render_opensearch_yml $i $nodes'"
+        remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $nodes'"
 
         # Set heap size
         local heap_size=$(calculate_heap_size "$heap" "$nodes")
-        remote_exec "bash -c 'set_heap_for_node $i $heap_size'"
+        remote_exec "bash -c '$(declare -f set_heap_for_node); set_heap_for_node $i $heap_size'"
 
         # Create systemd service
-        remote_exec "bash -c 'create_systemd_service $i'"
+        remote_exec "bash -c 'JAVA_HOME_PATH=\"$JAVA_HOME_PATH\"; $(declare -f create_systemd_service); create_systemd_service $i'"
     done
 
     # Start services
@@ -420,7 +420,7 @@ EOF
 
     # Create index template
     log "Creating index template with $shards shards..."
-    remote_exec "bash -c 'put_nyc_taxis_template $shards'"
+    remote_exec "bash -c '$(declare -f put_nyc_taxis_template); put_nyc_taxis_template $shards'"
 
     log "✅ Created $nodes-node cluster with $shards shards, ${heap}% heap"
 }
@@ -441,7 +441,7 @@ update_cluster() {
 
         # Update heap settings
         for i in $(seq 1 "$current_nodes"); do
-            remote_exec "bash -c 'set_heap_for_node $i $heap_size'"
+            remote_exec "bash -c '$(declare -f set_heap_for_node); set_heap_for_node $i $heap_size'"
         done
 
         # Start all services
@@ -467,13 +467,13 @@ update_cluster() {
                 remote_exec "chown -R opensearch:opensearch /opt/opensearch-node$i"
 
                 # Create config
-                remote_exec "bash -c 'render_opensearch_yml $i $NODES'"
+                remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $NODES'"
 
                 # Set default 8GB heap for new nodes
-                remote_exec "bash -c 'set_heap_for_node $i 8192'"
+                remote_exec "bash -c '$(declare -f set_heap_for_node); set_heap_for_node $i 8192'"
 
                 # Create service
-                remote_exec "bash -c 'create_systemd_service $i'"
+                remote_exec "bash -c 'JAVA_HOME_PATH=\"$JAVA_HOME_PATH\"; $(declare -f create_systemd_service); create_systemd_service $i'"
 
                 remote_exec "systemctl daemon-reload"
                 remote_exec "systemctl enable opensearch-node$i && systemctl start opensearch-node$i"
@@ -485,7 +485,7 @@ update_cluster() {
             # First, update remaining nodes' configurations before removing nodes
             log "Updating remaining nodes' configurations..."
             for i in $(seq 1 "$NODES"); do
-                remote_exec "bash -c 'render_opensearch_yml $i $NODES'"
+                remote_exec "bash -c '$(declare -f build_seed_hosts); $(declare -f build_cluster_manager_nodes); $(declare -f render_opensearch_yml); render_opensearch_yml $i $NODES'"
             done
 
             # Then remove the excess nodes
@@ -526,7 +526,7 @@ update_cluster() {
         # Start async operations
         log "Starting async shard operations..."
         remote_exec "curl -X DELETE 'localhost:9200/nyc_taxis*' >/dev/null 2>&1 &"
-        remote_exec "put_nyc_taxis_template '$SHARDS'" >/dev/null 2>&1 &
+        remote_exec "bash -c '$(declare -f put_nyc_taxis_template); put_nyc_taxis_template $SHARDS'" >/dev/null 2>&1 &
 
         # Monitor with memory checks every 1s
         log "Monitoring template update with memory checks..."
