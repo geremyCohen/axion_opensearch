@@ -90,7 +90,7 @@ if [[ "$FINAL" == "true" ]]; then
   mkdir -p "$RESULTS_DIR"
   echo "[final] Running $FINAL_REPS repetitions with bulk_indexing_clients=$FINAL_CLIENTS" >&2
 
-  # Helper: count docs
+  # Helper: count docs (sanity only)
   docs_count() {
     curl -s "$HOST/nyc_taxis/_count" | jq -r '.count // 0' 2>/dev/null
   }
@@ -101,6 +101,7 @@ if [[ "$FINAL" == "true" ]]; then
     # Reset index cleanly (no mid-run changes)
     echo "[prep] reset nyc_taxis index" >&2
     curl -s -X DELETE "$HOST/nyc_taxis" >/dev/null || true
+
     # Ensure template exists so any re-creations inherit desired settings
     curl -s -X PUT "$HOST/_index_template/nyc_taxis_template" \
       -H 'Content-Type: application/json' -d '{
@@ -112,7 +113,8 @@ if [[ "$FINAL" == "true" ]]; then
             "refresh_interval": "30s"
           }
         }
-      }' >/dev/null
+      }' >/dev/null || true
+
     # Create index with explicit settings for this run
     curl -s -X PUT "$HOST/nyc_taxis" -H 'Content-Type: application/json' -d '{
       "settings": {
@@ -120,9 +122,9 @@ if [[ "$FINAL" == "true" ]]; then
         "number_of_replicas": 0,
         "refresh_interval": "30s"
       }
-    }' >/dev/null
+    }' >/dev/null || true
 
-    # Build and run OSB (full run, no timeout)
+    # Build and run OSB (full run)
     OSB_CMD=(opensearch-benchmark run
       --workload-path="$WORKLOAD_PATH"
       --target-hosts="${HOST#http://}"
@@ -132,23 +134,32 @@ if [[ "$FINAL" == "true" ]]; then
       --workload-params="index_warmup_time_period:5,update_warmup_time_period:5,warmup_iterations:${WARMUP_ITER},bulk_indexing_clients:${FINAL_CLIENTS},bulk_size:${BULK_SIZE}"
     )
     echo "[cmd] ${OSB_CMD[*]}" >&2
-    "${OSB_CMD[@]}" 2>&1 | tee /dev/stderr || true
 
-    # Locate latest test run and copy JSON
+    # Protect loop from non-zero exit (e.g., transient driver errors)
+    if ! "${OSB_CMD[@]}" 2>&1 | tee /dev/stderr; then
+      echo "[final][warn] OSB returned non-zero for rep $rep; continuing" >&2
+    fi
+
+    # Locate latest test run and copy JSON (guarded to avoid set -e aborts)
     BASE_DIR="$HOME/.benchmark/benchmarks/test-runs"
     if [[ -d "$BASE_DIR" ]]; then
-      LAST_TEST_RUN=$(ls -1t "$BASE_DIR" | head -1)
+      LAST_TEST_RUN="$(ls -1t "$BASE_DIR" | head -1 || true)"
+      echo "LAST_TEST_RUN=${LAST_TEST_RUN}" >&2
       SRC_JSON="$BASE_DIR/$LAST_TEST_RUN/test_run.json"
       DEST_JSON="$RESULTS_DIR/test_run_${rep}.json"
-      if [[ -f "$SRC_JSON" ]]; then
-        cp -f "$SRC_JSON" "$DEST_JSON"
-        echo "[final] copied $SRC_JSON -> $DEST_JSON" >&2
+      if [[ -n "$LAST_TEST_RUN" && -f "$SRC_JSON" ]]; then
+        if cp -f "$SRC_JSON" "$DEST_JSON"; then
+          echo "[final] copied $SRC_JSON -> $DEST_JSON" >&2
+        else
+          echo "[final][warn] failed to copy $SRC_JSON to $DEST_JSON" >&2
+        fi
       else
-        echo "[final][warn] test_run.json not found under $BASE_DIR/$LAST_TEST_RUN" >&2
+        echo "[final][warn] test_run.json not found (BASE_DIR=$BASE_DIR LAST=$LAST_TEST_RUN)" >&2
       fi
     else
       echo "[final][warn] $BASE_DIR not found; no results copied" >&2
     fi
+
   done
 
   echo "[final] Completed $FINAL_REPS repetitions. Results in $RESULTS_DIR" >&2
