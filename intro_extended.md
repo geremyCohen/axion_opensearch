@@ -158,7 +158,7 @@ To choose `bulk_indexing_clients` fairly for both Intel and Arm, we ran an autom
 2. Sweep client counts (e.g., `8,12,16,20,24,32,40,48`) with ingest-only runs.
 3. For each trial, collect:
    - Ingest throughput (docs/s),
-   - Tail latency (p99) if available,
+   - Tail latency (p90) if available,
    - Threadpool rejections (`write`/`bulk`),
    - CPU utilization (user/sys) and **iowait** via `mpstat`.
 4. Compute the knee:
@@ -262,10 +262,10 @@ The first repetition (rep_1) for each platform is treated as a warmup and exclud
 
 ### 18.1 Result Summary
 
-| Architecture | Reps Used | Mean Throughput (docs/s) | Median Latency (ms) | 99th % Latency (ms) | Young GC Time (ms) | Total Store Size (GB) |
+| Architecture | Reps Used | Mean Throughput (docs/s) | Median Latency (ms) | 90th % Latency (ms) | ~546 | ~693 | **0.79×** |
 |--------------|------------|---------------------------|----------------------|----------------------|---------------------|------------------------|
-| **Arm (Neoverse-V2, c4a-standard-16)** | 2–4 | **374 000** | ~485 | ~2 570 | ~8 500 | ~53.2 |
-| **Intel (Sapphire Rapids, c4-standard-16)** | 2–4 | **281 000** | ~495 | ~2 650 | ~8 600 | ~52.0 |
+| **Arm (Neoverse-V2, c4a-standard-16)** | 2–4 | **374 000** | ~546 | ~8 500 | ~53.2 |
+| **Intel (Sapphire Rapids, c4-standard-16)** | 2–4 | **281 000** | ~693 | ~8 600 | ~52.0 |
 
 **Observations:**
 - Arm consistently delivered **≈ 1.33 × higher mean throughput** (374 K vs 281 K docs/s), matching the knee-test trend (1.3–1.4 × range).
@@ -280,7 +280,7 @@ The first repetition (rep_1) for each platform is treated as a warmup and exclud
 | Metric | Arm (Neoverse-V2) | Intel (Sapphire Rapids) | Ratio (Arm ÷ Intel) |
 |---------|------------------|--------------------------|---------------------|
 | Mean Throughput (docs/s) | 374 K | 281 K | **1.33 ×** |
-| 99th % Latency (ms) | ~2 575 | ~2 650 | ≈ 1.03 × faster |
+| 90th % Latency (ms) | ~546 | ~693 | **0.79×** |
 | Store Size (GB) | 53 | 52 | ≈ 1.0 × |
 | GC Time (ms) | 8 500 | 8 600 | ≈ 1.0 × |
 | Error Rate | 0 | 0 | – |
