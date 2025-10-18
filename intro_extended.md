@@ -249,3 +249,44 @@ Based on the confirmed knee points and quality gates, the final configuration fo
 - The shared `bulk_indexing_clients=16` provides ≥97% of peak throughput for both, ensuring fair, saturating conditions for all subsequent benchmarks.
 
 
+
+
+## 18. Benchmark Results (16-Client Formal Runs)
+
+The 16-client formal benchmark runs were executed four times per architecture using the finalized configuration:
+- 6 primary shards / 0 replicas / 30s refresh interval.
+- bulk_indexing_clients=16, bulk_size=10,000.
+- Each run indexed the full `nyc_taxis` dataset.
+
+The first repetition (rep_1) for each platform is treated as a warmup and excluded from averages.
+
+### 18.1 Result Summary
+
+| Architecture | Reps Used | Mean Throughput (docs/s) | Median Latency (ms) | 99th % Latency (ms) | Young GC Time (ms) | Total Store Size (GB) |
+|--------------|------------|---------------------------|----------------------|----------------------|---------------------|------------------------|
+| **Arm (Neoverse-V2, c4a-standard-16)** | 2–4 | **374 000** | ~485 | ~2 570 | ~8 500 | ~53.2 |
+| **Intel (Sapphire Rapids, c4-standard-16)** | 2–4 | **281 000** | ~495 | ~2 650 | ~8 600 | ~52.0 |
+
+**Observations:**
+- Arm consistently delivered **≈ 1.33 × higher mean throughput** (374 K vs 281 K docs/s), matching the knee-test trend (1.3–1.4 × range).
+- Both architectures showed < 2 % run-to-run variance, demonstrating stable indexing performance.
+- **GC Activity:** Both ran the G1 collector efficiently with minimal pause time; Arm’s young-GC time slightly lower overall.
+- **Resource Balance:** CPU and I/O wait behavior mirrored the sweep runs — Arm ~84 % CPU / 6 – 7 % iowait; Intel ~89 % CPU / 2 – 3 % iowait.
+- **Efficiency:** Arm achieved roughly **1.4 × greater throughput per % CPU**, reinforcing the earlier knee-curve analysis.
+- **Data Integrity:** No errors or rejected operations recorded in any repetition.
+
+### 18.2 Cross-Architecture Summary
+
+| Metric | Arm (Neoverse-V2) | Intel (Sapphire Rapids) | Ratio (Arm ÷ Intel) |
+|---------|------------------|--------------------------|---------------------|
+| Mean Throughput (docs/s) | 374 K | 281 K | **1.33 ×** |
+| 99th % Latency (ms) | ~2 575 | ~2 650 | ≈ 1.03 × faster |
+| Store Size (GB) | 53 | 52 | ≈ 1.0 × |
+| GC Time (ms) | 8 500 | 8 600 | ≈ 1.0 × |
+| Error Rate | 0 | 0 | – |
+
+**Conclusion:** The formal 16-client results confirm the earlier sweeps:
+- Arm sustains roughly **30 – 35 % higher indexing throughput** at similar resource utilization.
+- Both platforms exhibit identical stability and near-equal latency distribution.
+
+A forthcoming section will incorporate **Arm (64 KB page-size)** data for comparison once testing completes.
